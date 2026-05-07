@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import sys
 
 from pydantic import BaseModel
 
@@ -10,8 +12,14 @@ from llm_compat import LLMClient, SyncLLMClient, validate_config
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-BASE_URL = "REDACTED"
-API_KEY = "REDACTED"
+BASE_URL = os.environ.get("LLM_BASE_URL", "")
+API_KEY = os.environ.get("LLM_API_KEY", "")
+
+if not BASE_URL or not API_KEY:
+    print("请设置环境变量 LLM_BASE_URL 和 LLM_API_KEY")
+    print("  export LLM_BASE_URL=http://your-api/v1")
+    print("  export LLM_API_KEY=sk-xxx")
+    sys.exit(1)
 
 MODELS = ["deepseek-v4-flash", "gpt-4.1-mini", "gemini-3.1-flash-lite-preview"]
 
