@@ -19,6 +19,10 @@ _DEFAULT_PROVIDER_PATTERNS: tuple[tuple[str, str], ...] = (
     ("gpt-5.*", "openai_gpt5"),
     ("gpt-4*", "openai_gpt4"),
     ("gpt-*", "openai"),
+    # Doubao（doubao-seed 系列支持 thinking，普通 doubao 不支持）
+    ("doubao-seed-*", "doubao_seed"),
+    ("doubao-*", "doubao"),
+    # OpenAI o-series
     ("o1*", "openai_o"),
     ("o3*", "openai_o"),
     ("o4*", "openai_o"),
@@ -76,6 +80,18 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "efforts": frozenset({"low", "medium", "high"}),
         "min_effort": "low",
         "max_effort": "high",
+    },
+    "doubao_seed": {
+        "disable_mode": "minimal_fallback",
+        "efforts": frozenset({"minimal", "low", "medium", "high"}),
+        "min_effort": "minimal",
+        "max_effort": "high",
+    },
+    "doubao": {
+        "disable_mode": "na",
+        "efforts": frozenset(),
+        "min_effort": None,
+        "max_effort": None,
     },
     "openai": {
         "disable_mode": "na",

@@ -190,6 +190,64 @@ class TestBuildPayloadOpenAIO:
         assert payload["reasoning_effort"] == "high"
 
 
+class TestDetectProviderDoubao:
+    @pytest.mark.parametrize(
+        "model,expected",
+        [
+            ("doubao-seed-1.8", "doubao_seed"),
+            ("doubao-seed-2.0", "doubao_seed"),
+            ("doubao-seed-2-0-pro-260215", "doubao_seed"),
+            ("doubao-seed-2-0-lite-260428", "doubao_seed"),
+            ("doubao-pro-256k", "doubao"),
+            ("doubao-lite-128k", "doubao"),
+            ("doubao-vision-pro-32k", "doubao"),
+        ],
+    )
+    def test_doubao_family_recognition(self, model: str, expected: str) -> None:
+        assert providers.detect_provider(model) == expected
+
+
+class TestBuildPayloadDoubaoSeed:
+    def _base(self, model: str = "doubao-seed-2.0") -> dict:
+        return {"model": model, "messages": [{"role": "user", "content": "hi"}]}
+
+    def test_disabled_uses_minimal(self) -> None:
+        payload = providers.build_request_payload("doubao-seed-2.0", "disabled", self._base())
+        assert payload["reasoning_effort"] == "minimal"
+
+    def test_high_passthrough(self) -> None:
+        payload = providers.build_request_payload("doubao-seed-2.0", "high", self._base())
+        assert payload["reasoning_effort"] == "high"
+
+    def test_minimal_passthrough(self) -> None:
+        payload = providers.build_request_payload("doubao-seed-2.0", "minimal", self._base())
+        assert payload["reasoning_effort"] == "minimal"
+
+    def test_none_sends_no_extra(self) -> None:
+        payload = providers.build_request_payload("doubao-seed-2.0", None, self._base())
+        assert "reasoning_effort" not in payload
+
+    def test_max_clamps_to_high(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            payload = providers.build_request_payload("doubao-seed-2.0", "max", self._base())
+        assert payload["reasoning_effort"] == "high"
+
+
+class TestBuildPayloadDoubao:
+    def _base(self) -> dict:
+        return {"model": "doubao-pro-256k", "messages": []}
+
+    def test_disabled_is_na(self) -> None:
+        payload = providers.build_request_payload("doubao-pro-256k", "disabled", self._base())
+        assert "reasoning_effort" not in payload
+        assert "extra_body" not in payload
+
+    def test_effort_dropped(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            payload = providers.build_request_payload("doubao-pro-256k", "high", self._base())
+        assert "reasoning_effort" not in payload
+
+
 class TestDescribeFromPayload:
     def test_deepseek_disabled(self) -> None:
         payload = {"model": "deepseek-v4-flash", "extra_body": {"thinking": {"type": "disabled"}}}
