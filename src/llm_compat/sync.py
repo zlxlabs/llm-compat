@@ -51,7 +51,6 @@ class SyncLLMClient:
                 base_url=self._base_url,
                 headers={"Authorization": f"Bearer {self._api_key}"},
                 timeout=self._timeout,
-                proxy=None,
             )
         return self._http
 
