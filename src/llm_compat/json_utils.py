@@ -30,9 +30,12 @@ def parse_json(raw: str) -> Any:
 def _find_list_field(model_cls: type[BaseModel]) -> str | None:
     for name, field_info in model_cls.model_fields.items():
         annotation = field_info.annotation
-        if annotation is not None and hasattr(annotation, "__origin__"):
-            if annotation.__origin__ is list:
-                return name
+        if (
+            annotation is not None
+            and hasattr(annotation, "__origin__")
+            and annotation.__origin__ is list
+        ):
+            return name
     return None
 
 

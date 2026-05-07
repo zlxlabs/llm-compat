@@ -1,9 +1,6 @@
 """Tests for llm_compat.retry — smart retry with error classification."""
 from __future__ import annotations
 
-import asyncio
-import time
-
 import httpx
 import pytest
 
@@ -105,7 +102,9 @@ class TestAsyncRetryCall:
             call_count += 1
             if call_count == 1:
                 resp = httpx.Response(429, headers={"Retry-After": "0.01"})
-                raise httpx.HTTPStatusError("429", request=httpx.Request("POST", "http://x"), response=resp)
+                raise httpx.HTTPStatusError(
+                    "429", request=httpx.Request("POST", "http://x"), response=resp,
+                )
             return "ok"
 
         result = await async_retry_call(fn, max_retries=3, base_delay=0.01)

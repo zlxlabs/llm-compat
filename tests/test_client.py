@@ -123,7 +123,10 @@ class TestChatStream:
             b'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n'
             b"data: [DONE]\n\n"
         )
-        httpx_mock.add_response(stream=httpx.ByteStream(sse_data), headers={"content-type": "text/event-stream"})
+        httpx_mock.add_response(
+            stream=httpx.ByteStream(sse_data),
+            headers={"content-type": "text/event-stream"},
+        )
         chunks = []
         async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
             async for chunk in client.chat_stream("gpt-4o", [{"role": "user", "content": "hi"}]):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 import logging
-from typing import Any, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,22 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
 }
 
 _custom_patterns: tuple[tuple[str, str], ...] | None = None
+
+
+def register_provider(
+    pattern: str,
+    family: str,
+    *,
+    caps: dict[str, Any] | None = None,
+) -> None:
+    global _custom_patterns
+    entry = (pattern, family)
+    if _custom_patterns:
+        _custom_patterns = (entry,) + _custom_patterns
+    else:
+        _custom_patterns = (entry,)
+    if caps is not None:
+        _FAMILY_CAPABILITIES[family] = caps
 
 
 def set_custom_patterns(patterns: Any) -> None:
@@ -240,4 +256,9 @@ def describe_from_payload(
     else:
         mode, source = f"default({family})", "model_default"
 
-    return {"provider": family, "model": str(model), "thinking_mode": mode, "thinking_source": source}
+    return {
+        "provider": family,
+        "model": str(model),
+        "thinking_mode": mode,
+        "thinking_source": source,
+    }

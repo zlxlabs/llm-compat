@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 
-import httpx
 import pytest
 from pydantic import BaseModel
 from pytest_httpx import HTTPXMock
@@ -58,9 +57,11 @@ class TestSyncChatJson:
 
     def test_json_parse_error(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response("broken"))
-        with SyncLLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            with pytest.raises(JSONParseError):
-                client.chat_json("gpt-4o", [], schema=TagResult)
+        with (
+            SyncLLMClient(base_url="http://test/v1", api_key="sk-test") as client,
+            pytest.raises(JSONParseError),
+        ):
+            client.chat_json("gpt-4o", [], schema=TagResult)
 
 
 class TestSyncChatImage:

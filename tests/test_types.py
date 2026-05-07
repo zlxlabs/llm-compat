@@ -1,6 +1,8 @@
 """Tests for llm_compat._types — data classes."""
 from __future__ import annotations
 
+import pytest
+
 from llm_compat._types import ChatResult, LLMStats, ProviderCaps, TokenUsage
 
 
@@ -90,6 +92,3 @@ class TestLLMStats:
         s.record_success(model="m", latency_ms=100, tokens=10)
         s.reset()
         assert s.total_calls == 0
-
-
-import pytest
