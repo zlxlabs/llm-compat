@@ -1,0 +1,236 @@
+"""Tests for llm_compat.providers — provider detection, thinking translation, payload building."""
+from __future__ import annotations
+
+import logging
+
+import pytest
+
+from llm_compat import providers
+
+
+class TestDetectProvider:
+    @pytest.mark.parametrize(
+        "model,expected",
+        [
+            ("deepseek-v4-flash", "deepseek"),
+            ("deepseek-chat", "deepseek"),
+            ("deepseek-reasoner", "deepseek"),
+            ("gemini-2.5-flash", "gemini_25"),
+            ("gemini-2.5-pro", "gemini_25"),
+            ("gemini-3-flash", "gemini_3"),
+            ("gemini-3-flash-preview", "gemini_3"),
+            ("gemini-3.5-pro", "gemini_3"),
+            ("gemini-pro", "gemini"),
+            ("gpt-5", "openai_gpt5"),
+            ("gpt-5-turbo", "openai_gpt5"),
+            ("gpt-5.1", "openai_gpt5"),
+            ("gpt-4o", "openai_gpt4"),
+            ("gpt-4.1-mini", "openai_gpt4"),
+            ("o1-pro", "openai_o"),
+            ("o3-mini", "openai_o"),
+            ("o4-mini", "openai_o"),
+            ("qwen-turbo", "openai"),
+            ("glm-4", "openai"),
+        ],
+    )
+    def test_family_recognition(self, model: str, expected: str) -> None:
+        assert providers.detect_provider(model) == expected
+
+    def test_case_insensitive(self) -> None:
+        assert providers.detect_provider("DeepSeek-V4-Flash") == "deepseek"
+        assert providers.detect_provider("Gemini-3-Flash") == "gemini_3"
+
+    def test_empty_model_returns_openai_with_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            assert providers.detect_provider("") == "openai"
+        assert caplog.text
+
+    def test_none_model_returns_openai(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            assert providers.detect_provider(None) == "openai"  # type: ignore[arg-type]
+
+    def test_unknown_model_returns_openai(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            assert providers.detect_provider("unknown-model-xyz") == "openai"
+
+    def test_custom_patterns_override(self) -> None:
+        custom = (("myproxy-*", "deepseek"),)
+        assert providers.detect_provider("myproxy-v1", custom) == "deepseek"
+        assert providers.detect_provider("myproxy-v1") == "openai"
+
+    def test_set_custom_patterns_dict(self) -> None:
+        providers.set_custom_patterns({"dsproxy-*": "deepseek"})
+        try:
+            assert providers.detect_provider("dsproxy-alpha") == "deepseek"
+            assert providers.detect_provider("gpt-4o") == "openai_gpt4"
+        finally:
+            providers.set_custom_patterns(None)
+        assert providers.detect_provider("dsproxy-alpha") == "openai"
+
+    def test_set_custom_patterns_list(self) -> None:
+        providers.set_custom_patterns([["myai-*", "deepseek"]])
+        try:
+            assert providers.detect_provider("myai-v1") == "deepseek"
+        finally:
+            providers.set_custom_patterns(None)
+
+    def test_invalid_patterns_ignored(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            providers.set_custom_patterns("not a list")
+        assert providers.detect_provider("gpt-4o") == "openai_gpt4"
+
+
+class TestBuildPayloadDeepSeek:
+    def _base(self, model: str = "deepseek-v4-flash") -> dict:
+        return {"model": model, "messages": [{"role": "user", "content": "hi"}]}
+
+    def test_disabled_sets_extra_body(self) -> None:
+        payload = providers.build_request_payload("deepseek-v4-flash", "disabled", self._base())
+        assert payload["extra_body"] == {"thinking": {"type": "disabled"}}
+        assert "reasoning_effort" not in payload
+
+    def test_high_sets_reasoning_effort(self) -> None:
+        payload = providers.build_request_payload("deepseek-v4-flash", "high", self._base())
+        assert payload["reasoning_effort"] == "high"
+        assert "extra_body" not in payload
+
+    def test_max_passthrough(self) -> None:
+        payload = providers.build_request_payload("deepseek-v4-flash", "max", self._base())
+        assert payload["reasoning_effort"] == "max"
+
+    def test_none_sends_no_extra(self) -> None:
+        payload = providers.build_request_payload("deepseek-v4-flash", None, self._base())
+        assert "reasoning_effort" not in payload
+        assert "extra_body" not in payload
+
+    def test_minimal_clamps(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            payload = providers.build_request_payload(
+                "deepseek-v4-flash", "minimal", self._base()
+            )
+        assert payload.get("reasoning_effort") == "low"
+
+    def test_existing_extra_body_preserved(self) -> None:
+        base = {**self._base(), "extra_body": {"foo": "bar"}}
+        payload = providers.build_request_payload("deepseek-v4-flash", "disabled", base)
+        assert payload["extra_body"]["foo"] == "bar"
+        assert payload["extra_body"]["thinking"]["type"] == "disabled"
+
+
+class TestBuildPayloadGemini25:
+    def _base(self) -> dict:
+        return {"model": "gemini-2.5-flash", "messages": []}
+
+    def test_disabled_sets_effort_none(self) -> None:
+        payload = providers.build_request_payload("gemini-2.5-flash", "disabled", self._base())
+        assert payload["reasoning_effort"] == "none"
+
+    def test_high_passthrough(self) -> None:
+        payload = providers.build_request_payload("gemini-2.5-flash", "high", self._base())
+        assert payload["reasoning_effort"] == "high"
+
+    def test_max_clamps_to_high(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            payload = providers.build_request_payload("gemini-2.5-flash", "max", self._base())
+        assert payload["reasoning_effort"] == "high"
+
+
+class TestBuildPayloadGemini3:
+    def _base(self) -> dict:
+        return {"model": "gemini-3-flash", "messages": []}
+
+    def test_disabled_falls_to_minimal(self) -> None:
+        payload = providers.build_request_payload("gemini-3-flash", "disabled", self._base())
+        assert payload["reasoning_effort"] == "minimal"
+
+    def test_minimal_passthrough(self) -> None:
+        payload = providers.build_request_payload("gemini-3-flash", "minimal", self._base())
+        assert payload["reasoning_effort"] == "minimal"
+
+
+class TestBuildPayloadOpenAIGPT5:
+    def _base(self) -> dict:
+        return {"model": "gpt-5", "messages": []}
+
+    def test_disabled_falls_to_minimal(self) -> None:
+        payload = providers.build_request_payload("gpt-5", "disabled", self._base())
+        assert payload["reasoning_effort"] == "minimal"
+
+    def test_high_passthrough(self) -> None:
+        payload = providers.build_request_payload("gpt-5", "high", self._base())
+        assert payload["reasoning_effort"] == "high"
+
+
+class TestBuildPayloadOpenAIGPT4:
+    def _base(self) -> dict:
+        return {"model": "gpt-4o", "messages": []}
+
+    def test_disabled_is_na(self) -> None:
+        payload = providers.build_request_payload("gpt-4o", "disabled", self._base())
+        assert "reasoning_effort" not in payload
+        assert "extra_body" not in payload
+
+    def test_any_effort_dropped(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            payload = providers.build_request_payload("gpt-4o", "high", self._base())
+        assert "reasoning_effort" not in payload
+
+
+class TestBuildPayloadOpenAIO:
+    def _base(self) -> dict:
+        return {"model": "o3-mini", "messages": []}
+
+    def test_disabled_dropped_with_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            payload = providers.build_request_payload("o3-mini", "disabled", self._base())
+        assert "reasoning_effort" not in payload
+
+    def test_high_passthrough(self) -> None:
+        payload = providers.build_request_payload("o3-mini", "high", self._base())
+        assert payload["reasoning_effort"] == "high"
+
+
+class TestDescribeFromPayload:
+    def test_deepseek_disabled(self) -> None:
+        payload = {"model": "deepseek-v4-flash", "extra_body": {"thinking": {"type": "disabled"}}}
+        desc = providers.describe_from_payload(payload)
+        assert desc["provider"] == "deepseek"
+        assert desc["thinking_mode"] == "disabled"
+
+    def test_reasoning_effort_set(self) -> None:
+        payload = {"model": "gpt-5", "reasoning_effort": "high"}
+        desc = providers.describe_from_payload(payload)
+        assert desc["thinking_mode"] == "high"
+        assert desc["thinking_source"] == "reasoning_effort"
+
+    def test_no_thinking_shows_default(self) -> None:
+        payload = {"model": "deepseek-v4-flash"}
+        desc = providers.describe_from_payload(payload)
+        assert "default" in desc["thinking_mode"]
+
+    def test_gpt4_shows_na(self) -> None:
+        payload = {"model": "gpt-4o"}
+        desc = providers.describe_from_payload(payload)
+        assert desc["thinking_mode"] == "n/a"
+
+
+class TestDeepMerge:
+    def test_basic_merge(self) -> None:
+        base = {"a": 1, "b": 2}
+        overlay = {"b": 3, "c": 4}
+        result = providers._deep_merge(base, overlay)
+        assert result == {"a": 1, "b": 3, "c": 4}
+
+    def test_nested_merge(self) -> None:
+        base = {"extra_body": {"foo": "bar"}}
+        overlay = {"extra_body": {"thinking": {"type": "disabled"}}}
+        result = providers._deep_merge(base, overlay)
+        assert result["extra_body"]["foo"] == "bar"
+        assert result["extra_body"]["thinking"]["type"] == "disabled"
+
+    def test_does_not_mutate_inputs(self) -> None:
+        base = {"a": {"b": 1}}
+        overlay = {"a": {"c": 2}}
+        result = providers._deep_merge(base, overlay)
+        assert "c" not in base["a"]
+        assert result["a"] == {"b": 1, "c": 2}
