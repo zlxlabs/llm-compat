@@ -19,6 +19,7 @@ from .json_utils import parse_json, parse_json_model
 from .providers import build_request_payload, describe_from_payload, detect_provider
 from .refusal import RefusalDetector, detect_refusal
 from .retry import async_retry_call
+from .sensitive import SensitiveDetector
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class LLMClient:
         content_fallbacks: dict[str, list[str]] | None = None,
         refusal_detector: RefusalDetector | None = None,
         refusal_keywords: list[str] | None = None,
+        sensitive_detector: SensitiveDetector | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -52,6 +54,7 @@ class LLMClient:
         self._content_fallbacks = content_fallbacks
         self._refusal_detector = refusal_detector
         self._refusal_keywords = refusal_keywords
+        self._sensitive_detector = sensitive_detector
         self._http: httpx.AsyncClient | None = None
         self.stats = LLMStats()
 
@@ -177,6 +180,33 @@ class LLMClient:
         provider = detect_provider(model)
         chain = resolve_fallback_chain(model, self._content_fallbacks)
         deadline_start = time.monotonic()
+
+        # Pre-scan: skip primary if sensitive words detected and fallback available
+        if self._sensitive_detector and chain and self._sensitive_detector.is_available:
+            texts = [
+                msg.get("content", "") if isinstance(msg.get("content"), str) else ""
+                for msg in messages
+            ]
+            if self._sensitive_detector.contains_any(texts):
+                self.stats.record_prescan_skip()
+                logger.info(
+                    "[%s] LLM prescan | sensitive words detected | skipping %s → %s",
+                    request_id, model, chain[0],
+                )
+                needs_vision = self._has_vision_content(messages)
+                effective_chain = filter_by_modality(chain, needs_vision=needs_vision)
+                if effective_chain:
+                    fb_model = effective_chain[0]
+                    fb_provider = detect_provider(fb_model)
+                    fb_data, fb_latency = await self._single_chat(
+                        fb_model, messages, request_id,
+                        reasoning_effort=reasoning_effort, **extra,
+                    )
+                    return self._extract_result(
+                        fb_data, model=fb_model, provider=fb_provider,
+                        latency_ms=fb_latency, request_id=request_id,
+                        fallback_from=model, fallback_chain=[model],
+                    )
 
         # Try primary model
         try:
