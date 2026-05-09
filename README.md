@@ -258,9 +258,10 @@ print(f"调用: {stats.total_calls}, 成功率: {stats.success_rate:.0%}, tokens
 
 ```
 src/llm_compat/
+├── _base.py          — 共享基类 + generator fallback 编排
+├── client.py         — async client（I/O 层）
+├── sync.py           — sync client（I/O 层）
 ├── providers.py      — 10 族检测 + thinking 翻译 + supports_vision
-├── client.py         — async client + content fallback
-├── sync.py           — sync client + content fallback
 ├── retry.py          — 智能重试 + 错误分类
 ├── refusal.py        — 3 层拒绝检测（结构化信号/HTTP/关键词）
 ├── fallback.py       — fallback 链解析 + 模态过滤
