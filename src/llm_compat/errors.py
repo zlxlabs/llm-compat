@@ -7,12 +7,13 @@ _FATAL_STATUS_CODES: frozenset[int] = frozenset({400, 401, 403, 404})
 
 _TRUNCATION_PATTERNS = ("unterminated string", "unexpected end")
 
-_CONTENT_POLICY_STATUS_CODES: frozenset[int] = frozenset({400, 403})
+_CONTENT_POLICY_STATUS_CODES: frozenset[int] = frozenset({400, 403, 451, 500})
 _CONTENT_POLICY_BODY_KEYWORDS: tuple[str, ...] = (
     "content_policy",
     "content policy",
     "content_filter",
     "content filter",
+    "sensitive_words",
     "sensitive",
     "moderation",
     "blocked",

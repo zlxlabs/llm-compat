@@ -5,6 +5,7 @@ import httpx
 from llm_compat.errors import (
     ContentPolicyError,
     FatalError,
+    RetryableError,
     classify_error,
 )
 
@@ -91,3 +92,15 @@ class TestClassifyContentPolicy:
     def test_404_always_fatal(self):
         err = _make_http_error(404, '{"error": {"message": "content_policy"}}')
         assert classify_error(err) == FatalError
+
+    def test_500_with_sensitive_words_detected(self):
+        err = _make_http_error(
+            500,
+            '{"error": {"message": "sensitive_words_detected (request id: abc123)", '
+            '"type": "new_api_error", "code": "sensitive_words_detected"}}',
+        )
+        assert classify_error(err) == ContentPolicyError
+
+    def test_500_without_policy_keyword_is_retryable(self):
+        err = _make_http_error(500, '{"error": {"message": "internal server error"}}')
+        assert classify_error(err) == RetryableError
