@@ -208,6 +208,74 @@ print(f"各模型拒绝: {stats._refusal_counts}")
 - `chat_stream()` 不支持响应端 fallback（前置敏感词检测可部分覆盖流式场景）
 - fallback 配置为 init 级别，运行时不可动态修改（需创建多个 client 实例）
 
+## 敏感词积累（Collector）
+
+跨项目自动收集拒绝事件，人工审核后提取敏感词，闭环回 pre-scan。
+
+### 部署 Collector 服务
+
+```bash
+docker network create llm-net
+cd collector
+# 设置 API Key（可选，不设则不鉴权）
+echo "COLLECTOR_API_KEY=your-secret" > .env
+docker compose up -d
+```
+
+### 集成到项目
+
+```python
+async with LLMClient(
+    base_url="https://your-newapi.com/v1",
+    api_key="sk-xxx",
+    content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+    # Collector 集成（可选，不配则不上报）
+    collector_url="http://llm-compat-collector:8000",
+    collector_project="my-project",       # 来源标识，区分哪个项目触发的拒绝
+    collector_api_key="your-secret",      # 与 COLLECTOR_API_KEY 一致
+) as client:
+    result = await client.chat("deepseek-v4", messages)
+    # fallback 触发时自动上报拒绝事件到 collector
+```
+
+各项目的 docker-compose 需加入同一网络：
+
+```yaml
+networks:
+  llm-net:
+    external: true
+```
+
+### 日常使用
+
+```bash
+# 查看拒绝统计
+curl http://localhost:8234/stats | jq
+
+# 查看最近拒绝事件（含输入摘要）
+curl http://localhost:8234/stats | jq '.recent_refusals'
+
+# 审核后加词（需要 API Key）
+curl -X POST http://localhost:8234/words \
+  -H 'Authorization: Bearer your-secret' \
+  -H 'Content-Type: application/json' \
+  -d '{"word": "敏感词"}'
+
+# 查看当前词表
+curl http://localhost:8234/words | jq
+```
+
+### Collector API
+
+| 端点 | 方法 | 鉴权 | 说明 |
+|------|------|------|------|
+| `/refusals` | POST | 需要 | 上报拒绝事件 |
+| `/words` | GET | 不需要 | 获取当前词表 + hash |
+| `/words` | POST | 需要 | 添加敏感词 |
+| `/words/hash` | GET | 不需要 | 词表变更检测 |
+| `/words/{word}` | DELETE | 需要 | 删除误报词 |
+| `/stats` | GET | 不需要 | 拒绝统计 |
+
 ## 启动校验
 
 ```python
@@ -259,6 +327,7 @@ print(f"调用: {stats.total_calls}, 成功率: {stats.success_rate:.0%}, tokens
 ```
 src/llm_compat/
 ├── _base.py          — 共享基类 + generator fallback 编排
+├── _collector.py     — Collector 服务客户端（上报/拉取/降级缓存）
 ├── client.py         — async client（I/O 层）
 ├── sync.py           — sync client（I/O 层）
 ├── providers.py      — 10 族检测 + thinking 翻译 + supports_vision
@@ -272,7 +341,8 @@ src/llm_compat/
 ├── json_utils.py     — JSON 清洗 + Pydantic 校验
 └── __init__.py       — 公开 API
 
-tests/                236 tests
+collector/            — Sidecar 服务（FastAPI + SQLite），17 tests
+tests/                249 tests
 ```
 
 ## 依赖
