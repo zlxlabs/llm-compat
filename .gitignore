@@ -12,6 +12,8 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+.env
+.cx-index.db
 
 # Docker
 collector/docker/export/
