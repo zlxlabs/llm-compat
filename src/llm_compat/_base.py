@@ -11,6 +11,7 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel
 
+from ._collector import CollectorClient
 from ._compat import normalize_reasoning_effort
 from ._types import ChatResult, LLMStats, TokenUsage
 from .errors import ContentPolicyError, JSONParseError
@@ -59,6 +60,8 @@ class BaseClient:
         refusal_detector: RefusalDetector | None = None,
         refusal_keywords: list[str] | None = None,
         sensitive_detector: SensitiveDetector | None = None,
+        collector_url: str | None = None,
+        collector_project: str = "",
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -71,6 +74,10 @@ class BaseClient:
         self._refusal_detector = refusal_detector
         self._refusal_keywords = refusal_keywords
         self._sensitive_detector = sensitive_detector
+        self._collector: CollectorClient | None = None
+        if collector_url:
+            self._collector = CollectorClient(url=collector_url, project=collector_project)
+        self._pending_refusal_report: dict[str, Any] | None = None
         self.stats = LLMStats()
 
     def _build_payload(
@@ -270,6 +277,12 @@ class BaseClient:
 
         # Primary refused — enter fallback loop
         self.stats.record_fallback(refused_model=model)
+        self._pending_refusal_report = {
+            "model": model,
+            "error_type": "refusal_detected",
+            "messages": messages,
+            "provider": provider,
+        }
         logger.warning(
             "[%s] LLM fallback | model=%s refused | trying fallback chain",
             request_id, model,

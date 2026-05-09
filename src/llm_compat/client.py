@@ -103,7 +103,24 @@ class LLMClient(BaseClient):
         **extra: Any,
     ) -> Any:
         gen = self._chat_orchestrator(model, messages, reasoning_effort=reasoning_effort, **extra)
-        return await self._drive_chat(gen)
+        result = await self._drive_chat(gen)
+        await self._maybe_report_refusal()
+        return result
+
+    async def _maybe_report_refusal(self) -> None:
+        report = self._pending_refusal_report
+        self._pending_refusal_report = None
+        if report and self._collector:
+            try:
+                preview = self._collector.extract_preview(report["messages"])
+                await self._collector.report_refusal(
+                    model=report["model"],
+                    error_type=report["error_type"],
+                    input_text=preview,
+                    provider=report.get("provider", ""),
+                )
+            except Exception:
+                pass
 
     async def chat_json(
         self,
