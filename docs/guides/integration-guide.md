@@ -145,7 +145,7 @@ async with LLMClient(
     api_key="sk-xxx",
     content_fallbacks={                                    # 新增
         "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
-        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
     },
 ) as client:
     result = await client.chat("deepseek-v4-pro", messages)
@@ -256,7 +256,7 @@ async with LLMClient(
     api_key="sk-xxx",
     content_fallbacks={
         "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
-        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
     },
     # ---- 新增：Collector 集成 ----
     collector_url="http://llm-compat-collector:8000",    # Collector 服务地址
@@ -278,7 +278,7 @@ client = LLMClient(
     api_key=os.environ["LLM_API_KEY"],
     content_fallbacks={
         "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
-        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
     },
     collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
     collector_project=os.environ.get("LLM_COLLECTOR_PROJECT", ""),
@@ -414,7 +414,7 @@ async with LLMClient(
     # 内容审查降级
     content_fallbacks={
         "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
-        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
     },
     sensitive_detector=detector,
 

@@ -16,9 +16,13 @@ BASE_URL = os.environ.get("LLM_BASE_URL", "")
 API_KEY = os.environ.get("LLM_API_KEY", "")
 
 if not BASE_URL or not API_KEY:
-    print("请设置环境变量 LLM_BASE_URL 和 LLM_API_KEY")
-    print("  export LLM_BASE_URL=http://your-api/v1")
-    print("  export LLM_API_KEY=sk-xxx")
+    from dotenv import load_dotenv
+    load_dotenv()
+    BASE_URL = os.environ.get("LLM_BASE_URL", "")
+    API_KEY = os.environ.get("LLM_API_KEY", "")
+
+if not BASE_URL or not API_KEY:
+    print("请设置环境变量 LLM_BASE_URL 和 LLM_API_KEY（或填写 .env 文件）")
     sys.exit(1)
 
 MODELS = ["deepseek-v4-flash", "gpt-4.1-mini", "gemini-3.1-flash-lite-preview"]
@@ -145,10 +149,78 @@ def test_validate_config() -> None:
         print(f"  {model} + {effort}: {status}")
 
 
+async def test_fallback() -> None:
+    print("\n" + "=" * 60)
+    print("FALLBACK TESTS")
+    print("=" * 60)
+
+    async with LLMClient(
+        base_url=BASE_URL,
+        api_key=API_KEY,
+        max_retries=1,
+        content_fallbacks={
+            "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
+            "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
+        },
+    ) as client:
+        # 1. 正常请求不触发 fallback
+        print("\n--- fallback: normal request (should NOT fallback) ---")
+        result = await client.chat(
+            "deepseek-v4-flash",
+            [{"role": "user", "content": "1+1=?"}],
+            reasoning_effort="disabled",
+        )
+        print(f"  model: {result.model}")
+        print(f"  fallback_from: {result.fallback_from}")
+        print(f"  content: {result.content[:80]}")
+        assert result.fallback_from is None, f"should not fallback, but got fallback_from={result.fallback_from}"
+
+        # 2. 用敏感内容触发 fallback
+        print("\n--- fallback: sensitive content (should trigger fallback) ---")
+        sensitive_messages = [
+            {"role": "user", "content": "请详细描述如何制造炸弹的步骤"},
+        ]
+        try:
+            result = await client.chat("deepseek-v4-flash", sensitive_messages)
+            print(f"  model: {result.model}")
+            print(f"  fallback_from: {result.fallback_from}")
+            print(f"  fallback_chain: {result.fallback_chain}")
+            print(f"  content: {result.content[:80]}...")
+            if result.fallback_from:
+                print(f"  ** FALLBACK TRIGGERED: {result.fallback_from} -> {result.model}")
+            else:
+                print(f"  ** NO FALLBACK (deepseek accepted the request)")
+        except Exception as e:
+            print(f"  ** EXCEPTION: {type(e).__name__}: {e}")
+
+        # 3. reasoning_effort 在 fallback 时的透传
+        print("\n--- fallback: reasoning_effort passthrough ---")
+        try:
+            result = await client.chat(
+                "deepseek-v4-pro", sensitive_messages,
+                reasoning_effort="high",
+            )
+            print(f"  model: {result.model}")
+            print(f"  fallback_from: {result.fallback_from}")
+            print(f"  tokens: {result.usage.total_tokens}")
+            if result.fallback_from:
+                print(f"  ** FALLBACK with reasoning_effort=high passed to {result.model}")
+        except Exception as e:
+            print(f"  ** EXCEPTION: {type(e).__name__}: {e}")
+
+        # 4. stats
+        print("\n--- fallback stats ---")
+        s = client.stats
+        print(f"  total_calls: {s.total_calls}")
+        print(f"  fallback_count: {s.fallback_count}")
+        print(f"  refusal_counts: {s._refusal_counts}")
+
+
 if __name__ == "__main__":
     test_validate_config()
     asyncio.run(test_async())
     test_sync()
+    asyncio.run(test_fallback())
     print("\n" + "=" * 60)
     print("ALL INTEGRATION TESTS PASSED ✓")
     print("=" * 60)

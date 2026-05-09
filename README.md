@@ -124,7 +124,7 @@ async with LLMClient(
     api_key="sk-xxx",
     content_fallbacks={
         "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
-        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
     },
 ) as client:
     result = await client.chat("deepseek-v4-pro", messages)
