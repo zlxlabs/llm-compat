@@ -206,12 +206,38 @@ except ContentPolicyError as e:
     print(e.original_model)    # 'deepseek-v4-pro'
 ```
 
+### 2.6 从 URL 加载拒绝关键词（可选）
+
+内置的拒绝关键词列表（`我无法回答`、`I cannot assist` 等）覆盖有限。可以从 URL 动态加载更多关键词，扩大响应端拒绝检测覆盖面：
+
+```python
+client = LLMClient(
+    ...,
+    content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview"]},
+    # 从 URL 加载拒绝关键词（支持多个 URL）
+    refusal_keywords_url=[
+        "http://llm-compat-collector:8000/words",   # Collector 积累的
+        "https://cdn.internal/shared-keywords.json", # 团队共享的
+    ],
+    # 手动补充（可选，与 URL 来源合并去重）
+    refusal_keywords=["项目专属拒绝词"],
+)
+```
+
+特性：
+- 支持 `str`（单个 URL）或 `list[str]`（多个 URL）
+- 同进程多 LLMClient 实例共享缓存，不重复拉取
+- 后台每 5 分钟自动刷新，`chat()` 每次调用读最新词表
+- URL 不可达时保留旧缓存，永不丢词
+- 手动词 + 所有 URL 词自动去重合并
+
 ### 到这一步你获得了
 
 - 内容审查被拒时自动切换到海外模型
 - 三层拒绝检测（结构化信号 → HTTP 错误 → 关键词）
 - 图片请求自动跳过不支持 vision 的 fallback 模型
 - 可选的前置敏感词检测（已知敏感词直接跳过，省 API 调用）
+- 可选的 URL 动态关键词（拒绝检测覆盖面随 Collector 积累自动扩大）
 
 ---
 
@@ -259,13 +285,14 @@ async with LLMClient(
         "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
     },
     # ---- 新增：Collector 集成 ----
-    collector_url="http://llm-compat-collector:8000",    # Collector 服务地址
+    collector_url="http://llm-compat-collector:8000",    # 拒绝事件上报
     collector_project="your-project-name",               # 来源标识，如 "video-api"
-    collector_api_key="",                                # 与 Collector 的 COLLECTOR_API_KEY 一致
+    collector_api_key="",                                # 与 COLLECTOR_API_KEY 一致
+    # Collector 词表作为拒绝关键词来源（动态更新）
+    refusal_keywords_url="http://llm-compat-collector:8000/words",
 ) as client:
     result = await client.chat("deepseek-v4-pro", messages)
-    # 行为与之前完全一致
-    # 唯一区别：fallback 触发时自动上报拒绝事件到 Collector
+    # fallback 触发时自动上报 + 词表动态加载
 ```
 
 ### 3.4 推荐：用环境变量配置
@@ -283,6 +310,7 @@ client = LLMClient(
     collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
     collector_project=os.environ.get("LLM_COLLECTOR_PROJECT", ""),
     collector_api_key=os.environ.get("LLM_COLLECTOR_API_KEY", ""),
+    refusal_keywords_url=os.environ.get("LLM_REFUSAL_KEYWORDS_URL", ""),
 )
 ```
 
@@ -294,6 +322,7 @@ LLM_API_KEY=sk-xxx
 LLM_COLLECTOR_URL=http://llm-compat-collector:8000
 LLM_COLLECTOR_PROJECT=your-project-name
 LLM_COLLECTOR_API_KEY=
+LLM_REFUSAL_KEYWORDS_URL=http://llm-compat-collector:8000/words
 ```
 
 ### 3.5 验证接入
@@ -422,6 +451,8 @@ async with LLMClient(
     collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
     collector_project=os.environ.get("LLM_COLLECTOR_PROJECT", ""),
     collector_api_key=os.environ.get("LLM_COLLECTOR_API_KEY", ""),
+    # 动态关键词加载（可选，从 Collector 或其他 URL 加载）
+    refusal_keywords_url=os.environ.get("LLM_REFUSAL_KEYWORDS_URL", ""),
 ) as client:
     result = await client.chat("deepseek-v4-pro", messages)
 ```

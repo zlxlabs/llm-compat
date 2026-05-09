@@ -233,9 +233,11 @@ async with LLMClient(
     collector_url="http://llm-compat-collector:8000",
     collector_project="my-project",       # 来源标识，区分哪个项目触发的拒绝
     collector_api_key="your-secret",      # 与 COLLECTOR_API_KEY 一致
+    # 从 Collector 动态加载拒绝关键词（可选，支持多 URL）
+    refusal_keywords_url="http://llm-compat-collector:8000/words",
 ) as client:
-    result = await client.chat("deepseek-v4", messages)
-    # fallback 触发时自动上报拒绝事件到 collector
+    result = await client.chat("deepseek-v4-pro", messages)
+    # fallback 触发时自动上报 + 拒绝关键词随 Collector 积累动态扩展
 ```
 
 各项目的 docker-compose 需加入同一网络：
