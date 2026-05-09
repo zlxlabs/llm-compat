@@ -12,3 +12,4 @@ tests/
 LICENSE
 uv.lock
 docker/
+collector/docker/deploy_targets.json

@@ -6,15 +6,21 @@ Always respond in 中文
 
 ## 项目背景
 
-详见 `docs/business-context.md`。
+详见 `docs/design/business-context.md`。
 
 核心场景：10+ Python 项目通过 New API（OpenAI 兼容代理）接入多家 LLM（DeepSeek V4、GPT、Gemini 等），需要统一处理 thinking/reasoning_effort 参数翻译、JSON 输出清洗、重试和日志。
 
-## 设计文档
+## 文档结构
 
-- `docs/llm-compat-design.md` — 包结构和 API 设计
-- `docs/business-context.md` — 业务背景和架构定位
-- `docs/decision-log.md` — 关键决策记录
+- `docs/design/` — 设计文档
+  - `llm-compat-design.md` — 包结构和 API 设计
+  - `business-context.md` — 业务背景和架构定位
+  - `decision-log.md` — 关键决策记录
+  - `content-fallback-design-context.md` — 内容审查降级设计
+  - `sensitive-collector-design.md` — 敏感词积累系统设计
+- `docs/guides/` — 用户指南
+  - `collector-integration-guide.md` — 从零接入指南（三步渐进式）
+  - `migration-guide.md` — 下游迁移指南
 - `docs/research/` — API 调研资料
 
 ## 设计约束
