@@ -19,8 +19,7 @@ Always respond in 中文
   - `content-fallback-design-context.md` — 内容审查降级设计
   - `sensitive-collector-design.md` — 敏感词积累系统设计
 - `docs/guides/` — 用户指南
-  - `collector-integration-guide.md` — 从零接入指南（三步渐进式）
-  - `migration-guide.md` — 下游迁移指南
+  - `integration-guide.md` — 从零接入指南（三步渐进式 + 已有项目迁移附录）
 - `docs/research/` — API 调研资料
 
 ## 设计约束

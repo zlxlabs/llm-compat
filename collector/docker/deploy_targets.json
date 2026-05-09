@@ -1,0 +1,8 @@
+{
+  "targets": {
+    "n305": {
+      "ssh": "n305",
+      "dir": "/opt/infra/llm-compat-collector"
+    }
+  }
+}

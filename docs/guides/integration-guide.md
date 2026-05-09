@@ -450,3 +450,107 @@ async with LLMClient(
 ### Q: input_preview 会泄露用户数据吗？
 
 Collector 仅在 Docker 内网通信，不暴露公网。摘要默认截取前 200 字，可配置长度。
+
+---
+
+## 附录 A：已有项目迁移
+
+如果你的项目已有自建的 LLM 客户端（直接用 httpx + 自己的重试/翻译逻辑），接入 llm-compat 时可以删除这些重复代码。
+
+### 迁移策略
+
+llm-compat 接管 **HTTP 通信、重试、provider 翻译、JSON 清洗**，项目只保留 **配置解析 + Prompt 模板 + 业务逻辑**。
+
+```
+迁移前:  项目代码 = 配置 + Prompt + HTTP + 重试 + 翻译 + JSON清洗 + 业务
+迁移后:  项目代码 = 配置 + Prompt + 业务
+         llm-compat = HTTP + 重试 + 翻译 + JSON清洗
+```
+
+### 可以删除的代码
+
+| 功能 | 典型代码 | llm-compat 替代 |
+|------|---------|-----------------|
+| httpx 客户端管理 | `httpx.AsyncClient(...)` | `LLMClient` 内部管理 |
+| 重试逻辑 | `for attempt in range(max_retries)` | `retry.py` 自动处理 |
+| 退避计算 | `_compute_backoff()` | 内置指数退避+jitter |
+| 可重试判断 | `_is_retryable()` | `classify_error()` |
+| Retry-After 处理 | `_retry_after_seconds()` | 内置 |
+| Provider 翻译 | `if "deepseek" in model` | `providers.py` 自动检测 |
+| JSON code fence 清洗 | `re.search(r'```json')` | `json_utils.py` |
+| base64 图片编码 | `_build_image_content()` | `chat_image()` 内置 |
+| 请求 ID 生成 | `uuid.uuid4()` | 自动生成 |
+| token 用量提取 | `usage["prompt_tokens"]` | `ChatResult.usage` |
+
+### 薄封装模式
+
+项目级 LLMClient 变成 llm-compat 的薄封装，只保留配置解析：
+
+```python
+# 迁移后 (~100 行，从 ~538 行精简)
+from llm_compat import LLMClient as BaseLLMClient, ChatResult
+
+class LLMClient:
+    """项目级封装：配置解析 + task_overrides"""
+
+    def __init__(self, config: LLMConfig):
+        self._base = BaseLLMClient(
+            base_url=config.text.base_url,
+            api_key=config.text.api_key,
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+            collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
+            collector_project="my-project",
+        )
+        self._config = config
+
+    def _resolve_config(self, task_name, use_image=False):
+        # 保留：项目特有的配置解析逻辑
+        ...
+
+    async def chat(self, task_name, messages, *, use_image=False) -> ChatResult:
+        cfg = self._resolve_config(task_name, use_image)
+        return await self._base.chat(
+            model=cfg.model,
+            messages=messages,
+            reasoning_effort=cfg.reasoning_effort,
+        )
+
+    async def close(self):
+        await self._base.close()
+```
+
+### reasoning_effort 迁移
+
+旧值 `"none"` 改为 `"disabled"`：
+
+```yaml
+# 迁移前
+reasoning_effort: "none"     # 意图是关闭思考，但 DeepSeek 会忽略
+
+# 迁移后
+reasoning_effort: "disabled" # 明确关闭，DeepSeek → thinking.type=disabled
+```
+
+### 自定义 Provider 映射
+
+如果 New API 代理重命名了模型名：
+
+```python
+from llm_compat import register_provider, set_custom_patterns
+
+register_provider("my-proxy-ds-*", "deepseek")
+set_custom_patterns({"my-ds-*": "deepseek", "my-gpt-*": "openai_gpt4"})
+```
+
+### 迁移检查清单
+
+- [ ] 安装 llm-compat
+- [ ] 创建薄封装 LLMClient（保留配置解析，删除 HTTP/重试/翻译）
+- [ ] `reasoning_effort: "none"` → `"disabled"`
+- [ ] 删除重试逻辑代码
+- [ ] 删除 JSON code fence 清洗代码
+- [ ] 删除 base64 图片编码辅助函数
+- [ ] 更新错误处理为 FatalError/TimeoutError/JSONParseError
+- [ ] 可选：添加 validate_config 启动校验
+- [ ] 可选：添加 content_fallbacks + collector 集成
+- [ ] 运行测试验证
