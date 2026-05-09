@@ -1,8 +1,9 @@
 """llm-compat: 轻量 Python 包，抹平 OpenAI 兼容 API 的多 provider 差异。"""
-from llm_compat._compat import normalize_reasoning_effort, validate_config
+from llm_compat._compat import normalize_reasoning_effort, validate_config, validate_fallback_config
 from llm_compat._types import ChatResult, LLMStats, TokenUsage
 from llm_compat.client import LLMClient
 from llm_compat.errors import (
+    ContentPolicyError,
     FatalError,
     JSONParseError,
     LLMError,
@@ -10,6 +11,7 @@ from llm_compat.errors import (
     TimeoutError,
     TruncationError,
 )
+from llm_compat.refusal import RefusalContext, RefusalDetector
 from llm_compat.json_utils import parse_json, parse_json_model
 from llm_compat.providers import (
     build_request_payload,
@@ -32,6 +34,10 @@ __all__ = [
     "TimeoutError",
     "TruncationError",
     "JSONParseError",
+    "ContentPolicyError",
+    "RefusalContext",
+    "RefusalDetector",
+    "validate_fallback_config",
     "detect_provider",
     "build_request_payload",
     "describe_from_payload",
