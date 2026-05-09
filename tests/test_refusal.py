@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import pytest
-
 from llm_compat.refusal import (
-    DEFAULT_REFUSAL_KEYWORDS_CN,
-    DEFAULT_REFUSAL_KEYWORDS_EN,
     RefusalContext,
     check_response_keywords,
     check_structured_signals,

@@ -1,9 +1,6 @@
 """Tests for content fallback integration in LLMClient."""
 from __future__ import annotations
 
-import json
-
-import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 

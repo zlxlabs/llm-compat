@@ -94,7 +94,7 @@ async def test_async() -> None:
         assert full, "empty stream"
 
         # 5. stats
-        print(f"\n--- stats ---")
+        print("\n--- stats ---")
         s = client.stats
         print(f"  total_calls: {s.total_calls}")
         print(f"  success_count: {s.success_count}")

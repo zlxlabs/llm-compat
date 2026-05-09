@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from llm_compat.fallback import filter_by_modality, resolve_fallback_chain
 from llm_compat.providers import get_provider_caps
 

@@ -1,7 +1,6 @@
 """Tests for sensitive word pre-detection in LLMClient."""
 from __future__ import annotations
 
-import pytest
 from pytest_httpx import HTTPXMock
 
 from llm_compat.client import LLMClient

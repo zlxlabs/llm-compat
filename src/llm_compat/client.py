@@ -105,7 +105,6 @@ class LLMClient:
         **extra: Any,
     ) -> tuple[dict[str, Any], int]:
         payload = self._build_payload(model, messages, reasoning_effort, **extra)
-        provider = detect_provider(model)
 
         desc = describe_from_payload(payload)
         logger.info(

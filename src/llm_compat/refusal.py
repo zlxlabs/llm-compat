@@ -61,10 +61,7 @@ def check_structured_signals(data: dict[str, Any]) -> bool:
     if message.get("refusal"):
         return True
 
-    if message.get("content") is None and finish_reason == "stop":
-        return True
-
-    return False
+    return message.get("content") is None and finish_reason == "stop"
 
 
 def check_response_keywords(
@@ -115,7 +112,4 @@ def detect_refusal(
         except Exception:
             logger.warning("Custom refusal detector raised an exception, ignoring", exc_info=True)
 
-    if check_response_keywords(content, extra_keywords=extra_keywords):
-        return True
-
-    return False
+    return check_response_keywords(content, extra_keywords=extra_keywords)
