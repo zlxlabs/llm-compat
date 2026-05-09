@@ -12,3 +12,13 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Docker
+collector/docker/export/
+collector/docker/push_to_acr.bat
+collector/docker/push_to_acr.sh
+collector/docker/push_to_ghcr.sh
+collector/docker/push_to_ghcr.bat
+collector/docker/push_to_dockerhub.sh
+collector/docker/push_to_dockerhub.bat
+collector/docker/pull_and_deploy.sh
