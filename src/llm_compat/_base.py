@@ -59,6 +59,7 @@ class BaseClient:
         content_fallbacks: dict[str, list[str]] | None = None,
         refusal_detector: RefusalDetector | None = None,
         refusal_keywords: list[str] | None = None,
+        refusal_keywords_url: str | None = None,
         sensitive_detector: SensitiveDetector | None = None,
         collector_url: str | None = None,
         collector_project: str = "",
@@ -73,7 +74,9 @@ class BaseClient:
         self._total_timeout = total_timeout
         self._content_fallbacks = content_fallbacks
         self._refusal_detector = refusal_detector
-        self._refusal_keywords = refusal_keywords
+        self._refusal_keywords = self._load_refusal_keywords(
+            refusal_keywords, refusal_keywords_url,
+        )
         self._sensitive_detector = sensitive_detector
         self._collector: CollectorClient | None = None
         if collector_url:
@@ -82,6 +85,23 @@ class BaseClient:
             )
         self._pending_refusal_report: dict[str, Any] | None = None
         self.stats = LLMStats()
+
+    @staticmethod
+    def _load_refusal_keywords(
+        manual: list[str] | None,
+        url: str | None,
+    ) -> list[str] | None:
+        url_words: list[str] = []
+        if url:
+            try:
+                with httpx.Client(timeout=5.0) as http:
+                    resp = http.get(url)
+                    url_words = resp.json().get("words", [])
+            except Exception:
+                logger.debug("Failed to load refusal keywords from %s", url)
+        if not manual and not url_words:
+            return manual
+        return (manual or []) + url_words
 
     def _build_payload(
         self,
