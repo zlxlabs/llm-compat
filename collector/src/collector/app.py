@@ -15,10 +15,18 @@ class WordIn(BaseModel):
 
 class RefusalIn(BaseModel):
     model: str
-    error_type: str
-    input_preview: str = ""
-    source_project: str = ""
     provider: str = ""
+    source_project: str = ""
+    request_id: str = ""
+    input_preview: str = ""
+    response_preview: str = ""
+    message_count: int = 0
+    has_images: bool = False
+    detection_layer: str = ""
+    http_status: int | None = None
+    finish_reason: str | None = None
+    fallback_model: str | None = None
+    fallback_chain: list[str] | None = None
 
 
 def _compute_hash(words: list[str]) -> str:
@@ -37,10 +45,18 @@ def _init_db(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS refusals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             model TEXT NOT NULL,
-            error_type TEXT NOT NULL,
-            input_preview TEXT DEFAULT '',
-            source_project TEXT DEFAULT '',
             provider TEXT DEFAULT '',
+            source_project TEXT DEFAULT '',
+            request_id TEXT DEFAULT '',
+            input_preview TEXT DEFAULT '',
+            response_preview TEXT DEFAULT '',
+            message_count INTEGER DEFAULT 0,
+            has_images INTEGER DEFAULT 0,
+            detection_layer TEXT DEFAULT '',
+            http_status INTEGER,
+            finish_reason TEXT,
+            fallback_model TEXT,
+            fallback_chain TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_refusals_created ON refusals(created_at);
@@ -71,11 +87,24 @@ def create_app(db_path: str = "collector.db", api_key: str = "") -> FastAPI:
 
     @app.post("/refusals", status_code=201, dependencies=[Depends(_require_auth)])
     def report_refusal(body: RefusalIn) -> dict[str, str]:
+        import json as _json
+
         with get_db() as db:
             db.execute(
-                "INSERT INTO refusals (model, error_type, input_preview, source_project, provider)"
-                " VALUES (?, ?, ?, ?, ?)",
-                (body.model, body.error_type, body.input_preview, body.source_project, body.provider),
+                "INSERT INTO refusals"
+                " (model, provider, source_project, request_id,"
+                "  input_preview, response_preview, message_count, has_images,"
+                "  detection_layer, http_status, finish_reason,"
+                "  fallback_model, fallback_chain)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    body.model, body.provider, body.source_project, body.request_id,
+                    body.input_preview, body.response_preview, body.message_count,
+                    int(body.has_images),
+                    body.detection_layer, body.http_status, body.finish_reason,
+                    body.fallback_model,
+                    _json.dumps(body.fallback_chain) if body.fallback_chain else None,
+                ),
             )
             return {"status": "created"}
 
@@ -111,7 +140,9 @@ def create_app(db_path: str = "collector.db", api_key: str = "") -> FastAPI:
             word_count = db.execute("SELECT COUNT(*) as c FROM words").fetchone()["c"]
 
             recent = db.execute(
-                "SELECT model, error_type, input_preview, created_at as ts"
+                "SELECT model, provider, detection_layer, http_status,"
+                " input_preview, response_preview, fallback_model,"
+                " created_at as ts"
                 " FROM refusals ORDER BY created_at DESC LIMIT 20"
             ).fetchall()
             recent_list = [dict(r) for r in recent]

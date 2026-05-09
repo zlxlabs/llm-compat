@@ -104,10 +104,10 @@ class LLMClient(BaseClient):
     ) -> Any:
         gen = self._chat_orchestrator(model, messages, reasoning_effort=reasoning_effort, **extra)
         result = await self._drive_chat(gen)
-        await self._maybe_report_refusal()
+        await self._maybe_report_refusal(result)
         return result
 
-    async def _maybe_report_refusal(self) -> None:
+    async def _maybe_report_refusal(self, result: Any) -> None:
         report = self._pending_refusal_report
         self._pending_refusal_report = None
         if report and self._collector:
@@ -115,9 +115,17 @@ class LLMClient(BaseClient):
                 preview = self._collector.extract_preview(report["messages"])
                 await self._collector.report_refusal(
                     model=report["model"],
-                    error_type=report["error_type"],
-                    input_text=preview,
                     provider=report.get("provider", ""),
+                    request_id=report.get("request_id", ""),
+                    input_text=preview,
+                    response_preview=report.get("response_preview", ""),
+                    message_count=report.get("message_count", 0),
+                    has_images=report.get("has_images", False),
+                    detection_layer=report.get("detection_layer", ""),
+                    http_status=report.get("http_status"),
+                    finish_reason=report.get("finish_reason"),
+                    fallback_model=getattr(result, "model", None),
+                    fallback_chain=getattr(result, "fallback_chain", None),
                 )
             except Exception:
                 pass

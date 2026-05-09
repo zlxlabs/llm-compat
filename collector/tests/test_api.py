@@ -95,28 +95,54 @@ class TestWordHash:
 
 
 class TestRefusals:
-    def test_report_refusal(self):
+    def test_report_refusal_full(self):
         client = make_client()
         resp = client.post("/refusals", json={
             "model": "deepseek-v4",
-            "error_type": "sensitive_words_detected",
-            "input_preview": "这是一段测试文本",
-            "source_project": "project-a",
             "provider": "deepseek",
+            "source_project": "project-a",
+            "request_id": "a1b2c3d4",
+            "input_preview": "这是一段测试文本",
+            "response_preview": "我无法回答这个问题",
+            "message_count": 3,
+            "has_images": False,
+            "detection_layer": "http_error",
+            "http_status": 500,
+            "finish_reason": None,
+            "fallback_model": "gpt-4.1-mini",
+            "fallback_chain": ["deepseek-v4", "gpt-4.1-mini"],
         }, headers=auth_headers())
         assert resp.status_code == 201
+
+    def test_report_refusal_shows_in_stats(self):
+        client = make_client()
+        client.post("/refusals", json={
+            "model": "deepseek-v4",
+            "provider": "deepseek",
+            "detection_layer": "http_error",
+            "http_status": 500,
+            "input_preview": "测试内容",
+            "response_preview": "",
+            "fallback_model": "gpt-4.1-mini",
+        }, headers=auth_headers())
+        data = client.get("/stats").json()
+        recent = data["recent_refusals"][0]
+        assert recent["model"] == "deepseek-v4"
+        assert recent["detection_layer"] == "http_error"
+        assert recent["http_status"] == 500
+        assert recent["fallback_model"] == "gpt-4.1-mini"
 
     def test_report_refusal_minimal(self):
         client = make_client()
         resp = client.post("/refusals", json={
             "model": "deepseek-v4",
-            "error_type": "content_filter",
+            "detection_layer": "keyword_match",
         }, headers=auth_headers())
         assert resp.status_code == 201
 
-    def test_report_missing_required_fields(self):
+    def test_report_missing_model_returns_422(self):
         client = make_client()
-        resp = client.post("/refusals", json={"model": "deepseek-v4"}, headers=auth_headers())
+        resp = client.post("/refusals", json={"detection_layer": "http_error"}, headers=auth_headers())
         assert resp.status_code == 422
 
 
@@ -132,9 +158,9 @@ class TestStats:
     def test_stats_with_data(self):
         client = make_client()
         h = auth_headers()
-        client.post("/refusals", json={"model": "deepseek-v4", "error_type": "sensitive_words"}, headers=h)
-        client.post("/refusals", json={"model": "deepseek-v4", "error_type": "content_filter"}, headers=h)
-        client.post("/refusals", json={"model": "gpt-4.1", "error_type": "sensitive_words"}, headers=h)
+        client.post("/refusals", json={"model": "deepseek-v4", "detection_layer": "http_error"}, headers=h)
+        client.post("/refusals", json={"model": "deepseek-v4", "detection_layer": "keyword_match"}, headers=h)
+        client.post("/refusals", json={"model": "gpt-4.1", "detection_layer": "http_error"}, headers=h)
         client.post("/words", json={"word": "词1"}, headers=h)
         client.post("/words", json={"word": "词2"}, headers=h)
 
@@ -148,7 +174,7 @@ class TestStats:
         client = make_client()
         client.post("/refusals", json={
             "model": "deepseek-v4",
-            "error_type": "sensitive_words",
+            "detection_layer": "keyword_match",
             "input_preview": "测试内容",
         }, headers=auth_headers())
         data = client.get("/stats").json()

@@ -44,17 +44,34 @@ class CollectorClient:
 
     async def report_refusal(
         self,
+        *,
         model: str,
-        error_type: str,
-        input_text: str = "",
         provider: str = "",
+        request_id: str = "",
+        input_text: str = "",
+        response_preview: str = "",
+        message_count: int = 0,
+        has_images: bool = False,
+        detection_layer: str = "",
+        http_status: int | None = None,
+        finish_reason: str | None = None,
+        fallback_model: str | None = None,
+        fallback_chain: list[str] | None = None,
     ) -> None:
-        body = {
+        body: dict[str, Any] = {
             "model": model,
-            "error_type": error_type,
-            "input_preview": input_text[: self._preview_length],
-            "source_project": self._project,
             "provider": provider,
+            "source_project": self._project,
+            "request_id": request_id,
+            "input_preview": input_text[: self._preview_length],
+            "response_preview": response_preview[: self._preview_length],
+            "message_count": message_count,
+            "has_images": has_images,
+            "detection_layer": detection_layer,
+            "http_status": http_status,
+            "finish_reason": finish_reason,
+            "fallback_model": fallback_model,
+            "fallback_chain": fallback_chain,
         }
         try:
             http = self._get_http()

@@ -31,15 +31,19 @@ class TestReportRefusal:
         )
         await client.report_refusal(
             model="deepseek-v4",
-            error_type="sensitive_words_detected",
-            input_text="这是测试内容，前200字会被截取",
             provider="deepseek",
+            detection_layer="http_error",
+            http_status=500,
+            input_text="这是测试内容，前200字会被截取",
+            response_preview="sensitive_words_detected",
         )
         mock_http.post.assert_called_once()
         call_kwargs = mock_http.post.call_args
         body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
         assert body["model"] == "deepseek-v4"
         assert body["source_project"] == "test-project"
+        assert body["detection_layer"] == "http_error"
+        assert body["http_status"] == 500
 
     @pytest.mark.asyncio
     async def test_report_falls_back_to_cache(self, mock_http: AsyncMock, tmp_cache: Path):
@@ -52,7 +56,7 @@ class TestReportRefusal:
         )
         await client.report_refusal(
             model="deepseek-v4",
-            error_type="content_filter",
+            detection_layer="structured_signal",
             input_text="test",
         )
         assert tmp_cache.exists()

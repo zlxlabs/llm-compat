@@ -43,8 +43,14 @@ class TestCollectorIntegration:
 
     @pytest.mark.asyncio
     async def test_fallback_triggers_collector_report(self):
-        mock_collector = AsyncMock()
+        from unittest.mock import MagicMock
+
+        from llm_compat._collector import CollectorClient
+
+        mock_collector = MagicMock()
         mock_collector.report_refusal = AsyncMock()
+        real_collector = CollectorClient(url="http://test:8000")
+        mock_collector.extract_preview = real_collector.extract_preview
 
         client = LLMClient(
             base_url="http://api.example.com",
@@ -70,6 +76,13 @@ class TestCollectorIntegration:
         )
         assert result.fallback_from == "deepseek-v4"
         mock_collector.report_refusal.assert_called()
+        call_kwargs = mock_collector.report_refusal.call_args.kwargs
+        assert call_kwargs["model"] == "deepseek-v4"
+        assert call_kwargs["detection_layer"] == "keyword_match"
+        assert call_kwargs["fallback_model"] == "gpt-4.1-mini"
+        assert call_kwargs["message_count"] == 1
+        assert "测试内容" in call_kwargs["input_text"]
+        assert "我无法回答" in call_kwargs["response_preview"]
 
     @pytest.mark.asyncio
     async def test_no_fallback_no_report(self):

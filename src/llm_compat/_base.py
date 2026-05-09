@@ -133,6 +133,17 @@ class BaseClient:
         )
 
     @staticmethod
+    def _classify_refusal_layer(data: dict[str, Any]) -> str:
+        from .refusal import check_response_keywords, check_structured_signals
+        if check_structured_signals(data):
+            return "structured_signal"
+        choices = data.get("choices", [{}])
+        content = choices[0].get("message", {}).get("content", "") if choices else ""
+        if check_response_keywords(content):
+            return "keyword_match"
+        return "custom_detector"
+
+    @staticmethod
     def _has_vision_content(messages: list[dict[str, Any]]) -> bool:
         for msg in messages:
             content = msg.get("content")
@@ -245,10 +256,22 @@ class BaseClient:
         data: dict[str, Any] | None
         latency_ms: int
 
+        refusal_detail: dict[str, Any] = {}
+
         if resp.error:
             if isinstance(resp.error, ContentPolicyError) and chain:
                 data = None
                 latency_ms = int((time.monotonic() - deadline_start) * 1000)
+                http_status = None
+                cause = resp.error.__cause__
+                if hasattr(cause, "response"):
+                    http_status = getattr(cause.response, "status_code", None)
+                refusal_detail = {
+                    "detection_layer": "http_error",
+                    "http_status": http_status,
+                    "finish_reason": None,
+                    "response_preview": str(resp.error)[:200],
+                }
             elif isinstance(resp.error, ContentPolicyError):
                 self.stats.record_error(model=model, error_type="ContentPolicyError")
                 raise resp.error
@@ -278,13 +301,26 @@ class BaseClient:
                     latency_ms=latency_ms, request_id=request_id,
                 )
 
+            choices = data.get("choices", [{}])
+            choice = choices[0] if choices else {}
+            content = choice.get("message", {}).get("content", "") or ""
+            refusal_detail = {
+                "detection_layer": self._classify_refusal_layer(data),
+                "http_status": None,
+                "finish_reason": choice.get("finish_reason"),
+                "response_preview": content[:200],
+            }
+
         # Primary refused — enter fallback loop
         self.stats.record_fallback(refused_model=model)
         self._pending_refusal_report = {
             "model": model,
-            "error_type": "refusal_detected",
-            "messages": messages,
             "provider": provider,
+            "request_id": request_id,
+            "messages": messages,
+            "message_count": len(messages),
+            "has_images": self._has_vision_content(messages),
+            **refusal_detail,
         }
         logger.warning(
             "[%s] LLM fallback | model=%s refused | trying fallback chain",
