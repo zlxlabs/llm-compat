@@ -1,76 +1,120 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
 import pytest
 
 from llm_compat import LLMClient
+from llm_compat._keyword_cache import _keyword_cache, _polling_urls
 
 
-class TestRefusalKeywordsUrl:
-    @pytest.mark.asyncio
-    async def test_loads_keywords_from_url(self):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "words": ["自定义拒绝词1", "自定义拒绝词2"], "hash": "a", "count": 2,
-        }
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    _keyword_cache.clear()
+    _polling_urls.clear()
+    yield
+    _keyword_cache.clear()
+    _polling_urls.clear()
 
-        with patch("llm_compat._base.httpx.Client") as mock_client_cls:
-            mock_http = MagicMock()
-            mock_http.get.return_value = mock_resp
-            mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_http)
-            mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
 
-            client = LLMClient(
-                base_url="http://api.example.com",
-                api_key="sk-test",
-                refusal_keywords_url="http://collector:8000/words",
-            )
-            assert "自定义拒绝词1" in client._refusal_keywords
-            assert "自定义拒绝词2" in client._refusal_keywords
+class TestSingleUrl:
+    def test_loads_keywords_from_url(self):
+        _keyword_cache["http://test:8000/words"] = ["url词1", "url词2"]
+        client = LLMClient(
+            base_url="http://api.example.com",
+            api_key="sk-test",
+            refusal_keywords_url="http://test:8000/words",
+        )
+        kw = client._get_refusal_keywords()
+        assert "url词1" in kw
+        assert "url词2" in kw
 
-    @pytest.mark.asyncio
-    async def test_url_failure_uses_empty(self):
-        with patch("llm_compat._base.httpx.Client") as mock_client_cls:
-            mock_http = MagicMock()
-            mock_http.get.side_effect = Exception("connection refused")
-            mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_http)
-            mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
+    def test_merges_with_manual_keywords(self):
+        _keyword_cache["http://test:8000/words"] = ["url词"]
+        client = LLMClient(
+            base_url="http://api.example.com",
+            api_key="sk-test",
+            refusal_keywords=["手动词"],
+            refusal_keywords_url="http://test:8000/words",
+        )
+        kw = client._get_refusal_keywords()
+        assert "手动词" in kw
+        assert "url词" in kw
 
-            client = LLMClient(
-                base_url="http://api.example.com",
-                api_key="sk-test",
-                refusal_keywords_url="http://collector:8000/words",
-            )
-            assert client._refusal_keywords is None or client._refusal_keywords == []
-
-    @pytest.mark.asyncio
-    async def test_url_merges_with_manual_keywords(self):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {"words": ["url词"], "hash": "a", "count": 1}
-
-        with patch("llm_compat._base.httpx.Client") as mock_client_cls:
-            mock_http = MagicMock()
-            mock_http.get.return_value = mock_resp
-            mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_http)
-            mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
-
-            client = LLMClient(
-                base_url="http://api.example.com",
-                api_key="sk-test",
-                refusal_keywords=["手动词"],
-                refusal_keywords_url="http://collector:8000/words",
-            )
-            assert "手动词" in client._refusal_keywords
-            assert "url词" in client._refusal_keywords
-
-    @pytest.mark.asyncio
-    async def test_no_url_no_change(self):
+    def test_no_url_no_change(self):
         client = LLMClient(
             base_url="http://api.example.com",
             api_key="sk-test",
             refusal_keywords=["手动词"],
         )
-        assert client._refusal_keywords == ["手动词"]
+        kw = client._get_refusal_keywords()
+        assert kw == ["手动词"]
+
+    def test_no_url_no_manual_returns_none(self):
+        client = LLMClient(
+            base_url="http://api.example.com",
+            api_key="sk-test",
+        )
+        assert client._get_refusal_keywords() is None
+
+
+class TestMultipleUrls:
+    def test_multiple_urls_merged(self):
+        _keyword_cache["http://a:8000/words"] = ["词A"]
+        _keyword_cache["http://b:8000/words"] = ["词B"]
+        client = LLMClient(
+            base_url="http://api.example.com",
+            api_key="sk-test",
+            refusal_keywords_url=[
+                "http://a:8000/words",
+                "http://b:8000/words",
+            ],
+        )
+        kw = client._get_refusal_keywords()
+        assert "词A" in kw
+        assert "词B" in kw
+
+    def test_deduplication(self):
+        _keyword_cache["http://a:8000/words"] = ["重复词", "词A"]
+        _keyword_cache["http://b:8000/words"] = ["重复词", "词B"]
+        client = LLMClient(
+            base_url="http://api.example.com",
+            api_key="sk-test",
+            refusal_keywords=["重复词"],
+            refusal_keywords_url=[
+                "http://a:8000/words",
+                "http://b:8000/words",
+            ],
+        )
+        kw = client._get_refusal_keywords()
+        assert kw.count("重复词") == 1
+        assert "词A" in kw
+        assert "词B" in kw
+
+
+class TestDynamicUpdate:
+    def test_cache_update_reflects_in_keywords(self):
+        _keyword_cache["http://test:8000/words"] = ["旧词"]
+        client = LLMClient(
+            base_url="http://api.example.com",
+            api_key="sk-test",
+            refusal_keywords_url="http://test:8000/words",
+        )
+        assert "旧词" in client._get_refusal_keywords()
+
+        _keyword_cache["http://test:8000/words"] = ["旧词", "新词"]
+        kw = client._get_refusal_keywords()
+        assert "新词" in kw
+        assert "旧词" in kw
+
+    def test_partial_url_failure_keeps_others(self):
+        _keyword_cache["http://a:8000/words"] = ["词A"]
+        # URL B not cached (simulates failure)
+        client = LLMClient(
+            base_url="http://api.example.com",
+            api_key="sk-test",
+            refusal_keywords_url=[
+                "http://a:8000/words",
+                "http://b:8000/words",
+            ],
+        )
+        kw = client._get_refusal_keywords()
+        assert "词A" in kw

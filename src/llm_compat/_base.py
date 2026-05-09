@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from ._collector import CollectorClient
 from ._compat import normalize_reasoning_effort
+from ._keyword_cache import get_cached_keywords
 from ._types import ChatResult, LLMStats, TokenUsage
 from .errors import ContentPolicyError, JSONParseError
 from .fallback import filter_by_modality, resolve_fallback_chain
@@ -59,7 +60,7 @@ class BaseClient:
         content_fallbacks: dict[str, list[str]] | None = None,
         refusal_detector: RefusalDetector | None = None,
         refusal_keywords: list[str] | None = None,
-        refusal_keywords_url: str | None = None,
+        refusal_keywords_url: str | list[str] | None = None,
         sensitive_detector: SensitiveDetector | None = None,
         collector_url: str | None = None,
         collector_project: str = "",
@@ -74,9 +75,15 @@ class BaseClient:
         self._total_timeout = total_timeout
         self._content_fallbacks = content_fallbacks
         self._refusal_detector = refusal_detector
-        self._refusal_keywords = self._load_refusal_keywords(
-            refusal_keywords, refusal_keywords_url,
-        )
+        self._refusal_keywords_manual = refusal_keywords
+        self._refusal_keywords_urls: list[str] = []
+        if refusal_keywords_url:
+            if isinstance(refusal_keywords_url, str):
+                self._refusal_keywords_urls = [refusal_keywords_url]
+            else:
+                self._refusal_keywords_urls = list(refusal_keywords_url)
+            for url in self._refusal_keywords_urls:
+                get_cached_keywords(url)
         self._sensitive_detector = sensitive_detector
         self._collector: CollectorClient | None = None
         if collector_url:
@@ -86,22 +93,16 @@ class BaseClient:
         self._pending_refusal_report: dict[str, Any] | None = None
         self.stats = LLMStats()
 
-    @staticmethod
-    def _load_refusal_keywords(
-        manual: list[str] | None,
-        url: str | None,
-    ) -> list[str] | None:
-        url_words: list[str] = []
-        if url:
-            try:
-                with httpx.Client(timeout=5.0) as http:
-                    resp = http.get(url)
-                    url_words = resp.json().get("words", [])
-            except Exception:
-                logger.debug("Failed to load refusal keywords from %s", url)
-        if not manual and not url_words:
-            return manual
-        return (manual or []) + url_words
+    def _get_refusal_keywords(self) -> list[str] | None:
+        all_words: set[str] = set()
+        if self._refusal_keywords_manual:
+            all_words.update(self._refusal_keywords_manual)
+        for url in self._refusal_keywords_urls:
+            all_words.update(get_cached_keywords(url))
+        no_urls = not self._refusal_keywords_urls
+        if not all_words and no_urls and self._refusal_keywords_manual is None:
+            return None
+        return list(all_words)
 
     def _build_payload(
         self,
@@ -306,7 +307,7 @@ class BaseClient:
             if not detect_refusal(
                 data,
                 self._refusal_detector,
-                extra_keywords=self._refusal_keywords,
+                extra_keywords=self._get_refusal_keywords(),
                 model=model,
                 provider=provider,
             ):
@@ -383,7 +384,7 @@ class BaseClient:
             if not detect_refusal(
                 resp.data,
                 self._refusal_detector,
-                extra_keywords=self._refusal_keywords,
+                extra_keywords=self._get_refusal_keywords(),
                 model=fb_model,
                 provider=fb_provider,
             ):
