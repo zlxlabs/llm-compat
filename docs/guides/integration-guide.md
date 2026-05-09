@@ -144,12 +144,12 @@ async with LLMClient(
     base_url="https://your-newapi.com/v1",
     api_key="sk-xxx",
     content_fallbacks={                                    # 新增
-        "deepseek-*": ["gpt-4.1-mini", "gemini-2.5-flash"],
-        "qwen-*": ["gpt-4.1-mini"],
+        "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
     },
 ) as client:
-    result = await client.chat("deepseek-v4", messages)
-    # deepseek 被拒绝 → 自动尝试 gpt-4.1-mini → 再不行尝试 gemini-2.5-flash
+    result = await client.chat("deepseek-v4-pro", messages)
+    # deepseek-v4-pro 被拒绝 → 自动尝试 gemini-3-flash-preview → 再不行尝试 gemini-2.5-flash
     print(result.model)          # 实际使用的模型
     print(result.fallback_from)  # 原始模型（未降级时为 None）
 ```
@@ -187,7 +187,7 @@ from llm_compat.sensitive import SensitiveDetector
 detector = SensitiveDetector(words=["敏感词1", "敏感词2"])
 client = LLMClient(
     ...,
-    content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+    content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
     sensitive_detector=detector,                            # 新增
 )
 # 输入包含敏感词时，直接用 fallback 模型，省一次 API 调用
@@ -199,11 +199,11 @@ client = LLMClient(
 from llm_compat import ContentPolicyError
 
 try:
-    result = await client.chat("deepseek-v4", messages)
+    result = await client.chat("deepseek-v4-pro", messages)
 except ContentPolicyError as e:
-    print(e.attempted_models)  # ['deepseek-v4', 'gpt-4.1-mini', 'gemini-2.5-flash']
+    print(e.attempted_models)  # ['deepseek-v4-pro', 'gemini-3-flash-preview', 'gemini-2.5-flash']
     print(e.raw_content)       # 最后一个模型的拒绝内容
-    print(e.original_model)    # 'deepseek-v4'
+    print(e.original_model)    # 'deepseek-v4-pro'
 ```
 
 ### 到这一步你获得了
@@ -255,15 +255,15 @@ async with LLMClient(
     base_url="https://your-newapi.com/v1",
     api_key="sk-xxx",
     content_fallbacks={
-        "deepseek-*": ["gpt-4.1-mini", "gemini-2.5-flash"],
-        "qwen-*": ["gpt-4.1-mini"],
+        "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
     },
     # ---- 新增：Collector 集成 ----
     collector_url="http://llm-compat-collector:8000",    # Collector 服务地址
     collector_project="your-project-name",               # 来源标识，如 "video-api"
     collector_api_key="",                                # 与 Collector 的 COLLECTOR_API_KEY 一致
 ) as client:
-    result = await client.chat("deepseek-v4", messages)
+    result = await client.chat("deepseek-v4-pro", messages)
     # 行为与之前完全一致
     # 唯一区别：fallback 触发时自动上报拒绝事件到 Collector
 ```
@@ -276,7 +276,10 @@ import os
 client = LLMClient(
     base_url=os.environ["LLM_BASE_URL"],
     api_key=os.environ["LLM_API_KEY"],
-    content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+    content_fallbacks={
+        "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
+    },
     collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
     collector_project=os.environ.get("LLM_COLLECTOR_PROJECT", ""),
     collector_api_key=os.environ.get("LLM_COLLECTOR_API_KEY", ""),
@@ -336,8 +339,8 @@ curl -s http://localhost:8234/stats | python3 -m json.tool
 | `response_preview` | `"我无法回答..."` | 了解拒绝原因 |
 | `detection_layer` | `http_error` | 哪层检测到的 |
 | `http_status` | `500` | HTTP 状态码 |
-| `fallback_model` | `gpt-4.1-mini` | 谁兜住了 |
-| `fallback_chain` | `["deepseek-v4", "gpt-4.1-mini"]` | 完整尝试链 |
+| `fallback_model` | `gemini-3-flash-preview` | 谁兜住了 |
+| `fallback_chain` | `["deepseek-v4-pro", "gemini-3-flash-preview"]` | 完整尝试链 |
 | + 4 个辅助字段 | | message_count, has_images, finish_reason, created_at |
 
 ### 3.7 降级保障
@@ -410,8 +413,8 @@ async with LLMClient(
 
     # 内容审查降级
     content_fallbacks={
-        "deepseek-*": ["gpt-4.1-mini", "gemini-2.5-flash"],
-        "qwen-*": ["gpt-4.1-mini"],
+        "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
     },
     sensitive_detector=detector,
 
@@ -420,7 +423,7 @@ async with LLMClient(
     collector_project=os.environ.get("LLM_COLLECTOR_PROJECT", ""),
     collector_api_key=os.environ.get("LLM_COLLECTOR_API_KEY", ""),
 ) as client:
-    result = await client.chat("deepseek-v4", messages)
+    result = await client.chat("deepseek-v4-pro", messages)
 ```
 
 ---
@@ -497,7 +500,7 @@ class LLMClient:
         self._base = BaseLLMClient(
             base_url=config.text.base_url,
             api_key=config.text.api_key,
-            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+            content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
             collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
             collector_project="my-project",
         )

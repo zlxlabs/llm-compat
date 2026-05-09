@@ -123,12 +123,12 @@ async with LLMClient(
     base_url="https://your-newapi.com/v1",
     api_key="sk-xxx",
     content_fallbacks={
-        "deepseek-*": ["gpt-4.1-mini", "gemini-2.5-flash"],
-        "qwen-*": ["gpt-4.1-mini"],
+        "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
+        "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
     },
 ) as client:
-    result = await client.chat("deepseek-v4", messages)
-    # 如果 deepseek-v4 被拒绝，自动尝试 gpt-4.1-mini，再不行尝试 gemini-2.5-flash
+    result = await client.chat("deepseek-v4-pro", messages)
+    # 如果 deepseek-v4-pro 被拒绝，自动尝试 gemini-3-flash-preview，再不行尝试 gemini-2.5-flash
     print(result.model)          # 实际使用的模型
     print(result.fallback_from)  # 原始模型（未降级时为 None）
 ```
@@ -159,7 +159,7 @@ def my_detector(ctx: RefusalContext) -> bool:
 
 client = LLMClient(
     ...,
-    content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+    content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
     refusal_detector=my_detector,
     refusal_keywords=["额外关键词"],  # 追加到内置列表
 )
@@ -175,7 +175,7 @@ from llm_compat.sensitive import SensitiveDetector
 detector = SensitiveDetector(words=["敏感词1", "敏感词2"])
 client = LLMClient(
     ...,
-    content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+    content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
     sensitive_detector=detector,
 )
 # 输入包含敏感词时，直接用 fallback 模型，不浪费主模型的 API 调用
@@ -228,7 +228,7 @@ docker compose up -d
 async with LLMClient(
     base_url="https://your-newapi.com/v1",
     api_key="sk-xxx",
-    content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+    content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
     # Collector 集成（可选，不配则不上报）
     collector_url="http://llm-compat-collector:8000",
     collector_project="my-project",       # 来源标识，区分哪个项目触发的拒绝
