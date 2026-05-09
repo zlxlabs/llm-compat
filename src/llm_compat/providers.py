@@ -44,62 +44,84 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "efforts": frozenset({"low", "medium", "high", "max", "xhigh"}),
         "min_effort": "low",
         "max_effort": "xhigh",
+        "supports_vision": False,
     },
     "gemini_25": {
         "disable_mode": "effort_none",
         "efforts": frozenset({"low", "medium", "high"}),
         "min_effort": "low",
         "max_effort": "high",
+        "supports_vision": True,
     },
     "gemini_3": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
         "min_effort": "minimal",
         "max_effort": "high",
+        "supports_vision": True,
     },
     "gemini": {
         "disable_mode": "effort_none",
         "efforts": frozenset({"low", "medium", "high"}),
         "min_effort": "low",
         "max_effort": "high",
+        "supports_vision": True,
     },
     "openai_gpt5": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
         "min_effort": "minimal",
         "max_effort": "high",
+        "supports_vision": True,
     },
     "openai_gpt4": {
         "disable_mode": "na",
         "efforts": frozenset(),
         "min_effort": None,
         "max_effort": None,
+        "supports_vision": True,
     },
     "openai_o": {
         "disable_mode": "unsupported",
         "efforts": frozenset({"low", "medium", "high"}),
         "min_effort": "low",
         "max_effort": "high",
+        "supports_vision": False,
     },
     "doubao_seed": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
         "min_effort": "minimal",
         "max_effort": "high",
+        "supports_vision": False,
     },
     "doubao": {
         "disable_mode": "na",
         "efforts": frozenset(),
         "min_effort": None,
         "max_effort": None,
+        "supports_vision": False,
     },
     "openai": {
         "disable_mode": "na",
         "efforts": frozenset({"low", "medium", "high"}),
         "min_effort": "low",
         "max_effort": "high",
+        "supports_vision": True,
     },
 }
+
+_DEFAULT_CAPS: dict[str, Any] = {
+    "disable_mode": "na",
+    "efforts": frozenset(),
+    "min_effort": None,
+    "max_effort": None,
+    "supports_vision": True,
+}
+
+
+def get_provider_caps(family: str) -> dict[str, Any]:
+    return _FAMILY_CAPABILITIES.get(family, _DEFAULT_CAPS)
 
 _custom_patterns: tuple[tuple[str, str], ...] | None = None
 
