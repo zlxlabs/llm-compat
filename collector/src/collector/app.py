@@ -132,3 +132,18 @@ def create_app(db_path: str = "collector.db") -> FastAPI:
                 raise HTTPException(status_code=404, detail="Word not found")
 
     return app
+
+
+def _default_app() -> FastAPI:
+    import os
+    return create_app(os.environ.get("COLLECTOR_DB_PATH", "/data/collector.db"))
+
+
+app: FastAPI | None = None
+
+
+def get_app() -> FastAPI:
+    global app
+    if app is None:
+        app = _default_app()
+    return app

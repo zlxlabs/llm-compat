@@ -1,0 +1,18 @@
+services:
+  llm-compat-collector:
+    build: .
+    ports:
+      - "127.0.0.1:8234:8000"
+    volumes:
+      - collector-data:/data
+    restart: unless-stopped
+    networks:
+      - llm-net
+
+volumes:
+  collector-data:
+
+networks:
+  llm-net:
+    name: llm-net
+    external: true
