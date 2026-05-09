@@ -20,6 +20,8 @@ class ChatResult:
     request_id: str = ""
     model: str = ""
     provider: str = ""
+    fallback_from: str | None = None
+    fallback_chain: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
         return self.content
@@ -39,6 +41,9 @@ class LLMStats:
     error_count: int = 0
     total_tokens: int = 0
     total_latency_ms: int = 0
+    fallback_count: int = 0
+    prescan_skips: int = 0
+    _refusal_counts: dict[str, int] = field(default_factory=dict)
     _errors_by_type: dict[str, int] = field(default_factory=dict)
 
     @property
@@ -58,10 +63,20 @@ class LLMStats:
         self.error_count += 1
         self._errors_by_type[error_type] = self._errors_by_type.get(error_type, 0) + 1
 
+    def record_fallback(self, *, refused_model: str) -> None:
+        self.fallback_count += 1
+        self._refusal_counts[refused_model] = self._refusal_counts.get(refused_model, 0) + 1
+
+    def record_prescan_skip(self) -> None:
+        self.prescan_skips += 1
+
     def reset(self) -> None:
         self.total_calls = 0
         self.success_count = 0
         self.error_count = 0
         self.total_tokens = 0
         self.total_latency_ms = 0
+        self.fallback_count = 0
+        self.prescan_skips = 0
+        self._refusal_counts.clear()
         self._errors_by_type.clear()
