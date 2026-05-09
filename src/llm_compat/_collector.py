@@ -17,20 +17,29 @@ class CollectorClient:
         project: str = "",
         preview_length: int = 200,
         cache_path: Path | str | None = None,
+        api_key: str = "",
         http: Any = None,
     ) -> None:
         self._url = url.rstrip("/")
         self._project = project
         self._preview_length = preview_length
         self._cache_path = Path(cache_path) if cache_path else None
+        self._api_key = api_key
         self._http = http
         self._words_hash: str = ""
+
+    def _auth_headers(self) -> dict[str, str]:
+        if self._api_key:
+            return {"Authorization": f"Bearer {self._api_key}"}
+        return {}
 
     def _get_http(self) -> Any:
         if self._http is not None:
             return self._http
         if not hasattr(self, "_own_http") or self._own_http is None:
-            self._own_http = httpx.AsyncClient(base_url=self._url, timeout=5.0)
+            self._own_http = httpx.AsyncClient(
+                base_url=self._url, timeout=5.0, headers=self._auth_headers(),
+            )
         return self._own_http
 
     async def report_refusal(

@@ -62,6 +62,7 @@ class BaseClient:
         sensitive_detector: SensitiveDetector | None = None,
         collector_url: str | None = None,
         collector_project: str = "",
+        collector_api_key: str = "",
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -76,7 +77,9 @@ class BaseClient:
         self._sensitive_detector = sensitive_detector
         self._collector: CollectorClient | None = None
         if collector_url:
-            self._collector = CollectorClient(url=collector_url, project=collector_project)
+            self._collector = CollectorClient(
+                url=collector_url, project=collector_project, api_key=collector_api_key,
+            )
         self._pending_refusal_report: dict[str, Any] | None = None
         self.stats = LLMStats()
 

@@ -5,7 +5,7 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Any, Generator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 
@@ -48,12 +48,19 @@ def _init_db(conn: sqlite3.Connection) -> None:
     """)
 
 
-def create_app(db_path: str = "collector.db") -> FastAPI:
+def create_app(db_path: str = "collector.db", api_key: str = "") -> FastAPI:
     app = FastAPI(title="llm-compat-collector")
 
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     _init_db(conn)
+
+    def _require_auth(request: Request) -> None:
+        if not api_key:
+            return
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {api_key}":
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
     @contextmanager
     def get_db() -> Generator[sqlite3.Connection, None, None]:
@@ -62,7 +69,7 @@ def create_app(db_path: str = "collector.db") -> FastAPI:
         finally:
             conn.commit()
 
-    @app.post("/refusals", status_code=201)
+    @app.post("/refusals", status_code=201, dependencies=[Depends(_require_auth)])
     def report_refusal(body: RefusalIn) -> dict[str, str]:
         with get_db() as db:
             db.execute(
@@ -79,7 +86,7 @@ def create_app(db_path: str = "collector.db") -> FastAPI:
             words = [r["word"] for r in rows]
             return {"words": words, "hash": _compute_hash(words), "count": len(words)}
 
-    @app.post("/words", status_code=201)
+    @app.post("/words", status_code=201, dependencies=[Depends(_require_auth)])
     def add_word(body: WordIn) -> dict[str, str]:
         with get_db() as db:
             try:
@@ -124,7 +131,7 @@ def create_app(db_path: str = "collector.db") -> FastAPI:
             words = [r["word"] for r in rows]
             return {"hash": _compute_hash(words)}
 
-    @app.delete("/words/{word}", status_code=204)
+    @app.delete("/words/{word}", status_code=204, dependencies=[Depends(_require_auth)])
     def delete_word(word: str) -> None:
         with get_db() as db:
             cursor = db.execute("DELETE FROM words WHERE word = ?", (word,))
@@ -136,7 +143,11 @@ def create_app(db_path: str = "collector.db") -> FastAPI:
 
 def _default_app() -> FastAPI:
     import os
-    return create_app(os.environ.get("COLLECTOR_DB_PATH", "/data/collector.db"))
+
+    return create_app(
+        db_path=os.environ.get("COLLECTOR_DB_PATH", "/data/collector.db"),
+        api_key=os.environ.get("COLLECTOR_API_KEY", ""),
+    )
 
 
 app: FastAPI | None = None
