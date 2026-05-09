@@ -10,6 +10,7 @@ from typing import TypeVar
 import httpx
 
 from .errors import (
+    ContentPolicyError,
     FatalError,
     RetryableError,
     TimeoutError,
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-_NO_RETRY_TYPES = (TimeoutError, TruncationError)
+_NO_RETRY_TYPES = (TimeoutError, TruncationError, ContentPolicyError)
 
 
 def _get_retry_after(exc: Exception) -> float | None:

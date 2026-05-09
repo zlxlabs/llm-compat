@@ -7,6 +7,17 @@ _FATAL_STATUS_CODES: frozenset[int] = frozenset({400, 401, 403, 404})
 
 _TRUNCATION_PATTERNS = ("unterminated string", "unexpected end")
 
+_CONTENT_POLICY_STATUS_CODES: frozenset[int] = frozenset({400, 403})
+_CONTENT_POLICY_BODY_KEYWORDS: tuple[str, ...] = (
+    "content_policy",
+    "content policy",
+    "content_filter",
+    "content filter",
+    "sensitive",
+    "moderation",
+    "blocked",
+)
+
 
 class LLMError(Exception):
     pass
@@ -26,6 +37,21 @@ class TimeoutError(RetryableError):
 
 class TruncationError(RetryableError):
     pass
+
+
+class ContentPolicyError(LLMError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        attempted_models: list[str] | None = None,
+        raw_content: str = "",
+        original_model: str = "",
+    ) -> None:
+        super().__init__(message)
+        self.attempted_models: list[str] = attempted_models or []
+        self.raw_content = raw_content
+        self.original_model = original_model
 
 
 class JSONParseError(LLMError):
@@ -49,6 +75,10 @@ def classify_error(error: Exception) -> type[LLMError]:
 
     if isinstance(error, httpx.HTTPStatusError):
         code = error.response.status_code
+        if code in _CONTENT_POLICY_STATUS_CODES:
+            body = error.response.text.lower()
+            if any(kw in body for kw in _CONTENT_POLICY_BODY_KEYWORDS):
+                return ContentPolicyError
         if code in _FATAL_STATUS_CODES:
             return FatalError
         if code in _RETRYABLE_STATUS_CODES:
