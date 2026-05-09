@@ -1,48 +1,32 @@
-# Collector 接入指南
+# llm-compat 从零接入指南
 
-下游项目接入 llm-compat-collector，实现拒绝事件自动上报 + 敏感词共享。
+从零开始接入 llm-compat，获得：多 provider 适配、内容审查自动降级、敏感词积累。
 
-## 前提条件
+## 你现在的代码可能长这样
 
-- llm-compat-collector 服务已部署（当前运行在 n305 的 `127.0.0.1:8234`）
-- 项目已使用 llm-compat 的 content fallback 功能
-- 项目容器在 `llm-net` Docker 网络中
+```python
+import httpx
 
-## 接入步骤
-
-### 1. 确认 llm-compat 版本
-
-确保使用最新版本（包含 collector 集成）：
-
-```bash
-uv add git+https://github.com/zj1123581321/llm-compat.git@main
+async with httpx.AsyncClient(base_url="https://your-newapi.com/v1") as client:
+    resp = await client.post(
+        "/chat/completions",
+        headers={"Authorization": "Bearer sk-xxx"},
+        json={
+            "model": "deepseek-v4",
+            "messages": [{"role": "user", "content": "hello"}],
+        },
+    )
+    data = resp.json()
+    content = data["choices"][0]["message"]["content"]
 ```
 
-### 2. 项目容器加入 llm-net 网络
+问题：
+- 切模型时 thinking/reasoning_effort 参数各家写法不同
+- deepseek 因内容审查返回 500，需要手动切换到海外模型
+- JSON 输出格式不一致（code fence、bare list）
+- 重试、超时、日志每个项目都在重复写
 
-在项目的 `docker-compose.yml` 中添加：
-
-```yaml
-services:
-  your-app:
-    # ... 已有配置 ...
-    networks:
-      - llm-net      # 新增
-
-networks:
-  llm-net:
-    external: true    # 使用已存在的共享网络
-```
-
-如果网络不存在，先创建：
-
-```bash
-docker network create llm-net
-```
-
-### 3. 修改 LLMClient 初始化
-
-在原有配置基础上，加三个参数：
+## 接入后的代码
 
 ```python
 from llm_compat import LLMClient
@@ -50,39 +34,241 @@ from llm_compat import LLMClient
 async with LLMClient(
     base_url="https://your-newapi.com/v1",
     api_key="sk-xxx",
-
-    # 已有的 fallback 配置（必须有，collector 依赖 fallback 触发上报）
-    content_fallbacks={
-        "deepseek-*": ["gpt-4.1-mini", "gemini-2.5-flash"],
-        "qwen-*": ["gpt-4.1-mini"],
-    },
-
-    # ---- 新增：collector 集成 ----
-    collector_url="http://llm-compat-collector:8000",
-    collector_project="your-project-name",   # 标识来源，如 "video-api"
-    collector_api_key="",                    # 与服务端 COLLECTOR_API_KEY 一致，未设则留空
 ) as client:
-    result = await client.chat("deepseek-v4", messages)
+    result = await client.chat("deepseek-v4", [{"role": "user", "content": "hello"}])
+    print(result)              # 直接当 str 用
+    print(result.usage)        # TokenUsage(prompt=8, completion=75, total=83)
+    print(result.latency_ms)   # 1519
 ```
 
-同步客户端同理：
+下面分三步走，每一步都是独立可用的，可以按需停下。
+
+---
+
+## 第一步：基础接入
+
+### 1.1 安装
+
+```bash
+uv add git+https://github.com/zj1123581321/llm-compat.git
+```
+
+### 1.2 替换 HTTP 调用
+
+**异步（推荐）：**
+
+```python
+from llm_compat import LLMClient
+
+async with LLMClient(
+    base_url="https://your-newapi.com/v1",
+    api_key="sk-xxx",
+) as client:
+    # 基础对话
+    result = await client.chat(
+        "deepseek-v4",
+        [{"role": "user", "content": "hello"}],
+        reasoning_effort="high",  # 自动翻译为各 provider 格式
+    )
+    print(result)              # str
+    print(result.usage)        # TokenUsage
+    print(result.latency_ms)   # int
+    print(result.request_id)   # str
+
+    # JSON 输出（自动清洗 code fence、bare list）
+    from pydantic import BaseModel
+
+    class TagResult(BaseModel):
+        tags: list[str]
+
+    result = await client.chat_json(
+        "gpt-4.1-mini",
+        [{"role": "user", "content": "给 Python 打 3 个标签"}],
+        schema=TagResult,
+    )
+    print(result.parsed)  # TagResult(tags=['编程语言', 'Python', '开发'])
+
+    # 流式输出
+    async for chunk in client.chat_stream("deepseek-v4", messages):
+        print(chunk, end="")
+
+    # 图片理解
+    result = await client.chat_image(
+        "gpt-4o", "描述这张图",
+        image_data=raw_bytes, media_type="image/png",
+    )
+```
+
+**同步：**
 
 ```python
 from llm_compat import SyncLLMClient
 
-with SyncLLMClient(
-    base_url="...",
-    api_key="...",
-    content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
-    collector_url="http://llm-compat-collector:8000",
-    collector_project="your-project-name",
-) as client:
-    result = client.chat("deepseek-v4", messages)
+with SyncLLMClient(base_url="...", api_key="...") as client:
+    result = client.chat("gpt-4.1-mini", messages)
 ```
 
-### 4. 通过环境变量配置（推荐）
+### 1.3 错误处理
 
-避免硬编码，用环境变量：
+```python
+from llm_compat import FatalError, TimeoutError, JSONParseError
+
+try:
+    result = await client.chat_json("gpt-4o", messages, schema=MyModel)
+except JSONParseError as e:
+    print(e.raw_content)   # 模型返回的原始内容
+except TimeoutError:
+    pass  # 不会重试（同样的输入大概率同样超时）
+except FatalError:
+    pass  # 401/403/404，不会重试
+```
+
+### 到这一步你获得了
+
+- 自动重试（指数退避，可配置）
+- 结构化日志（标准 logging，带 request_id）
+- reasoning_effort 跨 provider 翻译（deepseek/gemini/openai 写法不同）
+- JSON 输出清洗（code fence 剥离、Pydantic 校验）
+- 统一的错误层级
+
+---
+
+## 第二步：内容审查自动降级
+
+国内模型（DeepSeek、Qwen 等）因内容审查拒绝回答时，自动切换到海外模型。
+
+### 2.1 配置 fallback 链
+
+```python
+async with LLMClient(
+    base_url="https://your-newapi.com/v1",
+    api_key="sk-xxx",
+    content_fallbacks={                                    # 新增
+        "deepseek-*": ["gpt-4.1-mini", "gemini-2.5-flash"],
+        "qwen-*": ["gpt-4.1-mini"],
+    },
+) as client:
+    result = await client.chat("deepseek-v4", messages)
+    # deepseek 被拒绝 → 自动尝试 gpt-4.1-mini → 再不行尝试 gemini-2.5-flash
+    print(result.model)          # 实际使用的模型
+    print(result.fallback_from)  # 原始模型（未降级时为 None）
+```
+
+### 2.2 工作机制
+
+拒绝检测三层（自动，无需配置）：
+
+1. **结构化信号**：`finish_reason=content_filter`、空 `choices`、`refusal` 字段
+2. **HTTP 错误码**：400/403/451/500 + body 包含 `sensitive_words`、`content_policy` 等
+3. **响应文本关键词**：内置中英文拒绝关键词列表（`我无法回答`、`I cannot assist` 等）
+
+### 2.3 图片请求自动跳过不支持的模型
+
+```python
+# deepseek 不支持 vision，fallback 链中只会尝试支持 vision 的模型
+result = await client.chat_image(
+    "deepseek-v4", "描述这张图",
+    image_data=img, media_type="image/png",
+)
+```
+
+### 2.4 前置敏感词检测（可选）
+
+如果你已有已知的敏感词列表，可以在发送前检测，直接跳过主模型：
+
+```bash
+# 安装可选依赖，启用高性能匹配
+uv add "git+https://github.com/zj1123581321/llm-compat.git[sensitive]"
+```
+
+```python
+from llm_compat.sensitive import SensitiveDetector
+
+detector = SensitiveDetector(words=["敏感词1", "敏感词2"])
+client = LLMClient(
+    ...,
+    content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+    sensitive_detector=detector,                            # 新增
+)
+# 输入包含敏感词时，直接用 fallback 模型，省一次 API 调用
+```
+
+### 2.5 所有模型都拒绝时
+
+```python
+from llm_compat import ContentPolicyError
+
+try:
+    result = await client.chat("deepseek-v4", messages)
+except ContentPolicyError as e:
+    print(e.attempted_models)  # ['deepseek-v4', 'gpt-4.1-mini', 'gemini-2.5-flash']
+    print(e.raw_content)       # 最后一个模型的拒绝内容
+    print(e.original_model)    # 'deepseek-v4'
+```
+
+### 到这一步你获得了
+
+- 内容审查被拒时自动切换到海外模型
+- 三层拒绝检测（结构化信号 → HTTP 错误 → 关键词）
+- 图片请求自动跳过不支持 vision 的 fallback 模型
+- 可选的前置敏感词检测（已知敏感词直接跳过，省 API 调用）
+
+---
+
+## 第三步：接入 Collector（敏感词积累）
+
+Collector 是一个独立的 Sidecar 服务，自动收集所有项目的拒绝事件，人工审核后提取敏感词，反馈回所有项目的 pre-scan。
+
+```
+项目 A ──┐                                    ┌── 项目 A 加载新词表
+项目 B ──┼── 拒绝事件上报 → Collector → 人工审核 ──┼── 项目 B 加载新词表
+项目 C ──┘                  (SQLite)    加词    └── 项目 C 加载新词表
+```
+
+### 3.1 前提：Collector 服务已部署
+
+Collector 是独立部署的（不在你的项目里），部署方式见仓库的 `collector/` 目录。如果你的团队已经部署好了，跳到 3.2。
+
+### 3.2 项目容器加入 llm-net 网络
+
+Collector 和你的项目需要在同一个 Docker 网络中通信：
+
+```yaml
+# 你的项目 docker-compose.yml
+services:
+  your-app:
+    # ... 已有配置 ...
+    networks:
+      - llm-net               # 新增
+
+networks:
+  llm-net:
+    external: true             # 使用已存在的共享网络
+```
+
+### 3.3 添加 Collector 参数
+
+在第二步的基础上，加三个参数：
+
+```python
+async with LLMClient(
+    base_url="https://your-newapi.com/v1",
+    api_key="sk-xxx",
+    content_fallbacks={
+        "deepseek-*": ["gpt-4.1-mini", "gemini-2.5-flash"],
+        "qwen-*": ["gpt-4.1-mini"],
+    },
+    # ---- 新增：Collector 集成 ----
+    collector_url="http://llm-compat-collector:8000",    # Collector 服务地址
+    collector_project="your-project-name",               # 来源标识，如 "video-api"
+    collector_api_key="",                                # 与 Collector 的 COLLECTOR_API_KEY 一致
+) as client:
+    result = await client.chat("deepseek-v4", messages)
+    # 行为与之前完全一致
+    # 唯一区别：fallback 触发时自动上报拒绝事件到 Collector
+```
+
+### 3.4 推荐：用环境变量配置
 
 ```python
 import os
@@ -97,120 +283,104 @@ client = LLMClient(
 )
 ```
 
-项目 `.env` 文件：
+项目 `.env`：
 
 ```env
+LLM_BASE_URL=https://your-newapi.com/v1
+LLM_API_KEY=sk-xxx
 LLM_COLLECTOR_URL=http://llm-compat-collector:8000
 LLM_COLLECTOR_PROJECT=your-project-name
 LLM_COLLECTOR_API_KEY=
 ```
 
-**注意**：`collector_url` 为空时不启用 collector，行为与之前完全一致。
+### 3.5 验证接入
 
-## 工作原理
-
-接入后的行为变化：
-
-```
-之前（无 collector）：
-  请求 → deepseek 拒绝 → fallback 到 gpt-4.1-mini → 返回结果
-                          ↑
-                          这次拒绝的信息丢失了
-
-之后（有 collector）：
-  请求 → deepseek 拒绝 → fallback 到 gpt-4.1-mini → 返回结果
-                          ↓
-                          自动上报拒绝事件到 collector（fire-and-forget，不增加延迟）
-```
-
-### 上报内容
-
-每次 fallback 触发时，自动上报 14 个字段：
-
-| 字段 | 示例 | 说明 |
-|------|------|------|
-| `model` | `deepseek-v4` | 被拒绝的模型 |
-| `provider` | `deepseek` | provider 族 |
-| `source_project` | `video-api` | 你的项目标识 |
-| `request_id` | `a1b2c3d4` | 关联日志 |
-| `input_preview` | `"用户输入前200字..."` | 输入摘要 |
-| `response_preview` | `"我无法回答..."` | 拒绝响应摘要 |
-| `message_count` | `3` | 对话消息数 |
-| `has_images` | `false` | 是否多模态 |
-| `detection_layer` | `http_error` | 检测层 |
-| `http_status` | `500` | HTTP 状态码 |
-| `finish_reason` | `content_filter` | API finish_reason |
-| `fallback_model` | `gpt-4.1-mini` | 最终成功的模型 |
-| `fallback_chain` | `["deepseek-v4", "gpt-4.1-mini"]` | 完整尝试链 |
-| `created_at` | `2026-05-09 15:30:00` | 服务端时间戳 |
-
-### 降级保障
-
-collector 不可用时（网络故障、服务重启等），上报会静默失败并写入本地缓存。**绝不影响主 chat 功能**。
-
-| 场景 | 行为 | 影响 |
-|------|------|------|
-| collector 正常 | 实时上报 | 无 |
-| collector 短暂不可用 | 写本地 JSONL 缓存 | 无 |
-| collector 完全不存在 | 静默跳过 | 无 |
-| collector_url 未配置 | 不启用 collector | 无 |
-
-## 验证接入
-
-### 1. 检查 collector 服务是否可达
-
-从项目容器内：
+**检查网络连通性**（从项目容器内）：
 
 ```bash
 docker exec your-container curl -s http://llm-compat-collector:8000/stats
+# 应返回 JSON：{"total_refusals": 0, "word_count": 0, ...}
 ```
 
-应返回 JSON。如果连不上，检查：
-- 容器是否在 `llm-net` 网络中：`docker network inspect llm-net`
-- collector 是否在运行：`docker ps | grep llm-compat-collector`
+连不上？检查：
+- `docker network inspect llm-net` 确认两个容器都在
+- `docker ps | grep llm-compat-collector` 确认 Collector 在运行
 
-### 2. 触发一次拒绝测试
+**触发拒绝测试**：
 
 ```python
-# 用一段已知会触发拒绝的内容测试
 result = await client.chat("deepseek-v4", [
     {"role": "user", "content": "（已知的敏感内容）"}
 ])
-print(result.fallback_from)  # 应该显示 "deepseek-v4"
+print(result.fallback_from)  # 应显示 "deepseek-v4"
 ```
 
-### 3. 检查上报是否成功
+**确认上报成功**：
 
 ```bash
-curl http://localhost:8234/stats | python3 -m json.tool
+curl -s http://localhost:8234/stats | python3 -m json.tool
+# total_refusals 应该增加
 ```
 
-应看到 `total_refusals` 增加，`recent_refusals` 中有刚才的记录。
+### 3.6 上报了什么
+
+每次 fallback 触发时自动上报，**fire-and-forget（不增加延迟）**：
+
+| 字段 | 示例 | 用途 |
+|------|------|------|
+| `model` | `deepseek-v4` | 哪个模型拒绝了 |
+| `provider` | `deepseek` | provider 族 |
+| `source_project` | `video-api` | 哪个项目 |
+| `request_id` | `a1b2c3d4` | 关联日志 |
+| `input_preview` | `"前200字..."` | 提取敏感词用 |
+| `response_preview` | `"我无法回答..."` | 了解拒绝原因 |
+| `detection_layer` | `http_error` | 哪层检测到的 |
+| `http_status` | `500` | HTTP 状态码 |
+| `fallback_model` | `gpt-4.1-mini` | 谁兜住了 |
+| `fallback_chain` | `["deepseek-v4", "gpt-4.1-mini"]` | 完整尝试链 |
+| + 4 个辅助字段 | | message_count, has_images, finish_reason, created_at |
+
+### 3.7 降级保障
+
+Collector 的任何故障都**不影响** chat 功能：
+
+| 场景 | 行为 |
+|------|------|
+| Collector 正常 | 实时上报 |
+| Collector 短暂不可用 | 写本地 JSONL 缓存，恢复后上传 |
+| Collector 完全不存在 | 静默跳过 |
+| `collector_url` 未配置 | 不启用，行为与第二步完全一致 |
+
+### 到这一步你获得了
+
+- 所有项目的拒绝事件自动汇聚到一处
+- 人工审核后加词，所有项目共享词表
+- 系统越用越聪明：新发现的敏感模式不断积累
+
+---
 
 ## 日常运维
 
-### 查看拒绝趋势
+### 查看拒绝统计
 
 ```bash
-# 统计概览
 curl -s http://localhost:8234/stats | python3 -m json.tool
-
-# 只看最近拒绝事件
-curl -s http://localhost:8234/stats | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-for r in data['recent_refusals']:
-    print(f\"{r['ts']}  {r['model']:20s}  {r['detection_layer']:18s}  {r['input_preview'][:50]}\")
-"
 ```
 
-### 审核后添加敏感词
+### 审核并添加敏感词
 
 ```bash
-# 添加词
+# 查看最近拒绝事件
+curl -s http://localhost:8234/stats | python3 -c "
+import json, sys
+for r in json.load(sys.stdin)['recent_refusals']:
+    print(f\"{r['ts']}  {r['model']:15s}  {r['detection_layer']:18s}  {r['input_preview'][:60]}\")
+"
+
+# 发现规律后加词
 curl -X POST http://localhost:8234/words \
   -H 'Content-Type: application/json' \
-  -d '{"word": "新发现的敏感词"}'
+  -d '{"word": "敏感词"}'
 
 # 查看当前词表
 curl -s http://localhost:8234/words | python3 -m json.tool
@@ -219,28 +389,64 @@ curl -s http://localhost:8234/words | python3 -m json.tool
 curl -X DELETE http://localhost:8234/words/误报词
 ```
 
-添加词后，各项目的 SensitiveDetector 会在下次热重载时自动加载（热重载功能待实现，当前需重启容器）。
+---
+
+## 完整配置示例
+
+```python
+import os
+from llm_compat import LLMClient
+from llm_compat.sensitive import SensitiveDetector
+
+# 可选：本地已知敏感词
+detector = SensitiveDetector(words=["已知敏感词1", "已知敏感词2"])
+
+async with LLMClient(
+    # 基础配置
+    base_url=os.environ["LLM_BASE_URL"],
+    api_key=os.environ["LLM_API_KEY"],
+    max_retries=3,
+    total_timeout=300.0,
+
+    # 内容审查降级
+    content_fallbacks={
+        "deepseek-*": ["gpt-4.1-mini", "gemini-2.5-flash"],
+        "qwen-*": ["gpt-4.1-mini"],
+    },
+    sensitive_detector=detector,
+
+    # Collector 集成（全部可选，不配就不启用）
+    collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
+    collector_project=os.environ.get("LLM_COLLECTOR_PROJECT", ""),
+    collector_api_key=os.environ.get("LLM_COLLECTOR_API_KEY", ""),
+) as client:
+    result = await client.chat("deepseek-v4", messages)
+```
+
+---
 
 ## 常见问题
 
-### Q: 不配 collector 会影响现有功能吗？
+### Q: 可以只用第一步不用后面的吗？
 
-不会。`collector_url` 不传或传空字符串，行为与之前完全一致。collector 是纯增量功能。
+可以。每一步都是独立的。第一步 = 统一的 LLM 客户端。第二步加降级。第三步加积累。按需停下。
 
-### Q: collector 挂了会影响 chat 吗？
+### Q: collector_url 不配会怎样？
 
-不会。上报是 fire-and-forget，失败静默跳过。collector 挂了 = 回到没有 collector 时的状态。
+不启用 Collector，行为与第二步完全一致。Collector 是纯增量功能。
 
-### Q: 多个项目怎么区分？
+### Q: Collector 挂了会影响 chat 吗？
 
-通过 `collector_project` 参数。每个项目传自己的名字，在 `/stats` 的 `recent_refusals` 中可以看到 `source_project` 字段。
+不会。上报是 fire-and-forget，Collector 挂了 = 回到没有 Collector 时的状态。
+
+### Q: 需要改业务逻辑吗？
+
+不需要。只改 `LLMClient` 初始化参数。`chat()` / `chat_json()` / `chat_image()` / `chat_stream()` 调用方式不变，返回类型不变。
+
+### Q: 多个项目怎么区分拒绝来源？
+
+通过 `collector_project` 参数。每个项目传自己的名字（如 `"video-api"`、`"memos-backend"`），Collector 的 `/stats` 中可看到 `source_project` 字段。
 
 ### Q: input_preview 会泄露用户数据吗？
 
-- collector 仅在 Docker 内网通信，不暴露公网
-- 摘要默认截取前 200 字，可通过 `CollectorClient(preview_length=100)` 调整
-- 如果完全不想传摘要，可以自行实现 CollectorClient 覆盖 `extract_preview` 方法返回空字符串
-
-### Q: 需要改业务代码逻辑吗？
-
-不需要。只改 `LLMClient` 初始化参数，`chat()` / `chat_json()` / `chat_image()` 调用方式不变。
+Collector 仅在 Docker 内网通信，不暴露公网。摘要默认截取前 200 字，可配置长度。
