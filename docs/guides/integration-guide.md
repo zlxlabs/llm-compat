@@ -574,7 +574,7 @@ class LLMClient:
 
 ### 迁移检查清单
 
-- [ ] 安装 llm-compat（v0.4.0+）
+- [ ] 安装 llm-compat（v0.5.0+）
 - [ ] 创建薄封装 LLMClient（保留配置解析，删除 HTTP/重试/翻译）
 - [ ] `reasoning_effort: "none"` → `"disabled"`
 - [ ] 删除重试逻辑、JSON 清洗、response_format 注入、并发信号量
