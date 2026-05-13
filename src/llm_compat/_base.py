@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from ._collector import CollectorClient
 from ._compat import normalize_reasoning_effort
-from ._keyword_cache import get_cached_keywords
+from ._keyword_cache import get_cache_version, get_cached_keywords
 from ._types import ChatResult, LLMStats, TokenUsage
 from .errors import ContentPolicyError, JSONParseError, SkipRequestError
 from .fallback import filter_by_modality, resolve_fallback_chain
@@ -77,6 +77,7 @@ class BaseClient:
         refusal_keywords: list[str] | None = None,
         refusal_keywords_url: str | list[str] | None = None,
         sensitive_detector: SensitiveDetector | None = None,
+        sensitive_words_url: str | list[str] | None = None,
         collector_url: str | None = None,
         collector_project: str = "",
         collector_api_key: str = "",
@@ -104,6 +105,20 @@ class BaseClient:
             for url in self._refusal_keywords_urls:
                 get_cached_keywords(url)
         self._sensitive_detector = sensitive_detector
+        self._sensitive_words_urls: list[str] = []
+        self._sensitive_manual_words: list[str] = []
+        self._sensitive_detector_cached: SensitiveDetector | None = None
+        self._sensitive_version_sum: int = 0
+        if sensitive_words_url:
+            if isinstance(sensitive_words_url, str):
+                self._sensitive_words_urls = [sensitive_words_url]
+            else:
+                self._sensitive_words_urls = list(sensitive_words_url)
+            for url in self._sensitive_words_urls:
+                get_cached_keywords(url)
+            if sensitive_detector:
+                self._sensitive_manual_words = sensitive_detector.words
+                self._sensitive_detector = None
         self._collector: CollectorClient | None = None
         if collector_url:
             self._collector = CollectorClient(
@@ -127,6 +142,23 @@ class BaseClient:
         if not all_words and no_urls and self._refusal_keywords_manual is None:
             return None
         return list(all_words)
+
+    def _get_sensitive_detector(self) -> SensitiveDetector | None:
+        if not self._sensitive_words_urls:
+            return self._sensitive_detector
+        version_sum = sum(
+            get_cache_version(url) for url in self._sensitive_words_urls
+        )
+        if self._sensitive_detector_cached is not None and version_sum == self._sensitive_version_sum:
+            return self._sensitive_detector_cached
+        all_words: set[str] = set()
+        if self._sensitive_manual_words:
+            all_words.update(self._sensitive_manual_words)
+        for url in self._sensitive_words_urls:
+            all_words.update(get_cached_keywords(url))
+        self._sensitive_detector_cached = SensitiveDetector(words=list(all_words))
+        self._sensitive_version_sum = version_sum
+        return self._sensitive_detector_cached
 
     def _build_payload(
         self,
@@ -373,12 +405,13 @@ class BaseClient:
         models_to_try = [model]
         prescan_skipped = False
 
-        if self._sensitive_detector and chain and self._sensitive_detector.is_available:
+        sensitive = self._get_sensitive_detector()
+        if sensitive and chain and sensitive.is_available:
             texts = [
                 msg.get("content", "") if isinstance(msg.get("content"), str) else ""
                 for msg in messages
             ]
-            if self._sensitive_detector.contains_any(texts):
+            if sensitive.contains_any(texts):
                 self.stats.record_prescan_skip()
                 needs_vision = self._has_vision_content(messages)
                 effective_chain = filter_by_modality(chain, needs_vision=needs_vision)
