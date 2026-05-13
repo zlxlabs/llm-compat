@@ -9,9 +9,10 @@ import pytest
 from pydantic import BaseModel
 from pytest_httpx import HTTPXMock
 
+from llm_compat._base import BaseClient
 from llm_compat._types import ChatResult
 from llm_compat.client import LLMClient
-from llm_compat.errors import JSONParseError, SkipRequestError
+from llm_compat.errors import ContentPolicyError, JSONParseError, SkipRequestError
 
 
 class TagResult(BaseModel):
@@ -312,3 +313,166 @@ class TestJsonSchemaFallback:
         assert first_body["response_format"]["type"] == "json_schema"
         assert second_body["response_format"] == {"type": "json_object"}
         assert client.stats.json_object_calls == 1
+
+
+class TestMultimodalSchemaInjection:
+    """Schema injection should handle multimodal (list) content in user messages."""
+
+    def test_inject_into_list_content(self) -> None:
+        messages = [
+            {"role": "user", "content": [
+                {"type": "text", "text": "Analyze this image"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+            ]}
+        ]
+        schema = {"type": "object", "properties": {"x": {"type": "integer"}}}
+        result = BaseClient._inject_schema_prompt(messages, schema)
+        assert len(result) == 1
+        content = result[0]["content"]
+        assert isinstance(content, list)
+        assert len(content) == 3
+        assert content[2]["type"] == "text"
+        assert '"x"' in content[2]["text"]
+
+    def test_inject_does_not_mutate_original(self) -> None:
+        original_content = [
+            {"type": "text", "text": "test"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+        ]
+        messages = [{"role": "user", "content": original_content}]
+        schema = {"type": "object", "properties": {"y": {"type": "string"}}}
+        result = BaseClient._inject_schema_prompt(messages, schema)
+        assert len(original_content) == 2
+        assert len(result[0]["content"]) == 3
+
+    def test_inject_prefers_list_over_earlier_string(self) -> None:
+        messages = [
+            {"role": "user", "content": "earlier question"},
+            {"role": "assistant", "content": "response"},
+            {"role": "user", "content": [
+                {"type": "text", "text": "look at this image"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+            ]},
+        ]
+        schema = {"type": "object", "properties": {"z": {"type": "number"}}}
+        result = BaseClient._inject_schema_prompt(messages, schema)
+        assert isinstance(result[2]["content"], list)
+        assert len(result[2]["content"]) == 3
+        assert result[0]["content"] == "earlier question"
+
+    async def test_chat_json_with_multimodal_deepseek(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(json=_chat_response('{"x": 42}'))
+        messages = [
+            {"role": "user", "content": [
+                {"type": "text", "text": "Extract data"},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+            ]}
+        ]
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            await client.chat_json(
+                "deepseek-v4",
+                messages,
+                json_schema={"type": "object", "properties": {"x": {"type": "integer"}}},
+            )
+        request = httpx_mock.get_request()
+        body = json.loads(request.content)
+        assert body["response_format"] == {"type": "json_object"}
+        user_msg = body["messages"][0]
+        assert isinstance(user_msg["content"], list)
+        assert len(user_msg["content"]) == 3
+        assert user_msg["content"][2]["type"] == "text"
+
+
+class TestContentFallbackWithJson:
+    """chat_json should support content_fallbacks like chat() does."""
+
+    def _refusal_response(self, content: str = "I cannot help with that.") -> dict:
+        return {
+            "id": "chatcmpl-refused",
+            "object": "chat.completion",
+            "model": "deepseek-v4",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        }
+
+    async def test_json_fallback_on_content_policy(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(status_code=451, json={"error": "content policy violation"})
+        httpx_mock.add_response(json=_chat_response('{"tags": ["ok"]}'))
+        async with LLMClient(
+            base_url="http://test/v1", api_key="sk-test",
+            content_fallbacks={"deepseek-v4": ["gpt-5-mini"]},
+            max_retries=0,
+        ) as client:
+            result = await client.chat_json(
+                "deepseek-v4",
+                [{"role": "user", "content": "test"}],
+                schema=TagResult,
+            )
+        assert result.parsed.tags == ["ok"]
+        assert result.fallback_from == "deepseek-v4"
+
+    async def test_json_fallback_on_refusal_detection(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(json=self._refusal_response())
+        httpx_mock.add_response(json=_chat_response('{"tags": ["safe"]}'))
+        async with LLMClient(
+            base_url="http://test/v1", api_key="sk-test",
+            content_fallbacks={"deepseek-v4": ["gpt-5-mini"]},
+            refusal_keywords=["cannot help"],
+            max_retries=0,
+        ) as client:
+            result = await client.chat_json(
+                "deepseek-v4",
+                [{"role": "user", "content": "sensitive topic"}],
+                schema=TagResult,
+            )
+        assert result.parsed.tags == ["safe"]
+        assert result.fallback_from == "deepseek-v4"
+
+    async def test_json_no_fallback_without_chain(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(json=_chat_response('{"tags": ["normal"]}'))
+        async with LLMClient(
+            base_url="http://test/v1", api_key="sk-test",
+            max_retries=0,
+        ) as client:
+            result = await client.chat_json(
+                "deepseek-v4",
+                [{"role": "user", "content": "test"}],
+                schema=TagResult,
+            )
+        assert result.parsed.tags == ["normal"]
+        assert result.fallback_from is None
+
+    async def test_json_fallback_model_uses_correct_json_mode(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(status_code=451, json={"error": "content policy"})
+        httpx_mock.add_response(json=_chat_response('{"tags": ["ok"]}'))
+        async with LLMClient(
+            base_url="http://test/v1", api_key="sk-test",
+            content_fallbacks={"deepseek-v4": ["gpt-5-mini"]},
+            max_retries=0,
+        ) as client:
+            await client.chat_json(
+                "deepseek-v4",
+                [{"role": "user", "content": "test"}],
+                schema=TagResult,
+            )
+        requests = httpx_mock.get_requests()
+        first_body = json.loads(requests[0].content)
+        second_body = json.loads(requests[1].content)
+        assert first_body["response_format"]["type"] == "json_object"
+        assert second_body["response_format"]["type"] == "json_schema"
+
+    async def test_json_all_models_refused(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(status_code=451, json={"error": "content policy"})
+        httpx_mock.add_response(status_code=451, json={"error": "content policy"})
+        async with LLMClient(
+            base_url="http://test/v1", api_key="sk-test",
+            content_fallbacks={"deepseek-v4": ["gpt-5-mini"]},
+            max_retries=0,
+        ) as client:
+            with pytest.raises(ContentPolicyError) as exc_info:
+                await client.chat_json(
+                    "deepseek-v4",
+                    [{"role": "user", "content": "test"}],
+                    schema=TagResult,
+                )
+            assert "deepseek-v4" in exc_info.value.attempted_models

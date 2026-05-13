@@ -463,8 +463,14 @@ class BaseClient:
         )
         msgs = [msg.copy() for msg in messages]
         for i in range(len(msgs) - 1, -1, -1):
-            if msgs[i].get("role") == "user" and isinstance(msgs[i].get("content"), str):
-                msgs[i]["content"] += hint
+            if msgs[i].get("role") != "user":
+                continue
+            content = msgs[i].get("content")
+            if isinstance(content, str):
+                msgs[i]["content"] = content + hint
+                return msgs
+            if isinstance(content, list):
+                msgs[i]["content"] = list(content) + [{"type": "text", "text": hint}]
                 return msgs
         msgs.append({"role": "user", "content": hint.lstrip()})
         return msgs
