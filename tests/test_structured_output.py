@@ -75,11 +75,12 @@ class TestResponseFormatInjection:
         assert body["response_format"] == {"type": "json_object"}
 
     async def test_explicit_json_schema_overrides_pydantic(self, httpx_mock: HTTPXMock) -> None:
+        """json_schema dict takes precedence over Pydantic schema (on capable providers)."""
         custom_schema = {"type": "object", "properties": {"x": {"type": "integer"}}}
         httpx_mock.add_response(json=_chat_response('{"tags": ["a"]}'))
         async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
             await client.chat_json(
-                "gpt-4o",
+                "gpt-5-mini",
                 [{"role": "user", "content": "test"}],
                 schema=TagResult,
                 json_schema=custom_schema,
@@ -89,6 +90,22 @@ class TestResponseFormatInjection:
         rf = body["response_format"]
         assert rf["type"] == "json_schema"
         assert rf["json_schema"]["schema"] == custom_schema
+
+    async def test_json_schema_dict_respects_provider_caps(self, httpx_mock: HTTPXMock) -> None:
+        """json_schema dict falls back to json_object when provider doesn't support json_schema."""
+        custom_schema = {"type": "object", "properties": {"x": {"type": "integer"}}}
+        httpx_mock.add_response(json=_chat_response('{"x": 1}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            await client.chat_json(
+                "deepseek-v4",
+                [{"role": "user", "content": "test"}],
+                json_schema=custom_schema,
+            )
+        request = httpx_mock.get_request()
+        body = json.loads(request.content)
+        assert body["response_format"] == {"type": "json_object"}
+        last_user_msg = [m for m in body["messages"] if m["role"] == "user"][-1]
+        assert '"x"' in last_user_msg["content"]
 
     async def test_json_stats_tracked(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response('{"tags": ["a"]}'))

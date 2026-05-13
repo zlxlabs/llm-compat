@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import time
 import uuid
@@ -449,6 +450,25 @@ class BaseClient:
             except Exception:
                 logger.warning("on_error hook raised an exception", exc_info=True)
 
+    @staticmethod
+    def _inject_schema_prompt(
+        messages: list[dict[str, Any]],
+        schema_dict: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Append JSON schema instruction to messages for json_object mode."""
+        hint = (
+            "\n\nRespond with valid JSON matching this schema:\n```json\n"
+            + json.dumps(schema_dict, ensure_ascii=False)
+            + "\n```"
+        )
+        msgs = [msg.copy() for msg in messages]
+        for i in range(len(msgs) - 1, -1, -1):
+            if msgs[i].get("role") == "user" and isinstance(msgs[i].get("content"), str):
+                msgs[i]["content"] += hint
+                return msgs
+        msgs.append({"role": "user", "content": hint.lstrip()})
+        return msgs
+
     def _build_json_payload(
         self,
         model: str,
@@ -457,13 +477,16 @@ class BaseClient:
         schema: type[BaseModel] | None = None,
         json_schema: dict[str, Any] | None = None,
         reasoning_effort: str | None = None,
+        force_json_object: bool = False,
         **extra: Any,
-    ) -> tuple[dict[str, Any], str]:
+    ) -> tuple[dict[str, Any], str, list[dict[str, Any]]]:
         family = detect_provider(model)
         caps = get_provider_caps(family)
         json_mode = caps.get("json_mode", "json_object")
 
-        if json_schema is not None:
+        use_json_schema = not force_json_object and json_mode == "json_schema"
+
+        if json_schema is not None and use_json_schema:
             response_format = {
                 "type": "json_schema",
                 "json_schema": {
@@ -473,7 +496,7 @@ class BaseClient:
                 },
             }
             effective_mode = "json_schema"
-        elif schema is not None and json_mode == "json_schema":
+        elif schema is not None and use_json_schema:
             response_format = {
                 "type": "json_schema",
                 "json_schema": pydantic_to_json_schema(schema),
@@ -482,12 +505,17 @@ class BaseClient:
         else:
             response_format = {"type": "json_object"}
             effective_mode = "json_object"
+            schema_dict = json_schema or (
+                schema.model_json_schema() if schema is not None else None
+            )
+            if schema_dict is not None:
+                messages = self._inject_schema_prompt(messages, schema_dict)
 
         payload = self._build_payload(
             model, messages, reasoning_effort,
             response_format=response_format, **extra,
         )
-        return payload, effective_mode
+        return payload, effective_mode, messages
 
     def _json_chat_orchestrator(
         self,
@@ -511,24 +539,18 @@ class BaseClient:
         fallback_to_json_object = False
 
         while True:
-            if fallback_to_json_object:
-                payload = self._build_payload(
-                    model, working_messages, reasoning_effort,
-                    response_format={"type": "json_object"}, **extra,
-                )
-                effective_mode = "json_object"
-            else:
-                payload, effective_mode = self._build_json_payload(
-                    model, working_messages,
-                    schema=current_schema, json_schema=current_json_schema,
-                    reasoning_effort=reasoning_effort, **extra,
-                )
+            payload, effective_mode, final_messages = self._build_json_payload(
+                model, working_messages,
+                schema=current_schema, json_schema=current_json_schema,
+                reasoning_effort=reasoning_effort,
+                force_json_object=fallback_to_json_object, **extra,
+            )
 
             self.stats.record_json_mode(effective_mode)
-            self._log_single_chat(payload, request_id, working_messages)
+            self._log_single_chat(payload, request_id, final_messages)
 
             resp = yield _ChatRequest(
-                model=model, messages=working_messages, request_id=request_id,
+                model=model, messages=final_messages, request_id=request_id,
                 reasoning_effort=reasoning_effort, remaining_timeout=None,
                 extra={**extra, "response_format": payload.get("response_format")},
             )
