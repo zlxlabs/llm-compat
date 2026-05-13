@@ -75,7 +75,7 @@ async with LLMClient(
     print(result.latency_ms)   # int
     print(result.request_id)   # str
 
-    # JSON 输出（自动清洗 code fence、bare list）
+    # 结构化 JSON 输出（自动注入 response_format + Pydantic 校验）
     from pydantic import BaseModel
 
     class TagResult(BaseModel):
@@ -85,6 +85,7 @@ async with LLMClient(
         "gpt-4.1-mini",
         [{"role": "user", "content": "给 Python 打 3 个标签"}],
         schema=TagResult,
+        self_correction=True,   # 解析失败时自动重试（可选）
     )
     print(result.parsed)  # TagResult(tags=['编程语言', 'Python', '开发'])
 
@@ -111,12 +112,14 @@ with SyncLLMClient(base_url="...", api_key="...") as client:
 ### 1.3 错误处理
 
 ```python
-from llm_compat import FatalError, TimeoutError, JSONParseError
+from llm_compat import FatalError, TimeoutError, JSONParseError, SkipRequestError
 
 try:
     result = await client.chat_json("gpt-4o", messages, schema=MyModel)
 except JSONParseError as e:
-    print(e.raw_content)   # 模型返回的原始内容
+    print(e.raw_content)   # 模型返回的原始内容（self_correction 开启时已经过重试）
+except SkipRequestError:
+    pass  # pre_request hook 返回 False（如熔断器触发）
 except TimeoutError:
     pass  # 不会重试（同样的输入大概率同样超时）
 except FatalError:
@@ -128,7 +131,9 @@ except FatalError:
 - 自动重试（指数退避，可配置）
 - 结构化日志（标准 logging，带 request_id）
 - reasoning_effort 跨 provider 翻译（deepseek/gemini/openai 写法不同）
-- JSON 输出清洗（code fence 剥离、Pydantic 校验）
+- 结构化 JSON 输出（自动注入 response_format + Pydantic 校验 + self-correction）
+- 并发控制（`max_concurrency` 参数）
+- 生命周期 Hook（`on_success`/`on_error`/`pre_request`，可接入熔断器/监控）
 - 统一的错误层级
 
 ---
@@ -496,9 +501,9 @@ Collector 仅在 Docker 内网通信，不暴露公网。摘要默认截取前 2
 llm-compat 接管 **HTTP 通信、重试、provider 翻译、JSON 清洗**，项目只保留 **配置解析 + Prompt 模板 + 业务逻辑**。
 
 ```
-迁移前:  项目代码 = 配置 + Prompt + HTTP + 重试 + 翻译 + JSON清洗 + 业务
+迁移前:  项目代码 = 配置 + Prompt + HTTP + 重试 + 翻译 + JSON清洗 + 熔断 + 并发 + 业务
 迁移后:  项目代码 = 配置 + Prompt + 业务
-         llm-compat = HTTP + 重试 + 翻译 + JSON清洗
+         llm-compat = HTTP + 重试 + 翻译 + 结构化JSON + 并发控制 + Hooks
 ```
 
 ### 可以删除的代码
@@ -512,6 +517,10 @@ llm-compat 接管 **HTTP 通信、重试、provider 翻译、JSON 清洗**，项
 | Retry-After 处理 | `_retry_after_seconds()` | 内置 |
 | Provider 翻译 | `if "deepseek" in model` | `providers.py` 自动检测 |
 | JSON code fence 清洗 | `re.search(r'```json')` | `json_utils.py` |
+| response_format 注入 | `"response_format": {"type": "json_schema"}` | `chat_json()` 自动适配 |
+| JSON 解析重试 | `for i in range(max_retries)` | `self_correction=True` |
+| 并发限制 | `asyncio.Semaphore(30)` | `max_concurrency=30` |
+| 熔断器接入 | 自建 CircuitBreaker | `pre_request` hook |
 | base64 图片编码 | `_build_image_content()` | `chat_image()` 内置 |
 | 请求 ID 生成 | `uuid.uuid4()` | 自动生成 |
 | token 用量提取 | `usage["prompt_tokens"]` | `ChatResult.usage` |
@@ -534,6 +543,10 @@ class LLMClient:
             content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
             collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
             collector_project="my-project",
+            max_concurrency=30,
+            on_error=lambda model, err: breaker.record_failure(),
+            on_success=lambda model, ms: breaker.record_success(),
+            pre_request=lambda model: breaker.can_execute(),
         )
         self._config = config
 
@@ -578,13 +591,16 @@ set_custom_patterns({"my-ds-*": "deepseek", "my-gpt-*": "openai_gpt4"})
 
 ### 迁移检查清单
 
-- [ ] 安装 llm-compat
+- [ ] 安装 llm-compat（v0.3.0+）
 - [ ] 创建薄封装 LLMClient（保留配置解析，删除 HTTP/重试/翻译）
 - [ ] `reasoning_effort: "none"` → `"disabled"`
 - [ ] 删除重试逻辑代码
-- [ ] 删除 JSON code fence 清洗代码
+- [ ] 删除 JSON code fence 清洗代码 → 改用 `chat_json(schema=..., self_correction=True)`
+- [ ] 删除 `response_format` 手动注入 → `chat_json()` 自动适配
+- [ ] 删除 `asyncio.Semaphore` 并发限制 → 改用 `max_concurrency=N`
+- [ ] 删除自建熔断器调用 → 通过 `pre_request`/`on_error`/`on_success` hook 接入
 - [ ] 删除 base64 图片编码辅助函数
-- [ ] 更新错误处理为 FatalError/TimeoutError/JSONParseError
+- [ ] 更新错误处理为 FatalError/TimeoutError/JSONParseError/SkipRequestError
 - [ ] 可选：添加 validate_config 启动校验
 - [ ] 可选：添加 content_fallbacks + collector 集成
 - [ ] 运行测试验证

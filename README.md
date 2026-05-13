@@ -74,7 +74,24 @@ result = await client.chat_json(
 print(result.parsed)  # TagResult(tags=['编程语言', 'Python', '开发'])
 ```
 
-自动处理 code fence 剥离、bare list 包装、Pydantic 校验。
+自动根据 provider 能力注入 `response_format`（json_schema 或 json_object），解析失败时支持 self-correction 重试：
+
+```python
+result = await client.chat_json(
+    "deepseek-v4",
+    messages,
+    schema=TagResult,
+    self_correction=True,   # 解析失败时把错误反馈给模型重试
+    max_retries=2,          # 最多重试 2 次
+)
+```
+
+| Provider | 结构化输出模式 |
+|----------|--------------|
+| GPT-4.x / GPT-5 / Gemini / Doubao | `json_schema`（API 级 Schema 约束） |
+| DeepSeek / O-series / Doubao Seed | `json_object`（API 级 JSON 约束） |
+
+json_schema 模式下 API 报错时自动降级到 json_object + warning 日志，调用方无感知。
 
 ### 流式输出
 
@@ -278,6 +295,36 @@ curl http://localhost:8234/words | jq
 | `/words/{word}` | DELETE | 需要 | 删除误报词 |
 | `/stats` | GET | 不需要 | 拒绝统计 |
 
+## 并发控制
+
+```python
+client = LLMClient(
+    base_url="...", api_key="...",
+    max_concurrency=30,  # 限制最大并发请求数，防止打爆 API
+)
+```
+
+内部用 `asyncio.Semaphore` 实现，不设则不限制。
+
+## 生命周期 Hook
+
+```python
+client = LLMClient(
+    ...,
+    on_success=lambda model, latency_ms: print(f"{model} ok in {latency_ms}ms"),
+    on_error=lambda model, error: print(f"{model} failed: {error}"),
+    pre_request=lambda model: breaker.can_execute(),  # 返回 False 跳过请求
+)
+```
+
+| Hook | 类型 | 异常处理 |
+|------|------|---------|
+| `on_success(model, latency_ms)` | 观察性 | 异常吞掉，记 warning 日志 |
+| `on_error(model, error)` | 观察性 | 异常吞掉，记 warning 日志 |
+| `pre_request(model) → bool` | 控制性 | 返回 False 抛 `SkipRequestError`，异常向上传播 |
+
+典型用途：接入熔断器、监控、告警。
+
 ## 启动校验
 
 ```python
@@ -290,7 +337,7 @@ warnings = validate_config("gpt-4.1-mini", "high")
 ## 错误处理
 
 ```python
-from llm_compat import FatalError, TimeoutError, JSONParseError, ContentPolicyError
+from llm_compat import FatalError, TimeoutError, JSONParseError, ContentPolicyError, SkipRequestError
 
 try:
     result = await client.chat_json("gpt-4o", messages, schema=MyModel)
@@ -304,6 +351,8 @@ except JSONParseError as e:
     print(e.request_id)    # 追踪 ID
 except TimeoutError:
     pass  # 不会重试（同样的输入大概率同样超时）
+except SkipRequestError:
+    pass  # pre_request hook 返回 False
 except FatalError:
     pass  # 401/403/404，不会重试
 ```
@@ -322,29 +371,31 @@ except FatalError:
 ```python
 stats = client.stats
 print(f"调用: {stats.total_calls}, 成功率: {stats.success_rate:.0%}, tokens: {stats.total_tokens}")
+print(f"JSON schema: {stats.json_schema_calls}, JSON object: {stats.json_object_calls}")
+print(f"JSON 解析失败: {stats.json_parse_failures}, Self-correction 成功: {stats.json_self_correction_success}")
 ```
 
 ## 包结构
 
 ```
 src/llm_compat/
-├── _base.py          — 共享基类 + generator fallback 编排
+├── _base.py          — 共享基类 + generator fallback/JSON 编排 + hooks
 ├── _collector.py     — Collector 服务客户端（上报/拉取/降级缓存）
 ├── client.py         — async client（I/O 层）
 ├── sync.py           — sync client（I/O 层）
-├── providers.py      — 10 族检测 + thinking 翻译 + supports_vision
+├── providers.py      — 10 族检测 + thinking 翻译 + json_mode + supports_vision
 ├── retry.py          — 智能重试 + 错误分类
 ├── refusal.py        — 3 层拒绝检测（结构化信号/HTTP/关键词）
 ├── fallback.py       — fallback 链解析 + 模态过滤
 ├── sensitive.py      — 前置敏感词检测（可选依赖）
 ├── _types.py         — ChatResult, TokenUsage, LLMStats
 ├── _compat.py        — validate_config, validate_fallback_config
-├── errors.py         — 错误层级 + ContentPolicyError
-├── json_utils.py     — JSON 清洗 + Pydantic 校验
+├── errors.py         — 错误层级 + ContentPolicyError + SkipRequestError
+├── json_utils.py     — JSON 清洗 + Pydantic 校验 + Schema 转换
 └── __init__.py       — 公开 API
 
 collector/            — Sidecar 服务（FastAPI + SQLite），17 tests
-tests/                249 tests
+tests/                307 tests
 ```
 
 ## 依赖
