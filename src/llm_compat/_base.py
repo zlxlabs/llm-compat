@@ -247,6 +247,272 @@ class BaseClient:
         result.parsed = parsed
         return result
 
+    def _simple_attempt(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        *,
+        request_id: str,
+        reasoning_effort: str | None = None,
+        remaining_timeout: float | None = None,
+        **extra: Any,
+    ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
+        provider = detect_provider(model)
+        payload = self._build_payload(model, messages, reasoning_effort, **extra)
+        self._log_single_chat(payload, request_id, messages)
+
+        resp = yield _ChatRequest(
+            model=model, messages=messages, request_id=request_id,
+            reasoning_effort=reasoning_effort, remaining_timeout=remaining_timeout,
+            extra=extra,
+        )
+        if resp.error:
+            raise resp.error
+
+        assert resp.data is not None
+        return self._extract_result(
+            resp.data, model=model, provider=provider,
+            latency_ms=resp.latency_ms, request_id=request_id,
+        )
+
+    def _json_attempt(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        *,
+        request_id: str,
+        schema: type[T] | None = None,
+        json_schema: dict[str, Any] | None = None,
+        self_correction: bool = False,
+        max_retries: int = 2,
+        reasoning_effort: str | None = None,
+        remaining_timeout: float | None = None,
+        **extra: Any,
+    ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
+        provider = detect_provider(model)
+        working_messages = list(messages)
+        attempts = 0
+        fallback_to_json_object = False
+
+        while True:
+            payload, effective_mode, final_messages = self._build_json_payload(
+                model, working_messages,
+                schema=schema, json_schema=json_schema,
+                reasoning_effort=reasoning_effort,
+                force_json_object=fallback_to_json_object, **extra,
+            )
+
+            self.stats.record_json_mode(effective_mode)
+            self._log_single_chat(payload, request_id, final_messages)
+
+            resp = yield _ChatRequest(
+                model=model, messages=final_messages, request_id=request_id,
+                reasoning_effort=reasoning_effort, remaining_timeout=remaining_timeout,
+                extra={**extra, "response_format": payload.get("response_format")},
+            )
+
+            if resp.error:
+                if (
+                    effective_mode == "json_schema"
+                    and not fallback_to_json_object
+                    and _is_format_error(resp.error)
+                ):
+                    logger.warning(
+                        "[%s] json_schema rejected by API, falling back to json_object",
+                        request_id,
+                    )
+                    fallback_to_json_object = True
+                    continue
+                raise resp.error
+
+            assert resp.data is not None
+            result = self._extract_result(
+                resp.data, model=model, provider=provider,
+                latency_ms=resp.latency_ms, request_id=request_id,
+            )
+
+            try:
+                if schema is not None:
+                    parsed = parse_json_model(result.content, schema)
+                else:
+                    parsed = parse_json(result.content)
+                result.parsed = parsed
+                if attempts > 0:
+                    self.stats.record_json_self_correction()
+                return result
+            except (ValueError, Exception) as parse_err:
+                self.stats.record_json_parse_failure()
+                attempts += 1
+
+                if not self_correction or attempts > max_retries:
+                    raise JSONParseError(
+                        str(parse_err),
+                        raw_content=result.content,
+                        model=model,
+                        request_id=request_id,
+                    ) from parse_err
+
+                working_messages = list(messages) + [
+                    {"role": "assistant", "content": result.content},
+                    {"role": "user", "content": f"Your response failed JSON parsing. Error: {parse_err}. Please return valid JSON matching the schema."},
+                ]
+
+    def _content_fallback_orchestrator(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        *,
+        attempt_fn: Callable[..., Generator[_ChatRequest, _ChatResponse, ChatResult]],
+        reasoning_effort: str | None = None,
+        **extra: Any,
+    ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
+        request_id = uuid.uuid4().hex[:8]
+        chain = resolve_fallback_chain(model, self._content_fallbacks)
+        deadline_start = time.monotonic()
+
+        models_to_try = [model]
+        prescan_skipped = False
+
+        if self._sensitive_detector and chain and self._sensitive_detector.is_available:
+            texts = [
+                msg.get("content", "") if isinstance(msg.get("content"), str) else ""
+                for msg in messages
+            ]
+            if self._sensitive_detector.contains_any(texts):
+                self.stats.record_prescan_skip()
+                needs_vision = self._has_vision_content(messages)
+                effective_chain = filter_by_modality(chain, needs_vision=needs_vision)
+                if effective_chain:
+                    models_to_try = effective_chain
+                    prescan_skipped = True
+                    logger.info(
+                        "[%s] LLM prescan | sensitive words detected | skipping %s → %s",
+                        request_id, model, effective_chain[0],
+                    )
+
+        attempted: list[str] = []
+        last_content = ""
+
+        for current_model in models_to_try:
+            elapsed = time.monotonic() - deadline_start
+            remaining = self._total_timeout - elapsed
+            if remaining <= 0 and attempted:
+                break
+
+            current_provider = detect_provider(current_model)
+
+            if attempted:
+                logger.info(
+                    "[%s] LLM fallback | from=%s → to=%s | attempt=%d/%d",
+                    request_id, model, current_model,
+                    len(attempted), len(models_to_try),
+                )
+
+            inner = attempt_fn(
+                current_model, messages,
+                request_id=request_id,
+                reasoning_effort=reasoning_effort,
+                remaining_timeout=remaining if attempted else None,
+                **extra,
+            )
+
+            try:
+                request = next(inner)
+                while True:
+                    response: _ChatResponse = yield request
+
+                    has_fallback = bool(chain) or len(models_to_try) > 1
+
+                    if response.error and isinstance(response.error, ContentPolicyError):
+                        if has_fallback:
+                            inner.close()
+                            http_status = None
+                            cause = response.error.__cause__
+                            if hasattr(cause, "response"):
+                                http_status = getattr(cause.response, "status_code", None)
+                            self._pending_refusal_report = {
+                                "model": current_model,
+                                "provider": current_provider,
+                                "request_id": request_id,
+                                "messages": messages,
+                                "message_count": len(messages),
+                                "has_images": self._has_vision_content(messages),
+                                "detection_layer": "http_error",
+                                "http_status": http_status,
+                                "finish_reason": None,
+                                "response_preview": str(response.error)[:200],
+                            }
+                            raise ContentPolicyError(str(response.error))
+
+                    if has_fallback and response.data and not response.error:
+                        if detect_refusal(
+                            response.data,
+                            self._refusal_detector,
+                            extra_keywords=self._get_refusal_keywords(),
+                            model=current_model,
+                            provider=current_provider,
+                        ):
+                            inner.close()
+                            choices = response.data.get("choices", [{}])
+                            choice = choices[0] if choices else {}
+                            last_content = choice.get("message", {}).get("content", "") or ""
+                            self._pending_refusal_report = {
+                                "model": current_model,
+                                "provider": current_provider,
+                                "request_id": request_id,
+                                "messages": messages,
+                                "message_count": len(messages),
+                                "has_images": self._has_vision_content(messages),
+                                "detection_layer": self._classify_refusal_layer(response.data),
+                                "http_status": None,
+                                "finish_reason": choice.get("finish_reason"),
+                                "response_preview": last_content[:200],
+                            }
+                            raise ContentPolicyError(
+                                f"Model {current_model} refused the request",
+                            )
+
+                    try:
+                        request = inner.send(response)
+                    except StopIteration as si:
+                        result: ChatResult = si.value
+                        if attempted or prescan_skipped:
+                            result.fallback_from = model
+                            result.fallback_chain = attempted
+                        return result
+
+            except ContentPolicyError:
+                attempted.append(current_model)
+                self.stats.record_fallback(refused_model=current_model)
+
+                if not chain or (current_model == models_to_try[-1]):
+                    needs_vision = self._has_vision_content(messages)
+                    effective_chain = filter_by_modality(chain or [], needs_vision=needs_vision)
+                    remaining_models = [m for m in effective_chain if m not in attempted and m not in models_to_try]
+                    models_to_try.extend(remaining_models)
+
+                    if current_model == models_to_try[-1]:
+                        if not chain:
+                            self.stats.record_error(model=current_model, error_type="ContentPolicyError")
+                        raise ContentPolicyError(
+                            f"All models refused: {attempted}",
+                            attempted_models=attempted,
+                            raw_content=last_content,
+                            original_model=model,
+                        )
+                continue
+
+            except Exception:
+                self.stats.record_error(model=current_model, error_type=type(Exception).__name__)
+                raise
+
+        raise ContentPolicyError(
+            f"All models refused: {attempted}",
+            attempted_models=attempted,
+            raw_content=last_content,
+            original_model=model,
+        )
+
     def _chat_orchestrator(
         self,
         model: str,
@@ -255,180 +521,11 @@ class BaseClient:
         reasoning_effort: str | None = None,
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
-        request_id = uuid.uuid4().hex[:8]
-        provider = detect_provider(model)
-        chain = resolve_fallback_chain(model, self._content_fallbacks)
-        deadline_start = time.monotonic()
-
-        # Pre-scan: skip primary if sensitive words detected and fallback available
-        if self._sensitive_detector and chain and self._sensitive_detector.is_available:
-            texts = [
-                msg.get("content", "") if isinstance(msg.get("content"), str) else ""
-                for msg in messages
-            ]
-            if self._sensitive_detector.contains_any(texts):
-                self.stats.record_prescan_skip()
-                logger.info(
-                    "[%s] LLM prescan | sensitive words detected | skipping %s → %s",
-                    request_id, model, chain[0],
-                )
-                needs_vision = self._has_vision_content(messages)
-                effective_chain = filter_by_modality(chain, needs_vision=needs_vision)
-                if effective_chain:
-                    fb_model = effective_chain[0]
-                    fb_provider = detect_provider(fb_model)
-                    resp = yield _ChatRequest(
-                        model=fb_model, messages=messages, request_id=request_id,
-                        reasoning_effort=reasoning_effort, remaining_timeout=None,
-                        extra=extra,
-                    )
-                    if resp.error:
-                        raise resp.error
-                    assert resp.data is not None
-                    return self._extract_result(
-                        resp.data, model=fb_model, provider=fb_provider,
-                        latency_ms=resp.latency_ms, request_id=request_id,
-                        fallback_from=model, fallback_chain=[model],
-                    )
-
-        # Try primary model
-        resp = yield _ChatRequest(
-            model=model, messages=messages, request_id=request_id,
-            reasoning_effort=reasoning_effort, remaining_timeout=None,
-            extra=extra,
-        )
-
-        data: dict[str, Any] | None
-        latency_ms: int
-
-        refusal_detail: dict[str, Any] = {}
-
-        if resp.error:
-            if isinstance(resp.error, ContentPolicyError) and chain:
-                data = None
-                latency_ms = int((time.monotonic() - deadline_start) * 1000)
-                http_status = None
-                cause = resp.error.__cause__
-                if hasattr(cause, "response"):
-                    http_status = getattr(cause.response, "status_code", None)
-                refusal_detail = {
-                    "detection_layer": "http_error",
-                    "http_status": http_status,
-                    "finish_reason": None,
-                    "response_preview": str(resp.error)[:200],
-                }
-            elif isinstance(resp.error, ContentPolicyError):
-                self.stats.record_error(model=model, error_type="ContentPolicyError")
-                raise resp.error
-            else:
-                self.stats.record_error(model=model, error_type=type(resp.error).__name__)
-                raise resp.error
-        else:
-            data = resp.data
-            latency_ms = resp.latency_ms
-
-        if data is not None:
-            if not detect_refusal(
-                data,
-                self._refusal_detector,
-                extra_keywords=self._get_refusal_keywords(),
-                model=model,
-                provider=provider,
-            ):
-                return self._extract_result(
-                    data, model=model, provider=provider,
-                    latency_ms=latency_ms, request_id=request_id,
-                )
-
-            if not chain:
-                return self._extract_result(
-                    data, model=model, provider=provider,
-                    latency_ms=latency_ms, request_id=request_id,
-                )
-
-            choices = data.get("choices", [{}])
-            choice = choices[0] if choices else {}
-            content = choice.get("message", {}).get("content", "") or ""
-            refusal_detail = {
-                "detection_layer": self._classify_refusal_layer(data),
-                "http_status": None,
-                "finish_reason": choice.get("finish_reason"),
-                "response_preview": content[:200],
-            }
-
-        # Primary refused — enter fallback loop
-        self.stats.record_fallback(refused_model=model)
-        self._pending_refusal_report = {
-            "model": model,
-            "provider": provider,
-            "request_id": request_id,
-            "messages": messages,
-            "message_count": len(messages),
-            "has_images": self._has_vision_content(messages),
-            **refusal_detail,
-        }
-        logger.warning(
-            "[%s] LLM fallback | model=%s refused | trying fallback chain",
-            request_id, model,
-        )
-
-        needs_vision = self._has_vision_content(messages)
-        effective_chain = filter_by_modality(chain, needs_vision=needs_vision)
-        attempted = [model]
-        last_content = (data["choices"][0]["message"].get("content") or "") if data else ""
-
-        for fb_model in effective_chain:
-            elapsed = time.monotonic() - deadline_start
-            remaining = self._total_timeout - elapsed
-            if remaining <= 0:
-                break
-
-            fb_provider = detect_provider(fb_model)
-            logger.info(
-                "[%s] LLM fallback | from=%s → to=%s | attempt=%d/%d",
-                request_id, model, fb_model,
-                len(attempted), len(effective_chain) + 1,
-            )
-
-            resp = yield _ChatRequest(
-                model=fb_model, messages=messages, request_id=request_id,
-                reasoning_effort=reasoning_effort, remaining_timeout=remaining,
-                extra=extra,
-            )
-
-            if resp.error:
-                if isinstance(resp.error, ContentPolicyError):
-                    attempted.append(fb_model)
-                    self.stats.record_fallback(refused_model=fb_model)
-                    continue
-                self.stats.record_error(model=fb_model, error_type=type(resp.error).__name__)
-                raise resp.error
-
-            assert resp.data is not None
-            if not detect_refusal(
-                resp.data,
-                self._refusal_detector,
-                extra_keywords=self._get_refusal_keywords(),
-                model=fb_model,
-                provider=fb_provider,
-            ):
-                total_latency = int((time.monotonic() - deadline_start) * 1000)
-                return self._extract_result(
-                    resp.data, model=fb_model, provider=fb_provider,
-                    latency_ms=total_latency, request_id=request_id,
-                    fallback_from=model, fallback_chain=attempted,
-                )
-
-            attempted.append(fb_model)
-            self.stats.record_fallback(refused_model=fb_model)
-            last_content = resp.data["choices"][0]["message"].get("content") or ""
-
-        raise ContentPolicyError(
-            f"All models refused: {attempted}",
-            attempted_models=attempted,
-            raw_content=last_content,
-            original_model=model,
-        )
+        return (yield from self._content_fallback_orchestrator(
+            model, messages,
+            attempt_fn=self._simple_attempt,
+            reasoning_effort=reasoning_effort, **extra,
+        ))
 
     def _invoke_pre_request(self, model: str) -> None:
         if self._pre_request is not None:
@@ -535,77 +632,17 @@ class BaseClient:
         reasoning_effort: str | None = None,
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
-        request_id = uuid.uuid4().hex[:8]
-        provider = detect_provider(model)
-
-        working_messages = list(messages)
-        current_json_schema = json_schema
-        current_schema = schema
-        attempts = 0
-        fallback_to_json_object = False
-
-        while True:
-            payload, effective_mode, final_messages = self._build_json_payload(
-                model, working_messages,
-                schema=current_schema, json_schema=current_json_schema,
-                reasoning_effort=reasoning_effort,
-                force_json_object=fallback_to_json_object, **extra,
-            )
-
-            self.stats.record_json_mode(effective_mode)
-            self._log_single_chat(payload, request_id, final_messages)
-
-            resp = yield _ChatRequest(
-                model=model, messages=final_messages, request_id=request_id,
-                reasoning_effort=reasoning_effort, remaining_timeout=None,
-                extra={**extra, "response_format": payload.get("response_format")},
-            )
-
-            if resp.error:
-                if (
-                    effective_mode == "json_schema"
-                    and not fallback_to_json_object
-                    and _is_format_error(resp.error)
-                ):
-                    logger.warning(
-                        "[%s] json_schema rejected by API, falling back to json_object",
-                        request_id,
-                    )
-                    fallback_to_json_object = True
-                    continue
-                raise resp.error
-
-            assert resp.data is not None
-            result = self._extract_result(
-                resp.data, model=model, provider=provider,
-                latency_ms=resp.latency_ms, request_id=request_id,
-            )
-
-            try:
-                if schema is not None:
-                    parsed = parse_json_model(result.content, schema)
-                else:
-                    parsed = parse_json(result.content)
-                result.parsed = parsed
-                if attempts > 0:
-                    self.stats.record_json_self_correction()
-                return result
-            except (ValueError, Exception) as parse_err:
-                self.stats.record_json_parse_failure()
-                attempts += 1
-
-                if not self_correction or attempts > max_retries:
-                    raise JSONParseError(
-                        str(parse_err),
-                        raw_content=result.content,
-                        model=model,
-                        request_id=request_id,
-                    ) from parse_err
-
-                working_messages = list(messages) + [
-                    {"role": "assistant", "content": result.content},
-                    {"role": "user", "content": f"Your response failed JSON parsing. Error: {parse_err}. Please return valid JSON matching the schema."},
-                ]
+        from functools import partial
+        attempt_fn = partial(
+            self._json_attempt,
+            schema=schema, json_schema=json_schema,
+            self_correction=self_correction, max_retries=max_retries,
+        )
+        return (yield from self._content_fallback_orchestrator(
+            model, messages,
+            attempt_fn=attempt_fn,
+            reasoning_effort=reasoning_effort, **extra,
+        ))
 
     def _log_single_chat(
         self,
