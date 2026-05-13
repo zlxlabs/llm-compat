@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -37,8 +38,19 @@ class LLMClient(BaseClient):
     async def __aexit__(self, *args: Any) -> None:
         await self.close()
 
+    def _get_semaphore(self) -> asyncio.Semaphore | None:
+        if self._max_concurrency is not None and self._semaphore is None:
+            self._semaphore = asyncio.Semaphore(self._max_concurrency)
+        return self._semaphore
+
     async def _request(self, payload: dict[str, Any]) -> dict[str, Any]:
         http = self._get_http()
+        sem = self._get_semaphore()
+        if sem is not None:
+            async with sem:
+                response = await http.post("/chat/completions", json=payload)
+                response.raise_for_status()
+                return response.json()
         response = await http.post("/chat/completions", json=payload)
         response.raise_for_status()
         return response.json()
@@ -102,8 +114,14 @@ class LLMClient(BaseClient):
         reasoning_effort: str | None = None,
         **extra: Any,
     ) -> Any:
+        self._invoke_pre_request(model)
         gen = self._chat_orchestrator(model, messages, reasoning_effort=reasoning_effort, **extra)
-        result = await self._drive_chat(gen)
+        try:
+            result = await self._drive_chat(gen)
+        except Exception as e:
+            self._invoke_on_error(model, e)
+            raise
+        self._invoke_on_success(model, result.latency_ms)
         await self._maybe_report_refusal(result)
         return result
 
@@ -136,11 +154,26 @@ class LLMClient(BaseClient):
         messages: list[dict[str, Any]],
         *,
         schema: type[T] | None = None,
+        json_schema: dict[str, Any] | None = None,
+        self_correction: bool = False,
+        max_retries: int = 2,
         reasoning_effort: str | None = None,
         **extra: Any,
     ) -> Any:
-        result = await self.chat(model, messages, reasoning_effort=reasoning_effort, **extra)
-        return self._parse_json_result(result, model, schema)
+        self._invoke_pre_request(model)
+        gen = self._json_chat_orchestrator(
+            model, messages,
+            schema=schema, json_schema=json_schema,
+            self_correction=self_correction, max_retries=max_retries,
+            reasoning_effort=reasoning_effort, **extra,
+        )
+        try:
+            result = await self._drive_chat(gen)
+        except Exception as e:
+            self._invoke_on_error(model, e)
+            raise
+        self._invoke_on_success(model, result.latency_ms)
+        return result
 
     async def chat_stream(
         self,

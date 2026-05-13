@@ -4,7 +4,7 @@ import base64
 import logging
 import time
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
@@ -15,16 +15,30 @@ from ._collector import CollectorClient
 from ._compat import normalize_reasoning_effort
 from ._keyword_cache import get_cached_keywords
 from ._types import ChatResult, LLMStats, TokenUsage
-from .errors import ContentPolicyError, JSONParseError
+from .errors import ContentPolicyError, JSONParseError, SkipRequestError
 from .fallback import filter_by_modality, resolve_fallback_chain
-from .json_utils import parse_json, parse_json_model
-from .providers import build_request_payload, describe_from_payload, detect_provider
+from .json_utils import parse_json, parse_json_model, pydantic_to_json_schema
+from .providers import build_request_payload, describe_from_payload, detect_provider, get_provider_caps
 from .refusal import RefusalDetector, detect_refusal
 from .sensitive import SensitiveDetector
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+
+def _is_format_error(error: Exception) -> bool:
+    cause = error.__cause__ if error.__cause__ else error
+    if isinstance(cause, httpx.HTTPStatusError):
+        if cause.response.status_code == 400:
+            body = cause.response.text.lower()
+            return "response_format" in body or "json_schema" in body or "unsupported" in body
+    if isinstance(error, httpx.HTTPStatusError):
+        if error.response.status_code == 400:
+            body = error.response.text.lower()
+            return "response_format" in body or "json_schema" in body or "unsupported" in body
+    return False
+
 
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=10.0, pool=10.0)
 
@@ -65,6 +79,10 @@ class BaseClient:
         collector_url: str | None = None,
         collector_project: str = "",
         collector_api_key: str = "",
+        max_concurrency: int | None = None,
+        on_success: Callable[[str, int], None] | None = None,
+        on_error: Callable[[str, Exception], None] | None = None,
+        pre_request: Callable[[str], bool] | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -91,6 +109,11 @@ class BaseClient:
                 url=collector_url, project=collector_project, api_key=collector_api_key,
             )
         self._pending_refusal_report: dict[str, Any] | None = None
+        self._max_concurrency = max_concurrency
+        self._semaphore: Any = None
+        self._on_success = on_success
+        self._on_error = on_error
+        self._pre_request = pre_request
         self.stats = LLMStats()
 
     def _get_refusal_keywords(self) -> list[str] | None:
@@ -405,6 +428,156 @@ class BaseClient:
             raw_content=last_content,
             original_model=model,
         )
+
+    def _invoke_pre_request(self, model: str) -> None:
+        if self._pre_request is not None:
+            result = self._pre_request(model)
+            if result is False:
+                raise SkipRequestError(f"pre_request hook returned False for model={model}")
+
+    def _invoke_on_success(self, model: str, latency_ms: int) -> None:
+        if self._on_success is not None:
+            try:
+                self._on_success(model, latency_ms)
+            except Exception:
+                logger.warning("on_success hook raised an exception", exc_info=True)
+
+    def _invoke_on_error(self, model: str, error: Exception) -> None:
+        if self._on_error is not None:
+            try:
+                self._on_error(model, error)
+            except Exception:
+                logger.warning("on_error hook raised an exception", exc_info=True)
+
+    def _build_json_payload(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        *,
+        schema: type[BaseModel] | None = None,
+        json_schema: dict[str, Any] | None = None,
+        reasoning_effort: str | None = None,
+        **extra: Any,
+    ) -> tuple[dict[str, Any], str]:
+        family = detect_provider(model)
+        caps = get_provider_caps(family)
+        json_mode = caps.get("json_mode", "json_object")
+
+        if json_schema is not None:
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "CustomSchema",
+                    "strict": True,
+                    "schema": json_schema,
+                },
+            }
+            effective_mode = "json_schema"
+        elif schema is not None and json_mode == "json_schema":
+            response_format = {
+                "type": "json_schema",
+                "json_schema": pydantic_to_json_schema(schema),
+            }
+            effective_mode = "json_schema"
+        else:
+            response_format = {"type": "json_object"}
+            effective_mode = "json_object"
+
+        payload = self._build_payload(
+            model, messages, reasoning_effort,
+            response_format=response_format, **extra,
+        )
+        return payload, effective_mode
+
+    def _json_chat_orchestrator(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        *,
+        schema: type[T] | None = None,
+        json_schema: dict[str, Any] | None = None,
+        self_correction: bool = False,
+        max_retries: int = 2,
+        reasoning_effort: str | None = None,
+        **extra: Any,
+    ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
+        request_id = uuid.uuid4().hex[:8]
+        provider = detect_provider(model)
+
+        working_messages = list(messages)
+        current_json_schema = json_schema
+        current_schema = schema
+        attempts = 0
+        fallback_to_json_object = False
+
+        while True:
+            if fallback_to_json_object:
+                payload = self._build_payload(
+                    model, working_messages, reasoning_effort,
+                    response_format={"type": "json_object"}, **extra,
+                )
+                effective_mode = "json_object"
+            else:
+                payload, effective_mode = self._build_json_payload(
+                    model, working_messages,
+                    schema=current_schema, json_schema=current_json_schema,
+                    reasoning_effort=reasoning_effort, **extra,
+                )
+
+            self.stats.record_json_mode(effective_mode)
+            self._log_single_chat(payload, request_id, working_messages)
+
+            resp = yield _ChatRequest(
+                model=model, messages=working_messages, request_id=request_id,
+                reasoning_effort=reasoning_effort, remaining_timeout=None,
+                extra={**extra, "response_format": payload.get("response_format")},
+            )
+
+            if resp.error:
+                if (
+                    effective_mode == "json_schema"
+                    and not fallback_to_json_object
+                    and _is_format_error(resp.error)
+                ):
+                    logger.warning(
+                        "[%s] json_schema rejected by API, falling back to json_object",
+                        request_id,
+                    )
+                    fallback_to_json_object = True
+                    continue
+                raise resp.error
+
+            assert resp.data is not None
+            result = self._extract_result(
+                resp.data, model=model, provider=provider,
+                latency_ms=resp.latency_ms, request_id=request_id,
+            )
+
+            try:
+                if schema is not None:
+                    parsed = parse_json_model(result.content, schema)
+                else:
+                    parsed = parse_json(result.content)
+                result.parsed = parsed
+                if attempts > 0:
+                    self.stats.record_json_self_correction()
+                return result
+            except (ValueError, Exception) as parse_err:
+                self.stats.record_json_parse_failure()
+                attempts += 1
+
+                if not self_correction or attempts > max_retries:
+                    raise JSONParseError(
+                        str(parse_err),
+                        raw_content=result.content,
+                        model=model,
+                        request_id=request_id,
+                    ) from parse_err
+
+                working_messages = list(messages) + [
+                    {"role": "assistant", "content": result.content},
+                    {"role": "user", "content": f"Your response failed JSON parsing. Error: {parse_err}. Please return valid JSON matching the schema."},
+                ]
 
     def _log_single_chat(
         self,

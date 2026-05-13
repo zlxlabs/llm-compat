@@ -100,8 +100,15 @@ class SyncLLMClient(BaseClient):
         reasoning_effort: str | None = None,
         **extra: Any,
     ) -> Any:
+        self._invoke_pre_request(model)
         gen = self._chat_orchestrator(model, messages, reasoning_effort=reasoning_effort, **extra)
-        return self._drive_chat(gen)
+        try:
+            result = self._drive_chat(gen)
+        except Exception as e:
+            self._invoke_on_error(model, e)
+            raise
+        self._invoke_on_success(model, result.latency_ms)
+        return result
 
     def chat_json(
         self,
@@ -109,11 +116,26 @@ class SyncLLMClient(BaseClient):
         messages: list[dict[str, Any]],
         *,
         schema: type[T] | None = None,
+        json_schema: dict[str, Any] | None = None,
+        self_correction: bool = False,
+        max_retries: int = 2,
         reasoning_effort: str | None = None,
         **extra: Any,
     ) -> Any:
-        result = self.chat(model, messages, reasoning_effort=reasoning_effort, **extra)
-        return self._parse_json_result(result, model, schema)
+        self._invoke_pre_request(model)
+        gen = self._json_chat_orchestrator(
+            model, messages,
+            schema=schema, json_schema=json_schema,
+            self_correction=self_correction, max_retries=max_retries,
+            reasoning_effort=reasoning_effort, **extra,
+        )
+        try:
+            result = self._drive_chat(gen)
+        except Exception as e:
+            self._invoke_on_error(model, e)
+            raise
+        self._invoke_on_success(model, result.latency_ms)
+        return result
 
     def chat_image(
         self,

@@ -12,10 +12,11 @@ from llm_compat.errors import (
     JSONParseError,
     LLMError,
     RetryableError,
+    SkipRequestError,
     TimeoutError,
     TruncationError,
 )
-from llm_compat.json_utils import parse_json, parse_json_model
+from llm_compat.json_utils import parse_json, parse_json_model, pydantic_to_json_schema
 from llm_compat.providers import (
     build_request_payload,
     describe_from_payload,
@@ -38,6 +39,7 @@ __all__ = [
     "TimeoutError",
     "TruncationError",
     "JSONParseError",
+    "SkipRequestError",
     "ContentPolicyError",
     "RefusalContext",
     "RefusalDetector",
@@ -49,6 +51,7 @@ __all__ = [
     "set_custom_patterns",
     "parse_json",
     "parse_json_model",
+    "pydantic_to_json_schema",
     "validate_config",
     "normalize_reasoning_effort",
 ]
