@@ -46,3 +46,17 @@ class TestSensitiveDetector:
         assert "敏感词" in matched
         assert "违禁" in matched
         assert "正常" not in matched
+
+    def test_words_property(self):
+        detector = SensitiveDetector(words=["词1", "词2"])
+        assert detector.words == ["词1", "词2"]
+
+    def test_words_property_returns_copy(self):
+        detector = SensitiveDetector(words=["词1"])
+        words = detector.words
+        words.append("词2")
+        assert detector.words == ["词1"]
+
+    def test_words_property_empty(self):
+        detector = SensitiveDetector(words=[])
+        assert detector.words == []

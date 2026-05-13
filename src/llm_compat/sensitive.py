@@ -24,6 +24,10 @@ class SensitiveDetector:
             self._automaton = None
 
     @property
+    def words(self) -> list[str]:
+        return list(self._words)
+
+    @property
     def is_available(self) -> bool:
         return len(self._words) > 0
 
