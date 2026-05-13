@@ -1,5 +1,7 @@
 # 敏感词积累系统设计
 
+> **实现状态 (v0.5.0)**：设计文档中提到的 `SensitiveDetector.from_url()` / `reload()` 方案未采用。实际实现使用 `LLMClient(sensitive_words_url=...)` 参数，通过 `_keyword_cache.py` 统一管理 URL 加载 + 300s 轮询 + 版本计数器驱动的懒重建。Collector 新增 `/words.txt` 纯文本端点供消费。
+
 ## 概述
 
 通过 Sidecar API 服务（collector）自动收集所有项目的拒绝事件，人工审核后提取敏感词，喂回 SensitiveDetector 实现前置检测闭环。

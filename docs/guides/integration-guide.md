@@ -651,7 +651,7 @@ class LLMClient:
 
 ### Q: chat_json() 支持 content fallback 吗？
 
-支持（v0.4.0+）。`chat()` 和 `chat_json()` 共享同一套 content fallback 逻辑。fallback 切换模型时会自动为新模型选择正确的 json_mode。
+支持（v0.4.0+，v0.5.0 起 `chat_json()` 也支持 `sensitive_words_url` 前置检测）。`chat()` 和 `chat_json()` 共享同一套 content fallback 逻辑。fallback 切换模型时会自动为新模型选择正确的 json_mode。
 
 ### Q: Collector 挂了会影响 chat 吗？
 

@@ -81,3 +81,28 @@
 - 包不应该强制消费者使用特定日志框架
 
 **决定**: 标准 `logging` 模块。消费者自行配置 handler。
+
+---
+
+## 2026-05-13: URL 关键词格式：JSON vs 纯文本
+
+**问题**: `_keyword_cache.py` 要求 URL 返回 `{"words": [...]}` JSON 格式，但敏感词场景更适合纯文本（每行一词）。
+
+**讨论过程**:
+1. 消费者项目的敏感词 URL 返回纯文本格式，与 JSON 要求不匹配
+2. JSON 的 `{"words": [...]}` 格式对于简单词表来说过于复杂
+3. 考虑过自动探测（JSON/纯文本），但增加复杂度且两种格式长期共存不利于维护
+
+**决定**: 完全切换为纯文本格式（每行一词，`#` 注释，空行忽略）。Breaking change，但格式更简单通用。Collector 新增 `/words.txt` 端点返回纯文本，保留 `/words` JSON 端点供 `_collector.py` 的 hash 增量更新使用。
+
+---
+
+## 2026-05-13: sensitive_words_url 的 detector 重建策略
+
+**问题**: `SensitiveDetector` 使用 Aho-Corasick 自动机，构造后不支持动态加词。轮询刷新词库后需要重建 detector。
+
+**考虑的方案**:
+1. **回调机制**: `_keyword_cache` 支持 `on_refresh` 回调，刷新时主动触发重建 → 增加 `_keyword_cache` 复杂度和耦合
+2. **版本计数器**: `_keyword_cache` 加计数器，`LLMClient` 每次请求做 O(1) 整数比较，变化时才重建 → 最小改动，低耦合
+
+**决定**: 版本计数器方案。`_cache_version` 字典 + `get_cache_version()` API，`LLMClient._get_sensitive_detector()` 做懒重建。相比 LLM API 调用延迟，O(1) 整数比较可忽略。
