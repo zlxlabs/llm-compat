@@ -214,6 +214,23 @@ result = await client.chat_image("deepseek-v4", "描述这张图", image_data=im
 uv add "git+https://github.com/zj1123581321/llm-compat.git[sensitive]"
 ```
 
+#### 方式一：从 URL 加载词库（推荐）
+
+```python
+client = LLMClient(
+    ...,
+    content_fallbacks={...},
+    sensitive_words_url="http://llm-compat-collector:8000/words.txt",
+)
+```
+
+- 支持 `str`（单 URL）或 `list[str]`（多 URL）
+- URL 返回纯文本格式：每行一个词，`#` 开头为注释行，空行自动忽略
+- 同进程多实例共享缓存，后台每 5 分钟刷新
+- URL 不可达时保留旧缓存，不影响业务
+
+#### 方式二：手动指定词库
+
 ```python
 from llm_compat.sensitive import SensitiveDetector
 
@@ -222,6 +239,17 @@ client = LLMClient(
     ...,
     content_fallbacks={...},
     sensitive_detector=detector,
+)
+```
+
+#### 方式三：URL + 手动词库合并
+
+```python
+client = LLMClient(
+    ...,
+    content_fallbacks={...},
+    sensitive_words_url="http://llm-compat-collector:8000/words.txt",
+    sensitive_detector=SensitiveDetector(words=["本地额外词"]),
 )
 ```
 
@@ -250,13 +278,14 @@ client = LLMClient(
     ...,
     content_fallbacks={...},
     refusal_keywords_url=[
-        "http://llm-compat-collector:8000/words",
-        "https://cdn.internal/shared-keywords.json",
+        "http://llm-compat-collector:8000/words.txt",
+        "https://cdn.internal/shared-keywords.txt",
     ],
 )
 ```
 
 - 支持 `str`（单 URL）或 `list[str]`（多 URL）
+- URL 返回纯文本格式：每行一个词，`#` 开头为注释行，空行自动忽略
 - 同进程多实例共享缓存，后台每 5 分钟刷新
 - URL 不可达时保留旧缓存
 
@@ -450,7 +479,8 @@ client = LLMClient(
     collector_url="http://llm-compat-collector:8000",
     collector_project="my-project",
     collector_api_key="your-secret",
-    refusal_keywords_url="http://llm-compat-collector:8000/words",
+    refusal_keywords_url="http://llm-compat-collector:8000/words.txt",
+    sensitive_words_url="http://llm-compat-collector:8000/words.txt",
 )
 ```
 
@@ -480,7 +510,8 @@ curl -X DELETE http://localhost:8234/words/误报词   # 删词
 | 端点 | 方法 | 鉴权 | 说明 |
 |------|------|------|------|
 | `/refusals` | POST | 需要 | 上报拒绝事件 |
-| `/words` | GET | 不需要 | 获取当前词表 |
+| `/words` | GET | 不需要 | 获取当前词表（JSON，含 hash） |
+| `/words.txt` | GET | 不需要 | 获取当前词表（纯文本，每行一词） |
 | `/words` | POST | 需要 | 添加敏感词 |
 | `/words/{word}` | DELETE | 需要 | 删除误报词 |
 | `/stats` | GET | 不需要 | 拒绝统计 |
@@ -573,7 +604,8 @@ class LLMClient:
 | `refusal_detector` | `RefusalDetector` | `None` | 自定义拒绝检测函数 |
 | `refusal_keywords` | `list[str]` | `None` | 追加拒绝关键词 |
 | `refusal_keywords_url` | `str \| list[str]` | `None` | 从 URL 动态加载关键词 |
-| `sensitive_detector` | `SensitiveDetector` | `None` | 前置敏感词检测器 |
+| `sensitive_detector` | `SensitiveDetector` | `None` | 前置敏感词检测器（手动词库） |
+| `sensitive_words_url` | `str \| list[str]` | `None` | 从 URL 加载敏感词（纯文本格式） |
 | `collector_url` | `str` | `""` | Collector 服务地址 |
 | `collector_project` | `str` | `""` | 项目标识 |
 | `collector_api_key` | `str` | `""` | Collector API Key |
@@ -640,9 +672,6 @@ class LLMClient:
 ```python
 import os
 from llm_compat import LLMClient
-from llm_compat.sensitive import SensitiveDetector
-
-detector = SensitiveDetector(words=["已知敏感词1", "已知敏感词2"])
 
 async with LLMClient(
     base_url=os.environ["LLM_BASE_URL"],
@@ -654,7 +683,7 @@ async with LLMClient(
         "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
         "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
     },
-    sensitive_detector=detector,
+    sensitive_words_url=os.environ.get("LLM_SENSITIVE_WORDS_URL", ""),
     collector_url=os.environ.get("LLM_COLLECTOR_URL", ""),
     collector_project=os.environ.get("LLM_COLLECTOR_PROJECT", ""),
     collector_api_key=os.environ.get("LLM_COLLECTOR_API_KEY", ""),
