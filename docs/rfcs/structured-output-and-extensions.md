@@ -200,7 +200,14 @@ text = truncate_to_tokens(long_text, max_tokens=8000, model="gpt-4o")
 | 4 | 并发控制 | **已实现** (v0.3.0) | 已解除 |
 | 5 | Token 计数 | **待定** | 否 — 项目层保留现有实现 |
 
-**迁移阻塞已全部解除**: 需求 1/3/4 已在 v0.3.0 实现，AIClient → llm-compat 薄封装的迁移可以立即开始。需求 2/5 为增量优化，不阻塞主迁移。
+**迁移阻塞已全部解除**: 需求 1/3/4 已在 v0.3.0 实现，v0.4.0 进一步合并 orchestrator 架构让 chat_json() 也获得 content_fallbacks 支持。AIClient → llm-compat 薄封装的迁移可以立即开始。需求 2/5 为增量优化，不阻塞主迁移。
+
+### v0.4.0 架构改进
+
+- **统一 orchestrator**：`chat()` 和 `chat_json()` 共享同一套 content fallback 逻辑（分层架构：外层 content fallback + 内层 per-model attempt）
+- **json_schema dict 能力检查**：`json_schema` 参数现在尊重 provider 能力表，不再对不支持的 provider 发注定被 400 拒绝的请求
+- **json_object schema 注入**：json_object 模式下自动将 schema 注入到 prompt 中引导输出格式
+- **多模态 schema 注入**：正确处理图片+文本混合消息的 schema prompt 注入
 
 ---
 
@@ -208,6 +215,8 @@ text = truncate_to_tokens(long_text, max_tokens=8000, model="gpt-4o")
 
 ```
 Phase 1: (已完成) llm-compat v0.3.0 补齐 JSON 结构化输出、Hook、并发控制
+    ↓
+Phase 1.5: (已完成) llm-compat v0.4.0 统一 orchestrator，chat_json() 获得 content fallback
     ↓
 Phase 2: AI_Information_processor 的 AIClient 改为 llm-compat 薄封装
          - 删除: HTTP 客户端管理(AsyncOpenAI)、重试逻辑、JSON 清洗(json_utils.py)、

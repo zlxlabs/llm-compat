@@ -7,20 +7,29 @@
 10+ 个 Python 项目通过 New API（OpenAI 兼容代理）接入 DeepSeek、GPT、Gemini 等模型，切换模型时：
 
 - `thinking` / `reasoning_effort` 参数各家写法不同，静默忽略不报错
-- JSON 输出格式不一致（code fence、bare list）
+- JSON 输出格式不一致（code fence、bare list），结构化输出各 provider 支持不同
 - 重试、日志、超时每个项目都在重复写
 - 国内模型因内容审查拒绝回答，需要手动切换到海外模型
 
 llm-compat 统一处理这些差异，业务代码只需改配置不改代码。
 
+## 功能概览
+
+| 功能 | 说明 |
+|------|------|
+| **统一对话 API** | `chat()` / `chat_json()` / `chat_stream()` / `chat_image()` + 同步版本 |
+| **结构化 JSON 输出** | 自动选择 json_schema 或 json_object 模式，Pydantic 校验，self-correction |
+| **内容审查降级** | 国内模型被拒时自动切换海外模型，`chat()` 和 `chat_json()` 均支持 |
+| **Provider 翻译** | reasoning_effort 跨 10 个 provider 族自动翻译 |
+| **智能重试** | 指数退避 + jitter，错误分类（可重试/致命/超时） |
+| **并发控制** | `max_concurrency` 参数，防止打爆 API |
+| **生命周期 Hook** | `on_success` / `on_error` / `pre_request`，可接入熔断器 |
+| **敏感词积累** | Collector sidecar 服务，跨项目收集拒绝事件，闭环回 pre-scan |
+
 ## 安装
 
 ```bash
-# 从 GitHub 安装
 uv add git+https://github.com/zj1123581321/llm-compat.git
-
-# 锁定版本
-uv add git+https://github.com/zj1123581321/llm-compat.git@v0.1.0
 
 # 启用敏感词前置检测（可选）
 uv add "git+https://github.com/zj1123581321/llm-compat.git[sensitive]"
@@ -28,374 +37,54 @@ uv add "git+https://github.com/zj1123581321/llm-compat.git[sensitive]"
 
 ## 快速开始
 
-### 异步（推荐）
-
 ```python
 from llm_compat import LLMClient
-
-async with LLMClient(
-    base_url="https://your-newapi.com/v1",
-    api_key="sk-xxx",
-) as client:
-    # 基础对话
-    result = await client.chat(
-        "deepseek-v4-flash",
-        [{"role": "user", "content": "hello"}],
-        reasoning_effort="high",
-    )
-    print(result)              # 直接当 str 用
-    print(result.usage)        # TokenUsage(prompt=8, completion=75, total=83)
-    print(result.latency_ms)   # 1519
-    print(result.request_id)   # a1b2c3d4
-```
-
-### 同步
-
-```python
-from llm_compat import SyncLLMClient
-
-with SyncLLMClient(base_url="...", api_key="...") as client:
-    result = client.chat("gpt-4.1-mini", messages)
-```
-
-### 结构化 JSON 输出
-
-```python
 from pydantic import BaseModel
 
 class TagResult(BaseModel):
     tags: list[str]
 
-result = await client.chat_json(
-    "gpt-4.1-mini",
-    [{"role": "user", "content": "给 Python 打 3 个标签"}],
-    schema=TagResult,
-)
-print(result.parsed)  # TagResult(tags=['编程语言', 'Python', '开发'])
-```
-
-自动根据 provider 能力注入 `response_format`（json_schema 或 json_object），解析失败时支持 self-correction 重试：
-
-```python
-result = await client.chat_json(
-    "deepseek-v4",
-    messages,
-    schema=TagResult,
-    self_correction=True,   # 解析失败时把错误反馈给模型重试
-    max_retries=2,          # 最多重试 2 次
-)
-```
-
-| Provider | 结构化输出模式 |
-|----------|--------------|
-| GPT-4.x / GPT-5 / Gemini / Doubao | `json_schema`（API 级 Schema 约束） |
-| DeepSeek / O-series / Doubao Seed | `json_object`（API 级 JSON 约束） |
-
-json_schema 模式下 API 报错时自动降级到 json_object + warning 日志，调用方无感知。
-
-### 流式输出
-
-```python
-async for chunk in client.chat_stream("deepseek-v4-flash", messages):
-    print(chunk, end="")
-```
-
-### 多模态图片
-
-```python
-result = await client.chat_image(
-    "gpt-4o", "描述这张图",
-    image_data=raw_bytes, media_type="image/png",
-)
-```
-
-## Provider 翻译
-
-同一个 `reasoning_effort` 参数，自动按模型翻译：
-
-| 配置值 | DeepSeek V4 | OpenAI GPT-5 | Gemini 2.5 | GPT-4.x |
-|--------|------------|--------------|------------|---------|
-| `None` | 不发 | 不发 | 不发 | 不发 |
-| `"disabled"` | `thinking.type=disabled` | `effort=minimal` | `effort=none` | 忽略(不思考) |
-| `"high"` | 透传 | 透传 | 透传 | drop+warn |
-| `"max"` | 透传 | clamp→`high` | clamp→`high` | drop+warn |
-
-支持 10 个 provider 族：`deepseek` / `gemini_25` / `gemini_3` / `gemini` / `openai_gpt5` / `openai_gpt4` / `openai_o` / `doubao_seed` / `doubao` / `openai`
-
-### 自定义 Provider
-
-```python
-from llm_compat import register_provider
-
-# 代理服务重命名了模型
-register_provider("my-proxy-ds-*", "deepseek")
-```
-
-## 内容审查降级（Content Fallback）
-
-国内模型（DeepSeek、Qwen 等）因内容审查拒绝回答时，自动降级到海外模型：
-
-```python
 async with LLMClient(
     base_url="https://your-newapi.com/v1",
     api_key="sk-xxx",
     content_fallbacks={
         "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
-        "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
     },
 ) as client:
-    result = await client.chat("deepseek-v4-pro", messages)
-    # 如果 deepseek-v4-pro 被拒绝，自动尝试 gemini-3-flash-preview，再不行尝试 gemini-2.5-flash
-    print(result.model)          # 实际使用的模型
-    print(result.fallback_from)  # 原始模型（未降级时为 None）
+    # 文本对话
+    result = await client.chat("deepseek-v4-flash", messages, reasoning_effort="high")
+
+    # 结构化 JSON（自动适配 provider 能力 + 内容审查降级）
+    result = await client.chat_json("deepseek-v4-pro", messages, schema=TagResult)
+    print(result.parsed)       # TagResult(tags=[...])
+    print(result.fallback_from) # 降级时显示原始模型，否则 None
 ```
 
-### 检测机制（三层）
+## 文档
 
-1. **结构化信号**（最可靠）：`finish_reason=content_filter`、空 `choices`、`refusal` 字段
-2. **HTTP 错误码**：400/403 + response body 包含审查关键词（`content_policy`、`blocked` 等）
-3. **响应文本关键词**（兜底）：内置中英文拒绝关键词列表
-
-### 模态感知
-
-`chat_image` 请求降级时自动跳过不支持图片的模型：
-
-```python
-# deepseek 不支持 vision，fallback 链中只会尝试支持 vision 的模型
-result = await client.chat_image("deepseek-v4", "描述这张图", image_data=img, media_type="image/png")
-```
-
-### 自定义检测
-
-```python
-from llm_compat import RefusalContext
-
-def my_detector(ctx: RefusalContext) -> bool:
-    # ctx.content, ctx.model, ctx.provider, ctx.finish_reason 可用
-    return "自定义拒绝标识" in ctx.content
-
-client = LLMClient(
-    ...,
-    content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
-    refusal_detector=my_detector,
-    refusal_keywords=["额外关键词"],  # 追加到内置列表
-)
-```
-
-### 前置敏感词检测（可选）
-
-发送前检测输入内容，直接跳过主模型，省一次 API 调用：
-
-```python
-from llm_compat.sensitive import SensitiveDetector
-
-detector = SensitiveDetector(words=["敏感词1", "敏感词2"])
-client = LLMClient(
-    ...,
-    content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
-    sensitive_detector=detector,
-)
-# 输入包含敏感词时，直接用 fallback 模型，不浪费主模型的 API 调用
-```
-
-需要安装 `llm-compat[sensitive]` 以启用 Aho-Corasick 高性能匹配（不安装也可用，降级到纯 Python 扫描）。
-
-### 配置校验
-
-```python
-from llm_compat import validate_fallback_config
-
-warnings = validate_fallback_config({
-    "gpt-4.1-*": ["deepseek-chat"],  # deepseek 不支持 vision
-})
-# ['Pattern gpt-4.1-* supports vision but no fallback model supports vision; ...']
-```
-
-### 统计
-
-```python
-stats = client.stats
-print(f"降级次数: {stats.fallback_count}")
-print(f"前置跳过: {stats.prescan_skips}")
-print(f"各模型拒绝: {stats._refusal_counts}")
-```
-
-### 已知限制
-
-- `chat_stream()` 不支持响应端 fallback（前置敏感词检测可部分覆盖流式场景）
-- fallback 配置为 init 级别，运行时不可动态修改（需创建多个 client 实例）
-
-## 敏感词积累（Collector）
-
-跨项目自动收集拒绝事件，人工审核后提取敏感词，闭环回 pre-scan。
-
-### 部署 Collector 服务
-
-```bash
-docker network create llm-net
-cd collector
-# 设置 API Key（可选，不设则不鉴权）
-echo "COLLECTOR_API_KEY=your-secret" > .env
-docker compose up -d
-```
-
-### 集成到项目
-
-```python
-async with LLMClient(
-    base_url="https://your-newapi.com/v1",
-    api_key="sk-xxx",
-    content_fallbacks={"deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"]},
-    # Collector 集成（可选，不配则不上报）
-    collector_url="http://llm-compat-collector:8000",
-    collector_project="my-project",       # 来源标识，区分哪个项目触发的拒绝
-    collector_api_key="your-secret",      # 与 COLLECTOR_API_KEY 一致
-    # 从 Collector 动态加载拒绝关键词（可选，支持多 URL）
-    refusal_keywords_url="http://llm-compat-collector:8000/words",
-) as client:
-    result = await client.chat("deepseek-v4-pro", messages)
-    # fallback 触发时自动上报 + 拒绝关键词随 Collector 积累动态扩展
-```
-
-各项目的 docker-compose 需加入同一网络：
-
-```yaml
-networks:
-  llm-net:
-    external: true
-```
-
-### 日常使用
-
-```bash
-# 查看拒绝统计
-curl http://localhost:8234/stats | jq
-
-# 查看最近拒绝事件（含输入摘要）
-curl http://localhost:8234/stats | jq '.recent_refusals'
-
-# 审核后加词（需要 API Key）
-curl -X POST http://localhost:8234/words \
-  -H 'Authorization: Bearer your-secret' \
-  -H 'Content-Type: application/json' \
-  -d '{"word": "敏感词"}'
-
-# 查看当前词表
-curl http://localhost:8234/words | jq
-```
-
-### Collector API
-
-| 端点 | 方法 | 鉴权 | 说明 |
-|------|------|------|------|
-| `/refusals` | POST | 需要 | 上报拒绝事件 |
-| `/words` | GET | 不需要 | 获取当前词表 + hash |
-| `/words` | POST | 需要 | 添加敏感词 |
-| `/words/hash` | GET | 不需要 | 词表变更检测 |
-| `/words/{word}` | DELETE | 需要 | 删除误报词 |
-| `/stats` | GET | 不需要 | 拒绝统计 |
-
-## 并发控制
-
-```python
-client = LLMClient(
-    base_url="...", api_key="...",
-    max_concurrency=30,  # 限制最大并发请求数，防止打爆 API
-)
-```
-
-内部用 `asyncio.Semaphore` 实现，不设则不限制。
-
-## 生命周期 Hook
-
-```python
-client = LLMClient(
-    ...,
-    on_success=lambda model, latency_ms: print(f"{model} ok in {latency_ms}ms"),
-    on_error=lambda model, error: print(f"{model} failed: {error}"),
-    pre_request=lambda model: breaker.can_execute(),  # 返回 False 跳过请求
-)
-```
-
-| Hook | 类型 | 异常处理 |
-|------|------|---------|
-| `on_success(model, latency_ms)` | 观察性 | 异常吞掉，记 warning 日志 |
-| `on_error(model, error)` | 观察性 | 异常吞掉，记 warning 日志 |
-| `pre_request(model) → bool` | 控制性 | 返回 False 抛 `SkipRequestError`，异常向上传播 |
-
-典型用途：接入熔断器、监控、告警。
-
-## 启动校验
-
-```python
-from llm_compat import validate_config
-
-warnings = validate_config("gpt-4.1-mini", "high")
-# ['Provider openai_gpt4 does not support reasoning_effort; value high will be dropped']
-```
-
-## 错误处理
-
-```python
-from llm_compat import FatalError, TimeoutError, JSONParseError, ContentPolicyError, SkipRequestError
-
-try:
-    result = await client.chat_json("gpt-4o", messages, schema=MyModel)
-except ContentPolicyError as e:
-    print(e.attempted_models)  # 所有尝试过的模型
-    print(e.raw_content)       # 最后一个模型的拒绝内容
-    print(e.original_model)    # 原始请求的模型
-except JSONParseError as e:
-    print(e.raw_content)   # 模型返回的原始内容
-    print(e.model)         # gpt-4o
-    print(e.request_id)    # 追踪 ID
-except TimeoutError:
-    pass  # 不会重试（同样的输入大概率同样超时）
-except SkipRequestError:
-    pass  # pre_request hook 返回 False
-except FatalError:
-    pass  # 401/403/404，不会重试
-```
-
-## 日志
-
-每次请求自动记录（标准 `logging`，消费者自行配置 handler）：
-
-```
-[a1b2c3d4] LLM request  | model=deepseek-v4-flash (deepseek) | thinking=high | messages=3
-[a1b2c3d4] LLM response | latency=1823ms | tokens=156/892/1048
-```
-
-## 统计
-
-```python
-stats = client.stats
-print(f"调用: {stats.total_calls}, 成功率: {stats.success_rate:.0%}, tokens: {stats.total_tokens}")
-print(f"JSON schema: {stats.json_schema_calls}, JSON object: {stats.json_object_calls}")
-print(f"JSON 解析失败: {stats.json_parse_failures}, Self-correction 成功: {stats.json_self_correction_success}")
-```
+- **[接入指南](docs/guides/integration-guide.md)** — 完整 API 文档 + 配置参考 + 迁移指南
+- **[RFC: 功能扩展](docs/rfcs/structured-output-and-extensions.md)** — 设计决策与路线图
 
 ## 包结构
 
 ```
 src/llm_compat/
-├── _base.py          — 共享基类 + generator fallback/JSON 编排 + hooks
-├── _collector.py     — Collector 服务客户端（上报/拉取/降级缓存）
-├── client.py         — async client（I/O 层）
-├── sync.py           — sync client（I/O 层）
-├── providers.py      — 10 族检测 + thinking 翻译 + json_mode + supports_vision
+├── _base.py          — 分层 orchestrator（content fallback + JSON 编排）+ hooks
+├── client.py         — async client
+├── sync.py           — sync client
+├── providers.py      — 10 族检测 + thinking 翻译 + json_mode
 ├── retry.py          — 智能重试 + 错误分类
-├── refusal.py        — 3 层拒绝检测（结构化信号/HTTP/关键词）
+├── refusal.py        — 3 层拒绝检测
 ├── fallback.py       — fallback 链解析 + 模态过滤
 ├── sensitive.py      — 前置敏感词检测（可选依赖）
-├── _types.py         — ChatResult, TokenUsage, LLMStats
-├── _compat.py        — validate_config, validate_fallback_config
-├── errors.py         — 错误层级 + ContentPolicyError + SkipRequestError
 ├── json_utils.py     — JSON 清洗 + Pydantic 校验 + Schema 转换
-└── __init__.py       — 公开 API
+├── errors.py         — 错误层级
+├── _types.py         — ChatResult, TokenUsage, LLMStats
+├── _collector.py     — Collector 服务客户端
+└── _compat.py        — 配置校验
 
-collector/            — Sidecar 服务（FastAPI + SQLite），17 tests
-tests/                307 tests
+collector/            — Sidecar 服务（FastAPI + SQLite）
+tests/                319 tests
 ```
 
 ## 依赖
@@ -403,8 +92,7 @@ tests/                307 tests
 - `httpx>=0.27` — HTTP 客户端
 - `pydantic>=2.0` — JSON 校验
 
-可选依赖：
-- `pyahocorasick>=2.0` — 高性能敏感词检测（`pip install llm-compat[sensitive]`）
+可选：`pyahocorasick>=2.0` — 高性能敏感词检测（`pip install llm-compat[sensitive]`）
 
 ## License
 
