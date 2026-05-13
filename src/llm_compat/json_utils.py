@@ -39,13 +39,30 @@ def _find_list_field(model_cls: type[BaseModel]) -> str | None:
     return None
 
 
+def _clean_schema_for_strict(schema: dict[str, Any]) -> dict[str, Any]:
+    schema.pop("title", None)
+    if schema.get("type") == "object":
+        schema["additionalProperties"] = False
+    if "properties" in schema:
+        for prop in schema["properties"].values():
+            if isinstance(prop, dict):
+                _clean_schema_for_strict(prop)
+    if "items" in schema and isinstance(schema["items"], dict):
+        _clean_schema_for_strict(schema["items"])
+    if "$defs" in schema:
+        for defn in schema["$defs"].values():
+            if isinstance(defn, dict):
+                _clean_schema_for_strict(defn)
+    return schema
+
+
 def pydantic_to_json_schema(
     model_cls: type[BaseModel],
     *,
     name: str | None = None,
 ) -> dict[str, Any]:
     schema = model_cls.model_json_schema()
-    schema.pop("title", None)
+    _clean_schema_for_strict(schema)
     return {
         "name": name or model_cls.__name__,
         "strict": True,

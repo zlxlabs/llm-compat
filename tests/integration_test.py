@@ -25,7 +25,7 @@ if not BASE_URL or not API_KEY:
     print("请设置环境变量 LLM_BASE_URL 和 LLM_API_KEY（或填写 .env 文件）")
     sys.exit(1)
 
-MODELS = ["deepseek-v4-flash", "gpt-4.1-mini", "gemini-3.1-flash-lite-preview"]
+MODELS = ["deepseek-v4-flash", "gpt-5-mini", "gemini-3.1-flash-lite"]
 
 
 class TagResult(BaseModel):
@@ -73,9 +73,9 @@ async def test_async() -> None:
         print(f"  (high 通常 tokens 更多: {r2.usage.total_tokens > r1.usage.total_tokens})")
 
         # 3. chat_json — Pydantic 校验
-        print("\n--- chat_json: gpt-4.1-mini ---")
+        print("\n--- chat_json: gpt-5-mini ---")
         result = await client.chat_json(
-            "gpt-4.1-mini",
+            "gpt-5-mini",
             [{"role": "user", "content": '给 Python 打 3 个标签，返回 JSON: {"tags": [...]}'}],
             schema=TagResult,
         )
@@ -97,8 +97,8 @@ async def test_async() -> None:
         print(f"  chunks: {len(chunks)}")
         assert full, "empty stream"
 
-        # 5. chat_json 结构化输出 — 多 provider 验证 response_format
-        for model in ["gpt-4.1-mini", "deepseek-v4-flash"]:
+        # 5. chat_json 结构化输出 — 三个模型验证 response_format
+        for model in ["gpt-5-mini", "gemini-3.1-flash-lite", "deepseek-v4-flash"]:
             print(f"\n--- structured chat_json: {model} ---")
             result = await client.chat_json(
                 model,
@@ -110,10 +110,10 @@ async def test_async() -> None:
             assert isinstance(result.parsed, TagResult), f"expected TagResult, got {type(result.parsed)}"
             assert len(result.parsed.tags) > 0, "empty tags"
 
-        # 6. chat_json self-correction（用 gpt-4.1-mini 因为最可靠）
-        print("\n--- chat_json self_correction: gpt-4.1-mini ---")
+        # 6. chat_json self-correction（用 gpt-5-mini 因为最可靠）
+        print("\n--- chat_json self_correction: gpt-5-mini ---")
         result = await client.chat_json(
-            "gpt-4.1-mini",
+            "gpt-5-mini",
             [{"role": "user", "content": '给 JavaScript 打 2 个标签，返回 JSON: {"tags": [...]}'}],
             schema=TagResult,
             self_correction=True,
@@ -141,9 +141,9 @@ def test_sync() -> None:
     print("=" * 60)
 
     with SyncLLMClient(base_url=BASE_URL, api_key=API_KEY, max_retries=1) as client:
-        print("\n--- sync chat: gpt-4.1-mini ---")
+        print("\n--- sync chat: gpt-5-mini ---")
         result = client.chat(
-            "gpt-4.1-mini", [{"role": "user", "content": "用一句话介绍 Go"}],
+            "gpt-5-mini", [{"role": "user", "content": "用一句话介绍 Go"}],
         )
         print(f"  content: {result.content[:80]}")
         print(f"  tokens: {result.usage.total_tokens}")
@@ -168,9 +168,9 @@ def test_validate_config() -> None:
     cases = [
         ("deepseek-v4-flash", "high"),
         ("deepseek-v4-flash", "disabled"),
-        ("gpt-4.1-mini", "high"),
-        ("gemini-3.1-flash-lite-preview", "disabled"),
-        ("gpt-4.1-mini", "max"),
+        ("gpt-5-mini", "high"),
+        ("gemini-3.1-flash-lite", "disabled"),
+        ("gpt-5-mini", "max"),
     ]
     for model, effort in cases:
         warnings = validate_config(model, effort)
@@ -189,7 +189,7 @@ async def test_fallback() -> None:
         max_retries=1,
         content_fallbacks={
             "deepseek-v4-pro": ["gemini-3-flash-preview", "gemini-2.5-flash"],
-            "deepseek-v4-flash": ["gemini-3.1-flash-lite-preview"],
+            "deepseek-v4-flash": ["gemini-3.1-flash-lite"],
         },
     ) as client:
         # 1. 正常请求不触发 fallback
