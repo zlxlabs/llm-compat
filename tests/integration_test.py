@@ -97,13 +97,42 @@ async def test_async() -> None:
         print(f"  chunks: {len(chunks)}")
         assert full, "empty stream"
 
-        # 5. stats
+        # 5. chat_json 结构化输出 — 多 provider 验证 response_format
+        for model in ["gpt-4.1-mini", "deepseek-v4-flash"]:
+            print(f"\n--- structured chat_json: {model} ---")
+            result = await client.chat_json(
+                model,
+                [{"role": "user", "content": '给 Rust 打 3 个标签，返回 JSON: {"tags": [...]}'}],
+                schema=TagResult,
+            )
+            print(f"  parsed: {result.parsed}")
+            print(f"  provider: {result.provider}")
+            assert isinstance(result.parsed, TagResult), f"expected TagResult, got {type(result.parsed)}"
+            assert len(result.parsed.tags) > 0, "empty tags"
+
+        # 6. chat_json self-correction（用 gpt-4.1-mini 因为最可靠）
+        print("\n--- chat_json self_correction: gpt-4.1-mini ---")
+        result = await client.chat_json(
+            "gpt-4.1-mini",
+            [{"role": "user", "content": '给 JavaScript 打 2 个标签，返回 JSON: {"tags": [...]}'}],
+            schema=TagResult,
+            self_correction=True,
+            max_retries=2,
+        )
+        print(f"  parsed: {result.parsed}")
+        assert isinstance(result.parsed, TagResult)
+
+        # 7. stats（含 JSON 统计）
         print("\n--- stats ---")
         s = client.stats
         print(f"  total_calls: {s.total_calls}")
         print(f"  success_count: {s.success_count}")
         print(f"  total_tokens: {s.total_tokens}")
         print(f"  success_rate: {s.success_rate:.1%}")
+        print(f"  json_schema_calls: {s.json_schema_calls}")
+        print(f"  json_object_calls: {s.json_object_calls}")
+        print(f"  json_parse_failures: {s.json_parse_failures}")
+        print(f"  json_self_correction: {s.json_self_correction_success}")
 
 
 def test_sync() -> None:
