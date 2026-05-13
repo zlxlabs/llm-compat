@@ -43,6 +43,10 @@ class LLMStats:
     total_latency_ms: int = 0
     fallback_count: int = 0
     prescan_skips: int = 0
+    json_schema_calls: int = 0
+    json_object_calls: int = 0
+    json_parse_failures: int = 0
+    json_self_correction_success: int = 0
     _refusal_counts: dict[str, int] = field(default_factory=dict)
     _errors_by_type: dict[str, int] = field(default_factory=dict)
 
@@ -70,6 +74,18 @@ class LLMStats:
     def record_prescan_skip(self) -> None:
         self.prescan_skips += 1
 
+    def record_json_mode(self, mode: str) -> None:
+        if mode == "json_schema":
+            self.json_schema_calls += 1
+        elif mode == "json_object":
+            self.json_object_calls += 1
+
+    def record_json_parse_failure(self) -> None:
+        self.json_parse_failures += 1
+
+    def record_json_self_correction(self) -> None:
+        self.json_self_correction_success += 1
+
     def reset(self) -> None:
         self.total_calls = 0
         self.success_count = 0
@@ -78,5 +94,9 @@ class LLMStats:
         self.total_latency_ms = 0
         self.fallback_count = 0
         self.prescan_skips = 0
+        self.json_schema_calls = 0
+        self.json_object_calls = 0
+        self.json_parse_failures = 0
+        self.json_self_correction_success = 0
         self._refusal_counts.clear()
         self._errors_by_type.clear()

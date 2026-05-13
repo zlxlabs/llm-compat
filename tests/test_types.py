@@ -87,6 +87,43 @@ class TestLLMStats:
         s = LLMStats()
         assert s.success_rate == 0.0
 
+    def test_json_stats_initial_zero(self):
+        s = LLMStats()
+        assert s.json_schema_calls == 0
+        assert s.json_object_calls == 0
+        assert s.json_parse_failures == 0
+        assert s.json_self_correction_success == 0
+
+    def test_record_json_mode(self):
+        s = LLMStats()
+        s.record_json_mode("json_schema")
+        s.record_json_mode("json_schema")
+        s.record_json_mode("json_object")
+        assert s.json_schema_calls == 2
+        assert s.json_object_calls == 1
+
+    def test_record_json_parse_failure(self):
+        s = LLMStats()
+        s.record_json_parse_failure()
+        s.record_json_parse_failure()
+        assert s.json_parse_failures == 2
+
+    def test_record_json_self_correction(self):
+        s = LLMStats()
+        s.record_json_self_correction()
+        assert s.json_self_correction_success == 1
+
+    def test_reset_clears_json_stats(self):
+        s = LLMStats()
+        s.record_json_mode("json_schema")
+        s.record_json_parse_failure()
+        s.record_json_self_correction()
+        s.reset()
+        assert s.json_schema_calls == 0
+        assert s.json_object_calls == 0
+        assert s.json_parse_failures == 0
+        assert s.json_self_correction_success == 0
+
     def test_reset(self):
         s = LLMStats()
         s.record_success(model="m", latency_ms=100, tokens=10)
