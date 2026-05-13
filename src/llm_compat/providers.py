@@ -45,6 +45,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": "low",
         "max_effort": "xhigh",
         "supports_vision": False,
+        "json_mode": "json_object",
     },
     "gemini_25": {
         "disable_mode": "effort_none",
@@ -52,6 +53,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": "low",
         "max_effort": "high",
         "supports_vision": True,
+        "json_mode": "json_schema",
     },
     "gemini_3": {
         "disable_mode": "minimal_fallback",
@@ -59,6 +61,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": "minimal",
         "max_effort": "high",
         "supports_vision": True,
+        "json_mode": "json_schema",
     },
     "gemini": {
         "disable_mode": "effort_none",
@@ -66,6 +69,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": "low",
         "max_effort": "high",
         "supports_vision": True,
+        "json_mode": "json_schema",
     },
     "openai_gpt5": {
         "disable_mode": "minimal_fallback",
@@ -73,6 +77,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": "minimal",
         "max_effort": "high",
         "supports_vision": True,
+        "json_mode": "json_schema",
     },
     "openai_gpt4": {
         "disable_mode": "na",
@@ -80,6 +85,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": None,
         "max_effort": None,
         "supports_vision": True,
+        "json_mode": "json_schema",
     },
     "openai_o": {
         "disable_mode": "unsupported",
@@ -87,6 +93,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": "low",
         "max_effort": "high",
         "supports_vision": False,
+        "json_mode": "json_object",
     },
     "doubao_seed": {
         "disable_mode": "minimal_fallback",
@@ -94,6 +101,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": "minimal",
         "max_effort": "high",
         "supports_vision": False,
+        "json_mode": "json_object",
     },
     "doubao": {
         "disable_mode": "na",
@@ -101,6 +109,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": None,
         "max_effort": None,
         "supports_vision": False,
+        "json_mode": "json_schema",
     },
     "openai": {
         "disable_mode": "na",
@@ -108,6 +117,7 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "min_effort": "low",
         "max_effort": "high",
         "supports_vision": True,
+        "json_mode": "json_schema",
     },
 }
 
@@ -117,6 +127,7 @@ _DEFAULT_CAPS: dict[str, Any] = {
     "min_effort": None,
     "max_effort": None,
     "supports_vision": True,
+    "json_mode": "json_schema",
 }
 
 

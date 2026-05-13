@@ -272,6 +272,42 @@ class TestDescribeFromPayload:
         assert desc["thinking_mode"] == "n/a"
 
 
+class TestJsonMode:
+    """Every provider family must declare json_mode: json_schema or json_object."""
+
+    @pytest.mark.parametrize(
+        "model,expected_mode",
+        [
+            ("gpt-4o", "json_schema"),
+            ("gpt-5", "json_schema"),
+            ("gpt-4.1-mini", "json_schema"),
+            ("gemini-2.5-flash", "json_schema"),
+            ("gemini-3-flash", "json_schema"),
+            ("gemini-pro", "json_schema"),
+            ("doubao-pro-256k", "json_schema"),
+            ("deepseek-v4-flash", "json_object"),
+            ("doubao-seed-2.0", "json_object"),
+            ("o3-mini", "json_object"),
+        ],
+    )
+    def test_json_mode_per_provider(self, model: str, expected_mode: str) -> None:
+        family = providers.detect_provider(model)
+        caps = providers.get_provider_caps(family)
+        assert caps["json_mode"] == expected_mode
+
+    def test_all_families_have_json_mode(self) -> None:
+        for family, caps in providers._FAMILY_CAPABILITIES.items():
+            assert "json_mode" in caps, f"{family} missing json_mode"
+            assert caps["json_mode"] in ("json_schema", "json_object"), (
+                f"{family} has invalid json_mode: {caps['json_mode']}"
+            )
+
+    def test_default_caps_has_json_mode(self) -> None:
+        caps = providers._DEFAULT_CAPS
+        assert "json_mode" in caps
+        assert caps["json_mode"] in ("json_schema", "json_object")
+
+
 class TestDeepMerge:
     def test_basic_merge(self) -> None:
         base = {"a": 1, "b": 2}
