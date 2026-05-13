@@ -40,7 +40,7 @@ class TestResponseFormatInjection:
         httpx_mock.add_response(json=_chat_response('{"tags": ["python"]}'))
         async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
             result = await client.chat_json(
-                "gpt-4o",
+                "gpt-5-mini",
                 [{"role": "user", "content": "tag this"}],
                 schema=TagResult,
             )
@@ -94,7 +94,7 @@ class TestResponseFormatInjection:
         httpx_mock.add_response(json=_chat_response('{"tags": ["a"]}'))
         httpx_mock.add_response(json=_chat_response('{"tags": ["b"]}'))
         async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            await client.chat_json("gpt-4o", [{"role": "user", "content": "1"}], schema=TagResult)
+            await client.chat_json("gpt-5-mini", [{"role": "user", "content": "1"}], schema=TagResult)
             await client.chat_json(
                 "deepseek-v4-flash", [{"role": "user", "content": "2"}], schema=TagResult,
             )
@@ -284,7 +284,7 @@ class TestJsonSchemaFallback:
             base_url="http://test/v1", api_key="sk-test", max_retries=0,
         ) as client:
             result = await client.chat_json(
-                "gpt-4o",
+                "gpt-5-mini",
                 [{"role": "user", "content": "tag"}],
                 schema=TagResult,
             )

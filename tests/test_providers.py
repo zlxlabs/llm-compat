@@ -278,16 +278,18 @@ class TestJsonMode:
     @pytest.mark.parametrize(
         "model,expected_mode",
         [
-            ("gpt-4o", "json_schema"),
             ("gpt-5", "json_schema"),
-            ("gpt-4.1-mini", "json_schema"),
+            ("gpt-5-mini", "json_schema"),
             ("gemini-2.5-flash", "json_schema"),
             ("gemini-3-flash", "json_schema"),
-            ("gemini-pro", "json_schema"),
             ("doubao-pro-256k", "json_schema"),
+            ("doubao-seed-2.0", "json_schema"),
+            ("o3-mini", "json_schema"),
+            ("o4-mini", "json_schema"),
+            ("gpt-4o", "json_object"),
+            ("gpt-4.1-mini", "json_object"),
+            ("gemini-pro", "json_object"),
             ("deepseek-v4-flash", "json_object"),
-            ("doubao-seed-2.0", "json_object"),
-            ("o3-mini", "json_object"),
         ],
     )
     def test_json_mode_per_provider(self, model: str, expected_mode: str) -> None:
