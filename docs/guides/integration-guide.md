@@ -109,13 +109,147 @@ with SyncLLMClient(base_url="...", api_key="...") as client:
     result = client.chat("gpt-4.1-mini", messages)
 ```
 
-### 1.3 错误处理
+### 1.3 结构化 JSON 输出（重点）
+
+让 LLM 返回结构化 JSON 是最常见的需求之一。`chat_json()` 自动处理所有 provider 差异，你只需要定义 Pydantic model：
+
+#### 基本用法
+
+```python
+from pydantic import BaseModel
+
+class TagResult(BaseModel):
+    tags: list[str]
+
+result = await client.chat_json(
+    "gpt-5-mini",
+    [{"role": "user", "content": "给 Python 打 3 个标签"}],
+    schema=TagResult,
+)
+print(result.parsed)       # TagResult(tags=['编程语言', 'Python', '开发'])
+print(type(result.parsed)) # <class 'TagResult'>
+```
+
+#### 它在背后做了什么
+
+`chat_json()` 根据模型的 provider 能力，自动选择最优的 JSON 输出模式：
+
+```
+你的代码                      llm-compat 自动处理                    API 请求
+─────────                    ──────────────                        ─────────
+chat_json(                   1. 检测 provider：gpt-5-mini → openai_gpt5
+  "gpt-5-mini",             2. 查能力表：json_mode = "json_schema"
+  messages,                  3. Pydantic → JSON Schema 转换          → response_format:
+  schema=TagResult,          4. 注入 response_format                    {"type": "json_schema",
+)                            5. 发送请求                                 "json_schema": {...}}
+                             6. 解析响应 + Pydantic 校验             ← {"tags": ["编程语言",...]}
+```
+
+**各 provider 的结构化输出模式：**
+
+| Provider 族 | json_mode | 代表模型 | 说明 |
+|---|---|---|---|
+| `openai_gpt5` | json_schema | gpt-5, gpt-5-mini | API 层面强制 Schema 约束 |
+| `openai_o` | json_schema | o3-mini, o4-mini | API 层面强制 Schema 约束 |
+| `gemini_25` | json_schema | gemini-2.5-flash/pro | API 层面强制 Schema 约束 |
+| `gemini_3` | json_schema | gemini-3-flash, gemini-3.1-flash-lite | API 层面强制 Schema 约束 |
+| `doubao` | json_schema | doubao-pro-256k | API 层面强制 Schema 约束（beta） |
+| `doubao_seed` | json_schema | doubao-seed-2.0 | API 层面强制 Schema 约束（beta） |
+| `openai_gpt4` | json_object | gpt-4o, gpt-4.1-mini | API 保证合法 JSON，不强制 Schema |
+| `deepseek` | json_object | deepseek-v4-flash | API 保证合法 JSON，不强制 Schema |
+| `gemini` | json_object | gemini-pro（旧版） | API 保证合法 JSON，不强制 Schema |
+
+两种模式的区别：
+- **json_schema**：API 层面约束返回的 JSON 必须符合你的 Schema，成功率最高
+- **json_object**：API 只保证返回合法 JSON，字段结构靠 Pydantic 校验兜底
+
+调用方无需关心这个区别——`chat_json()` 自动选择。如果代理层不支持 json_schema（返回 400），会自动降级到 json_object 并记 warning 日志。
+
+#### Self-Correction：解析失败时自动重试
+
+开启 `self_correction` 后，如果 JSON 解析或 Pydantic 校验失败，会把错误信息反馈给模型重试：
+
+```python
+result = await client.chat_json(
+    "deepseek-v4-flash",
+    messages,
+    schema=TagResult,
+    self_correction=True,   # 开启 self-correction
+    max_retries=2,          # 最多重试 2 次（默认）
+)
+```
+
+**流程：**
+
+```
+第 1 次请求 → 模型返回 {"tag": ["python"]}  ← 字段名错误
+                ↓ Pydantic 校验失败
+第 2 次请求 → messages 追加：
+                assistant: {"tag": ["python"]}
+                user: "JSON 解析失败：tags field required. 请返回符合 Schema 的 JSON。"
+             → 模型返回 {"tags": ["python"]}  ← 修正成功 ✓
+```
+
+不开启 `self_correction`（默认行为），解析失败直接抛 `JSONParseError`。
+
+#### 不传 Schema：只要合法 JSON
+
+不传 `schema` 时，只保证返回合法 JSON，不做结构校验：
+
+```python
+result = await client.chat_json(
+    "gpt-5-mini",
+    [{"role": "user", "content": "返回一个 JSON 对象"}],
+)
+print(result.parsed)  # dict，如 {"key": "value"}
+```
+
+此时固定使用 `json_object` 模式（无 Schema 可注入）。
+
+#### 传原始 JSON Schema（不用 Pydantic）
+
+如果你有现成的 JSON Schema dict，可以直接传：
+
+```python
+my_schema = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "score": {"type": "number"},
+    },
+    "required": ["name", "score"],
+    "additionalProperties": False,
+}
+
+result = await client.chat_json(
+    "gpt-5-mini",
+    messages,
+    schema=ScoreResult,         # 仍用于反序列化
+    json_schema=my_schema,      # 优先用这个注入 API
+)
+```
+
+`json_schema` 参数优先于 Pydantic 自动生成的 Schema 用于 API 的 `response_format`。`schema`（Pydantic model）仍用于反序列化响应。
+
+#### 监控 JSON 输出效果
+
+```python
+stats = client.stats
+print(f"json_schema 调用: {stats.json_schema_calls}")
+print(f"json_object 调用: {stats.json_object_calls}")
+print(f"解析失败次数: {stats.json_parse_failures}")
+print(f"self-correction 成功: {stats.json_self_correction_success}")
+```
+
+`json_parse_failures > 0` 但 `json_self_correction_success` 接近说明 self-correction 在起作用。如果 `json_parse_failures` 持续很高，可能需要优化 Prompt 或 Schema 设计。
+
+### 1.4 错误处理
 
 ```python
 from llm_compat import FatalError, TimeoutError, JSONParseError, SkipRequestError
 
 try:
-    result = await client.chat_json("gpt-4o", messages, schema=MyModel)
+    result = await client.chat_json("gpt-5-mini", messages, schema=MyModel)
 except JSONParseError as e:
     print(e.raw_content)   # 模型返回的原始内容（self_correction 开启时已经过重试）
 except SkipRequestError:
