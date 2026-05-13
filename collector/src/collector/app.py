@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from typing import Any, Generator
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 
@@ -114,6 +115,13 @@ def create_app(db_path: str = "collector.db", api_key: str = "") -> FastAPI:
             rows = db.execute("SELECT word FROM words ORDER BY word").fetchall()
             words = [r["word"] for r in rows]
             return {"words": words, "hash": _compute_hash(words), "count": len(words)}
+
+    @app.get("/words.txt")
+    def list_words_txt() -> PlainTextResponse:
+        with get_db() as db:
+            rows = db.execute("SELECT word FROM words ORDER BY word").fetchall()
+            text = "\n".join(r["word"] for r in rows) + "\n" if rows else ""
+            return PlainTextResponse(text)
 
     @app.post("/words", status_code=201, dependencies=[Depends(_require_auth)])
     def add_word(body: WordIn) -> dict[str, str]:

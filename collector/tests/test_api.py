@@ -74,6 +74,25 @@ class TestWords:
         assert "待删除" not in resp.json()["words"]
 
 
+class TestWordsTxt:
+    def test_words_txt_returns_plain_text(self):
+        client = make_client()
+        client.post("/words", json={"word": "词1"}, headers=auth_headers())
+        client.post("/words", json={"word": "词2"}, headers=auth_headers())
+        resp = client.get("/words.txt")
+        assert resp.status_code == 200
+        assert "text/plain" in resp.headers["content-type"]
+        lines = [l for l in resp.text.strip().split("\n") if l]
+        assert "词1" in lines
+        assert "词2" in lines
+
+    def test_words_txt_empty(self):
+        client = make_client()
+        resp = client.get("/words.txt")
+        assert resp.status_code == 200
+        assert resp.text == ""
+
+
 class TestWordHash:
     def test_hash_changes_when_words_change(self):
         client = make_client()
