@@ -55,6 +55,10 @@ class ContentPolicyError(LLMError):
         self.original_model = original_model
 
 
+class SkipRequestError(LLMError):
+    pass
+
+
 class JSONParseError(LLMError):
     def __init__(
         self,

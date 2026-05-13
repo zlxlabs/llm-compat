@@ -39,6 +39,20 @@ def _find_list_field(model_cls: type[BaseModel]) -> str | None:
     return None
 
 
+def pydantic_to_json_schema(
+    model_cls: type[BaseModel],
+    *,
+    name: str | None = None,
+) -> dict[str, Any]:
+    schema = model_cls.model_json_schema()
+    schema.pop("title", None)
+    return {
+        "name": name or model_cls.__name__,
+        "strict": True,
+        "schema": schema,
+    }
+
+
 def parse_json_model(raw: str, model_cls: type[T]) -> T:
     data = parse_json(raw)
 

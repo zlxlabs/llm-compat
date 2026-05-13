@@ -1,10 +1,12 @@
-"""Tests for llm_compat.json_utils — JSON response cleaning and Pydantic validation."""
+"""Tests for llm_compat.json_utils — JSON response cleaning, Pydantic validation, and schema conversion."""
 from __future__ import annotations
+
+from typing import Optional
 
 import pytest
 from pydantic import BaseModel
 
-from llm_compat.json_utils import parse_json, parse_json_model
+from llm_compat.json_utils import parse_json, parse_json_model, pydantic_to_json_schema
 
 
 class TagResult(BaseModel):
@@ -79,3 +81,38 @@ class TestParseJsonModel:
         result = parse_json_model('{"name": "test", "score": 9.5}', SimpleResult)
         assert result.name == "test"
         assert result.score == 9.5
+
+
+class NestedModel(BaseModel):
+    name: str
+    items: list[str]
+    score: Optional[float] = None
+
+
+class TestPydanticToJsonSchema:
+    def test_simple_model(self) -> None:
+        schema = pydantic_to_json_schema(TagResult)
+        assert schema["name"] == "TagResult"
+        assert schema["strict"] is True
+        assert "schema" in schema
+        props = schema["schema"]["properties"]
+        assert "tags" in props
+
+    def test_nested_model(self) -> None:
+        schema = pydantic_to_json_schema(NestedModel)
+        assert schema["name"] == "NestedModel"
+        props = schema["schema"]["properties"]
+        assert "name" in props
+        assert "items" in props
+        assert "score" in props
+
+    def test_schema_is_valid_json_schema(self) -> None:
+        schema = pydantic_to_json_schema(SimpleResult)
+        inner = schema["schema"]
+        assert inner["type"] == "object"
+        assert "properties" in inner
+        assert "required" in inner
+
+    def test_custom_name(self) -> None:
+        schema = pydantic_to_json_schema(TagResult, name="MyCustomName")
+        assert schema["name"] == "MyCustomName"
