@@ -12,7 +12,7 @@ dependencies = [
 sensitive = ["pyahocorasick>=2.0"]
 
 [project.urls]
-Repository = "https://github.com/zj1123581321/llm-compat"
+Repository = "https://github.com/zlxlabs/llm-compat"
 
 [build-system]
 requires = ["hatchling"]

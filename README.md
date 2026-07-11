@@ -29,10 +29,10 @@ llm-compat 统一处理这些差异，业务代码只需改配置不改代码。
 ## 安装
 
 ```bash
-uv add git+https://github.com/zj1123581321/llm-compat.git
+uv add git+https://github.com/zlxlabs/llm-compat.git
 
 # 启用敏感词前置检测（可选）
-uv add "git+https://github.com/zj1123581321/llm-compat.git[sensitive]"
+uv add "git+https://github.com/zlxlabs/llm-compat.git[sensitive]"
 ```
 
 ## 快速开始

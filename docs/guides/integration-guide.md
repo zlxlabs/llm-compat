@@ -3,7 +3,7 @@
 ## 快速开始
 
 ```bash
-uv add git+https://github.com/zj1123581321/llm-compat.git
+uv add git+https://github.com/zlxlabs/llm-compat.git
 ```
 
 ```python
@@ -211,7 +211,7 @@ result = await client.chat_image("deepseek-v4", "描述这张图", image_data=im
 已知的敏感词可在发送前检测，直接跳过主模型，省一次 API 调用：
 
 ```bash
-uv add "git+https://github.com/zj1123581321/llm-compat.git[sensitive]"
+uv add "git+https://github.com/zlxlabs/llm-compat.git[sensitive]"
 ```
 
 #### 方式一：从 URL 加载词库（推荐）

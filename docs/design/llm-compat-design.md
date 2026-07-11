@@ -317,13 +317,13 @@ class LLMClient:
 
 ```bash
 # 从 GitHub 安装（私有包，不发 PyPI）
-uv add git+https://github.com/zj1123581321/llm-compat.git
+uv add git+https://github.com/zlxlabs/llm-compat.git
 
 # 或锁定版本
-uv add git+https://github.com/zj1123581321/llm-compat.git@v0.1.0
+uv add git+https://github.com/zlxlabs/llm-compat.git@v0.1.0
 
 # 带 Pydantic 支持
-uv add "llm-compat[pydantic] @ git+https://github.com/zj1123581321/llm-compat.git"
+uv add "llm-compat[pydantic] @ git+https://github.com/zlxlabs/llm-compat.git"
 ```
 
 ## 版本策略
