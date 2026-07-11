@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.34",
+    "zlx-ops-sdk>=0.2,<0.3",
 ]
 
 [project.optional-dependencies]

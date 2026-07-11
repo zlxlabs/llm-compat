@@ -8,6 +8,8 @@ services:
     container_name: llm-compat-collector
     env_file:
       - .env
+      - path: ops.env
+        required: false
     ports:
       - "127.0.0.1:8234:8000"
     volumes:

@@ -5,6 +5,7 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Any, Generator
 
+import zlx_ops_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
@@ -183,6 +184,12 @@ def create_app(db_path: str = "collector.db", api_key: str = "") -> FastAPI:
 def _default_app() -> FastAPI:
     import os
 
+    zlx_ops_sdk.init(
+        "llm-compat-collector",
+        repo="zlxlabs/llm-compat",
+        server=os.environ.get("SERVER_NAME", "n305"),
+        environment=os.environ.get("OPS_ENV", "prod"),
+    )
     return create_app(
         db_path=os.environ.get("COLLECTOR_DB_PATH", "/data/collector.db"),
         api_key=os.environ.get("COLLECTOR_API_KEY", ""),
