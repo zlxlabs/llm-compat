@@ -1,0 +1,21 @@
+name: CI
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# The reusable gate requests pull-request write permission for its Codex review
+# comment.  Keep this explicit: organization defaults are read-only.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  gate:
+    uses: zlxlabs/gate/.github/workflows/gate.yml@main
+    with:
+      tier: personal
+      runner: self
+      has_ui: false
+      design_doc: ""
+    secrets:
+      FEISHU_CI_WEBHOOK: ${{ secrets.FEISHU_CI_WEBHOOK }}

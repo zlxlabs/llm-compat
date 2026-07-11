@@ -22,8 +22,19 @@ if not BASE_URL or not API_KEY:
     API_KEY = os.environ.get("LLM_API_KEY", "")
 
 if not BASE_URL or not API_KEY:
-    print("请设置环境变量 LLM_BASE_URL 和 LLM_API_KEY（或填写 .env 文件）")
-    sys.exit(1)
+    if __name__ == "__main__":
+        print("请设置环境变量 LLM_BASE_URL 和 LLM_API_KEY（或填写 .env 文件）")
+        sys.exit(1)
+
+    # This module performs paid, live-provider checks.  It is deliberately
+    # collected by pytest for explicit local runs, but must never abort the
+    # ordinary unit-test suite when CI has no provider credentials.
+    import pytest
+
+    pytest.skip(
+        "live LLM integration test requires LLM_BASE_URL and LLM_API_KEY",
+        allow_module_level=True,
+    )
 
 MODELS = ["deepseek-v4-flash", "gpt-5-mini", "gemini-3.1-flash-lite"]
 
