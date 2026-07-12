@@ -46,7 +46,11 @@ def _is_format_error(error: Exception) -> bool:
     while current is not None:
         if isinstance(current, httpx.HTTPStatusError) and current.response.status_code == 400:
             body = current.response.text.lower()
-            body = re.sub(r"(['\"])(response_format|json_schema)\1", r"\2", body)
+            body = re.sub(
+                r"\\?(['\"])(response_format|json_schema)\\?\1",
+                r"\2",
+                body,
+            )
             format_target = (
                 r"(?:response_format(?:\s+json_schema)?|json_schema|structured outputs?)"
             )
@@ -56,7 +60,8 @@ def _is_format_error(error: Exception) -> bool:
                 rf"\b(?:unsupported|not supported)\s+{format_target}\b",
                 r"\b(?:model|provider|api|endpoint)\b\s+"
                 r"(?:does not(?: currently)? support|doesn't support)\s+"
-                rf"(?:the\s+)?['\"]?{format_target}['\"]?\b",
+                rf"(?:the\s+)?{format_target}\b"
+                r"(?!\s+(?:keyword|property|field|constraint)\b)",
                 r"['\"]?response_format['\"]?\s+of\s+type\s+"
                 r"['\"]?json_schema['\"]?\s+is\s+not\s+supported\s+"
                 r"(?:with|by|for)\s+(?:this\s+)?(?:model|provider|api|endpoint)\b",

@@ -225,6 +225,7 @@ async def test_fatal_http_status_keeps_specific_error_kind(
         "Invalid json_schema: required field 'name' is missing",
         "json_schema contains unsupported keyword 'oneOf'",
         "This model does not support keyword oneOf in json_schema",
+        "This model does not support the json_schema keyword 'oneOf'",
     ],
 )
 async def test_malformed_schema_is_not_treated_as_unsupported_capability(
@@ -250,6 +251,7 @@ async def test_malformed_schema_is_not_treated_as_unsupported_capability(
     [
         "response_format json_schema is unsupported",
         "response_format 'json_schema' is unsupported",
+        'response_format "json_schema" is unsupported',
         "model does not currently support response_format json_schema",
         "Invalid parameter: 'response_format' of type 'json_schema' is not supported "
         "with this model",
