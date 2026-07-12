@@ -6,6 +6,7 @@ on:
 # The reusable gate requests pull-request write permission for its Codex review
 # comment.  Keep this explicit: organization defaults are read-only.
 permissions:
+  actions: read
   contents: read
   pull-requests: write
 
