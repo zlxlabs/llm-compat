@@ -53,9 +53,9 @@ def _is_format_error(error: Exception) -> bool:
                 rf"\b{format_target}\b\s+(?:is\s+|are\s+)?"
                 r"(?:unsupported|not supported|unavailable)\b",
                 rf"\b(?:unsupported|not supported)\s+{format_target}\b",
-                r"\b(?:model|provider|api|endpoint)\b.{0,80}"
-                r"\b(?:does not(?: currently)? support|doesn't support)\b.{0,80}"
-                rf"\b{format_target}\b",
+                r"\b(?:model|provider|api|endpoint)\b\s+"
+                r"(?:does not(?: currently)? support|doesn't support)\s+"
+                rf"(?:the\s+)?['\"]?{format_target}['\"]?\b",
                 r"['\"]?response_format['\"]?\s+of\s+type\s+"
                 r"['\"]?json_schema['\"]?\s+is\s+not\s+supported\s+"
                 r"(?:with|by|for)\s+(?:this\s+)?(?:model|provider|api|endpoint)\b",
