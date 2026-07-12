@@ -164,6 +164,51 @@ async def test_generic_400_is_terminal_and_does_not_downgrade_schema(
     assert client.stats._errors_by_type == {"FatalError": 1}
 
 
+@pytest.mark.parametrize(
+    ("status", "error_kind"),
+    [
+        (401, "authentication"),
+        (403, "permission_denied"),
+        (404, "model_not_found"),
+    ],
+)
+async def test_fatal_http_status_keeps_specific_error_kind(
+    httpx_mock: HTTPXMock,
+    status: int,
+    error_kind: str,
+) -> None:
+    httpx_mock.add_response(status_code=status, json={"error": "failure"})
+    async with LLMClient(
+        base_url="http://test/v1", api_key="secret", max_retries=0
+    ) as client:
+        with pytest.raises(FatalError) as exc_info:
+            await client.chat("gpt-4o", MESSAGES)
+
+    error = exc_info.value
+    assert error.error_kind == error_kind
+    assert error.http_status == status
+    assert error.trace is not None
+    assert error.trace.final_outcome == error_kind
+    assert error.trace.model_attempts[0].error_kind == error_kind
+
+
+async def test_malformed_schema_is_not_treated_as_unsupported_capability(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(
+        status_code=400,
+        json={"error": "Invalid json_schema: required field 'name' is missing"},
+    )
+    async with LLMClient(
+        base_url="http://test/v1", api_key="secret", max_retries=0
+    ) as client:
+        with pytest.raises(FatalError) as exc_info:
+            await client.chat_json("gpt-5-mini", MESSAGES, schema=TagResult)
+
+    assert len(httpx_mock.get_requests()) == 1
+    assert exc_info.value.error_kind == "invalid_request"
+
+
 async def test_explicit_schema_unsupported_downgrades_and_records_both_attempts(
     httpx_mock: HTTPXMock,
 ) -> None:
@@ -234,6 +279,7 @@ async def test_all_fallbacks_refused_keep_legacy_catch_trace_and_http_cause(
             await client.chat("deepseek-v4", MESSAGES)
 
     error = exc_info.value
+    assert error.http_status == 451
     assert error.trace is not None
     assert error.trace.final_outcome == "content_policy"
     assert [item.model for item in error.trace.model_attempts] == ["deepseek-v4", "gpt-4o"]

@@ -120,7 +120,7 @@ def describe_error(error: Exception) -> tuple[str, int | None]:
     while current is not None:
         if isinstance(current, httpx.HTTPStatusError):
             status = current.response.status_code
-            if stable_kind != "unknown":
+            if stable_kind in {"content_policy", "unsupported_response_format"}:
                 return stable_kind, status
             if status == 400:
                 return "invalid_request", status

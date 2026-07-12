@@ -51,7 +51,7 @@ def _is_format_error(error: Exception) -> bool:
             )
             rejects_capability = any(
                 marker in body
-                for marker in ("unsupported", "not support", "invalid", "unrecognized")
+                for marker in ("unsupported", "not support", "doesn't support")
             )
             return names_format and rejects_capability
         current = current.__cause__
@@ -684,6 +684,7 @@ class BaseClient:
                             attempted_models=attempted,
                             raw_content=last_content,
                             original_model=model,
+                            http_status=describe_error(error)[1],
                             trace=trace.freeze(
                                 final_outcome="content_policy",
                                 final_model=current_model,
@@ -709,6 +710,7 @@ class BaseClient:
             attempted_models=attempted,
             raw_content=last_content,
             original_model=model,
+            http_status=(describe_error(last_error)[1] if last_error is not None else None),
             trace=trace.freeze(
                 final_outcome="content_policy",
                 final_model=attempted[-1] if attempted else None,
