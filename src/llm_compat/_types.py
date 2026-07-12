@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ._trace import CallTrace
+
 
 @dataclass
 class TokenUsage:
@@ -22,6 +24,7 @@ class ChatResult:
     provider: str = ""
     fallback_from: str | None = None
     fallback_chain: list[str] = field(default_factory=list)
+    trace: CallTrace | None = None
 
     def __str__(self) -> str:
         return self.content

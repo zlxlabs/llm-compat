@@ -4,12 +4,14 @@ from llm_compat._compat import (
     validate_config,
     validate_fallback_config,
 )
+from llm_compat._trace import CallTrace, ModelAttempt, RouteDecision
 from llm_compat._types import ChatResult, LLMStats, TokenUsage
 from llm_compat.client import LLMClient
 from llm_compat.errors import (
     ContentPolicyError,
     FatalError,
     JSONParseError,
+    LLMCallError,
     LLMError,
     RetryableError,
     SkipRequestError,
@@ -34,6 +36,7 @@ __all__ = [
     "TokenUsage",
     "LLMStats",
     "LLMError",
+    "LLMCallError",
     "RetryableError",
     "FatalError",
     "TimeoutError",
@@ -41,6 +44,9 @@ __all__ = [
     "JSONParseError",
     "SkipRequestError",
     "ContentPolicyError",
+    "CallTrace",
+    "RouteDecision",
+    "ModelAttempt",
     "RefusalContext",
     "RefusalDetector",
     "validate_fallback_config",
