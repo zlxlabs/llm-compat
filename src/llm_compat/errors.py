@@ -114,10 +114,14 @@ class JSONParseError(LLMCallError):
 def describe_error(error: Exception) -> tuple[str, int | None]:
     """Return stable metadata without serializing error text or the cause object."""
 
+    stable_kind = error.error_kind if isinstance(error, LLMCallError) else "unknown"
+    stable_status = error.http_status if isinstance(error, LLMCallError) else None
     current: BaseException | None = error
     while current is not None:
         if isinstance(current, httpx.HTTPStatusError):
             status = current.response.status_code
+            if stable_kind != "unknown":
+                return stable_kind, status
             if status == 400:
                 return "invalid_request", status
             if status == 401:
@@ -137,9 +141,7 @@ def describe_error(error: Exception) -> tuple[str, int | None]:
             return "network_error", None
         current = current.__cause__
 
-    if isinstance(error, LLMCallError):
-        return error.error_kind, error.http_status
-    return "unknown", None
+    return stable_kind, stable_status
 
 
 def classify_error(error: Exception) -> type[LLMError]:

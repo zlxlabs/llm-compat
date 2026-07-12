@@ -15,11 +15,23 @@ from pydantic import BaseModel
 from ._collector import CollectorClient
 from ._compat import normalize_reasoning_effort
 from ._keyword_cache import get_cache_version, get_cached_keywords
+from ._trace import _CallTraceBuilder
 from ._types import ChatResult, LLMStats, TokenUsage
-from .errors import ContentPolicyError, JSONParseError, SkipRequestError
+from .errors import (
+    ContentPolicyError,
+    JSONParseError,
+    LLMCallError,
+    SkipRequestError,
+    describe_error,
+)
 from .fallback import filter_by_modality, resolve_fallback_chain
 from .json_utils import parse_json, parse_json_model, pydantic_to_json_schema
-from .providers import build_request_payload, describe_from_payload, detect_provider, get_provider_caps
+from .providers import (
+    build_request_payload,
+    describe_from_payload,
+    detect_provider,
+    get_provider_caps,
+)
 from .refusal import RefusalDetector, detect_refusal
 from .sensitive import SensitiveDetector
 
@@ -29,16 +41,30 @@ T = TypeVar("T", bound=BaseModel)
 
 
 def _is_format_error(error: Exception) -> bool:
-    cause = error.__cause__ if error.__cause__ else error
-    if isinstance(cause, httpx.HTTPStatusError):
-        if cause.response.status_code == 400:
-            body = cause.response.text.lower()
-            return "response_format" in body or "json_schema" in body or "unsupported" in body
-    if isinstance(error, httpx.HTTPStatusError):
-        if error.response.status_code == 400:
-            body = error.response.text.lower()
-            return "response_format" in body or "json_schema" in body or "unsupported" in body
+    current: BaseException | None = error
+    while current is not None:
+        if isinstance(current, httpx.HTTPStatusError) and current.response.status_code == 400:
+            body = current.response.text.lower()
+            names_format = any(
+                marker in body
+                for marker in ("response_format", "json_schema", "structured output")
+            )
+            rejects_capability = any(
+                marker in body
+                for marker in ("unsupported", "not support", "invalid", "unrecognized")
+            )
+            return names_format and rejects_capability
+        current = current.__cause__
     return False
+
+
+def _json_mode(request: _ChatRequest) -> str:
+    response_format = request.extra.get("response_format")
+    if isinstance(response_format, dict):
+        value = response_format.get("type")
+        if isinstance(value, str):
+            return value
+    return "text"
 
 
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=300.0, write=10.0, pool=10.0)
@@ -149,7 +175,10 @@ class BaseClient:
         version_sum = sum(
             get_cache_version(url) for url in self._sensitive_words_urls
         )
-        if self._sensitive_detector_cached is not None and version_sum == self._sensitive_version_sum:
+        if (
+            self._sensitive_detector_cached is not None
+            and version_sum == self._sensitive_version_sum
+        ):
             return self._sensitive_detector_cached
         all_words: set[str] = set()
         if self._sensitive_manual_words:
@@ -386,7 +415,13 @@ class BaseClient:
 
                 working_messages = list(messages) + [
                     {"role": "assistant", "content": result.content},
-                    {"role": "user", "content": f"Your response failed JSON parsing. Error: {parse_err}. Please return valid JSON matching the schema."},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Your response failed JSON parsing. Error: {parse_err}. "
+                            "Please return valid JSON matching the schema."
+                        ),
+                    },
                 ]
 
     def _content_fallback_orchestrator(
@@ -399,6 +434,7 @@ class BaseClient:
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
         request_id = uuid.uuid4().hex[:8]
+        trace = _CallTraceBuilder(request_id=request_id, requested_model=model)
         chain = resolve_fallback_chain(model, self._content_fallbacks)
         deadline_start = time.monotonic()
 
@@ -406,7 +442,25 @@ class BaseClient:
         prescan_skipped = False
 
         sensitive = self._get_sensitive_detector()
-        if sensitive and chain and sensitive.is_available:
+        if not chain:
+            trace.add_route_decision(
+                model=model,
+                action="selected",
+                reason="no_fallback_config",
+            )
+        elif sensitive is None:
+            trace.add_route_decision(
+                model=model,
+                action="selected",
+                reason="prescan_not_configured",
+            )
+        elif not sensitive.is_available:
+            trace.add_route_decision(
+                model=model,
+                action="selected",
+                reason="prescan_unavailable",
+            )
+        else:
             texts = [
                 msg.get("content", "") if isinstance(msg.get("content"), str) else ""
                 for msg in messages
@@ -418,13 +472,31 @@ class BaseClient:
                 if effective_chain:
                     models_to_try = effective_chain
                     prescan_skipped = True
+                    trace.add_route_decision(
+                        model=model,
+                        action="skipped",
+                        reason="sensitive_match",
+                    )
                     logger.info(
                         "[%s] LLM prescan | sensitive words detected | skipping %s → %s",
                         request_id, model, effective_chain[0],
                     )
+                else:
+                    trace.add_route_decision(
+                        model=model,
+                        action="selected",
+                        reason="no_eligible_fallback",
+                    )
+            else:
+                trace.add_route_decision(
+                    model=model,
+                    action="selected",
+                    reason="prescan_miss",
+                )
 
         attempted: list[str] = []
         last_content = ""
+        last_error: ContentPolicyError | None = None
 
         for current_model in models_to_try:
             elapsed = time.monotonic() - deadline_start
@@ -435,6 +507,11 @@ class BaseClient:
             current_provider = detect_provider(current_model)
 
             if attempted:
+                trace.add_route_decision(
+                    model=current_model,
+                    action="selected",
+                    reason="content_policy_fallback",
+                )
                 logger.info(
                     "[%s] LLM fallback | from=%s → to=%s | attempt=%d/%d",
                     request_id, model, current_model,
@@ -451,40 +528,92 @@ class BaseClient:
 
             try:
                 request = next(inner)
+                request_number = 0
+                previous_json_mode: str | None = None
                 while True:
+                    current_json_mode = _json_mode(request)
+                    if request_number == 0:
+                        if prescan_skipped:
+                            trigger = "sensitive_prescan"
+                        elif attempted:
+                            trigger = "content_fallback"
+                        else:
+                            trigger = "primary"
+                    elif (
+                        previous_json_mode == "json_schema"
+                        and current_json_mode == "json_object"
+                    ):
+                        trigger = "schema_downgrade"
+                    else:
+                        trigger = "self_correction"
+
+                    attempt_started = time.monotonic()
                     response: _ChatResponse = yield request
+                    attempt_latency_ms = response.latency_ms or int(
+                        (time.monotonic() - attempt_started) * 1000
+                    )
 
                     has_fallback = bool(chain) or len(models_to_try) > 1
 
-                    if response.error and isinstance(response.error, ContentPolicyError):
-                        if has_fallback:
-                            inner.close()
-                            http_status = None
-                            cause = response.error.__cause__
-                            if hasattr(cause, "response"):
-                                http_status = getattr(cause.response, "status_code", None)
-                            self._pending_refusal_report = {
-                                "model": current_model,
-                                "provider": current_provider,
-                                "request_id": request_id,
-                                "messages": messages,
-                                "message_count": len(messages),
-                                "has_images": self._has_vision_content(messages),
-                                "detection_layer": "http_error",
-                                "http_status": http_status,
-                                "finish_reason": None,
-                                "response_preview": str(response.error)[:200],
-                            }
-                            raise ContentPolicyError(str(response.error))
+                    if response.error:
+                        error_kind, http_status = describe_error(response.error)
+                        if _is_format_error(response.error):
+                            error_kind = "unsupported_response_format"
+                        trace.add_model_attempt(
+                            model=current_model,
+                            provider=current_provider,
+                            json_mode=current_json_mode,
+                            trigger=trigger,
+                            outcome="error",
+                            error_kind=error_kind,
+                            http_status=http_status,
+                            latency_ms=attempt_latency_ms,
+                        )
 
+                    if (
+                        response.error
+                        and isinstance(response.error, ContentPolicyError)
+                        and has_fallback
+                    ):
+                        inner.close()
+                        self._pending_refusal_report = {
+                            "model": current_model,
+                            "provider": current_provider,
+                            "request_id": request_id,
+                            "messages": messages,
+                            "message_count": len(messages),
+                            "has_images": self._has_vision_content(messages),
+                            "detection_layer": "http_error",
+                            "http_status": http_status,
+                            "finish_reason": None,
+                            "response_preview": str(response.error)[:200],
+                        }
+                        raise ContentPolicyError(
+                            str(response.error),
+                            http_status=http_status,
+                        ) from response.error
+
+                    response_is_refusal = False
                     if has_fallback and response.data and not response.error:
-                        if detect_refusal(
+                        response_is_refusal = detect_refusal(
                             response.data,
                             self._refusal_detector,
                             extra_keywords=self._get_refusal_keywords(),
                             model=current_model,
                             provider=current_provider,
-                        ):
+                        )
+                        trace.add_model_attempt(
+                            model=current_model,
+                            provider=current_provider,
+                            json_mode=current_json_mode,
+                            trigger=trigger,
+                            outcome="response_received",
+                            latency_ms=attempt_latency_ms,
+                            response_classification=(
+                                "content_policy" if response_is_refusal else None
+                            ),
+                        )
+                        if response_is_refusal:
                             inner.close()
                             choices = response.data.get("choices", [{}])
                             choice = choices[0] if choices else {}
@@ -504,6 +633,15 @@ class BaseClient:
                             raise ContentPolicyError(
                                 f"Model {current_model} refused the request",
                             )
+                    elif response.data and not response.error:
+                        trace.add_model_attempt(
+                            model=current_model,
+                            provider=current_provider,
+                            json_mode=current_json_mode,
+                            trigger=trigger,
+                            outcome="response_received",
+                            latency_ms=attempt_latency_ms,
+                        )
 
                     try:
                         request = inner.send(response)
@@ -512,39 +650,73 @@ class BaseClient:
                         if attempted or prescan_skipped:
                             result.fallback_from = model
                             result.fallback_chain = attempted
+                        result.trace = trace.freeze(
+                            final_outcome="success",
+                            final_model=result.model,
+                        )
                         return result
+                    previous_json_mode = current_json_mode
+                    request_number += 1
 
-            except ContentPolicyError:
+            except ContentPolicyError as error:
+                last_error = error
                 attempted.append(current_model)
                 self.stats.record_fallback(refused_model=current_model)
 
                 if not chain or (current_model == models_to_try[-1]):
                     needs_vision = self._has_vision_content(messages)
                     effective_chain = filter_by_modality(chain or [], needs_vision=needs_vision)
-                    remaining_models = [m for m in effective_chain if m not in attempted and m not in models_to_try]
+                    remaining_models = [
+                        candidate
+                        for candidate in effective_chain
+                        if candidate not in attempted and candidate not in models_to_try
+                    ]
                     models_to_try.extend(remaining_models)
 
                     if current_model == models_to_try[-1]:
                         if not chain:
-                            self.stats.record_error(model=current_model, error_type="ContentPolicyError")
-                        raise ContentPolicyError(
+                            self.stats.record_error(
+                                model=current_model,
+                                error_type="ContentPolicyError",
+                            )
+                        terminal_error = ContentPolicyError(
                             f"All models refused: {attempted}",
                             attempted_models=attempted,
                             raw_content=last_content,
                             original_model=model,
+                            trace=trace.freeze(
+                                final_outcome="content_policy",
+                                final_model=current_model,
+                            ),
                         )
+                        raise terminal_error from error
                 continue
 
-            except Exception:
-                self.stats.record_error(model=current_model, error_type=type(Exception).__name__)
+            except Exception as error:
+                self.stats.record_error(model=current_model, error_type=type(error).__name__)
+                if isinstance(error, LLMCallError):
+                    error_kind, http_status = describe_error(error)
+                    error.error_kind = error_kind
+                    error.http_status = http_status
+                    error.trace = trace.freeze(
+                        final_outcome=error_kind,
+                        final_model=current_model,
+                    )
                 raise
 
-        raise ContentPolicyError(
+        terminal_error = ContentPolicyError(
             f"All models refused: {attempted}",
             attempted_models=attempted,
             raw_content=last_content,
             original_model=model,
+            trace=trace.freeze(
+                final_outcome="content_policy",
+                final_model=attempted[-1] if attempted else None,
+            ),
         )
+        if last_error is not None:
+            raise terminal_error from last_error
+        raise terminal_error
 
     def _chat_orchestrator(
         self,
