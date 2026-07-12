@@ -533,10 +533,10 @@ class BaseClient:
                 while True:
                     current_json_mode = _json_mode(request)
                     if request_number == 0:
-                        if prescan_skipped:
-                            trigger = "sensitive_prescan"
-                        elif attempted:
+                        if attempted:
                             trigger = "content_fallback"
+                        elif prescan_skipped:
+                            trigger = "sensitive_prescan"
                         else:
                             trigger = "primary"
                     elif (

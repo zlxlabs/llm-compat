@@ -113,6 +113,33 @@ async def test_prescan_hit_skips_primary_without_creating_an_attempt(
     assert result.trace.model_attempts[0].trigger == "sensitive_prescan"
 
 
+async def test_refusal_after_prescan_labels_later_model_as_content_fallback(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(json=_chat_response("I cannot help"))
+    httpx_mock.add_response(json=_chat_response("ok"))
+    async with LLMClient(
+        base_url="http://test/v1",
+        api_key="secret",
+        content_fallbacks={"deepseek-*": ["gpt-4o", "gemini-2.5-flash"]},
+        sensitive_detector=SensitiveDetector(words=["敏感词"]),
+        refusal_keywords=["cannot help"],
+    ) as client:
+        result = await client.chat(
+            "deepseek-v4", [{"role": "user", "content": "包含敏感词"}]
+        )
+
+    assert result.trace is not None
+    assert [item.model for item in result.trace.model_attempts] == [
+        "gpt-4o",
+        "gemini-2.5-flash",
+    ]
+    assert [item.trigger for item in result.trace.model_attempts] == [
+        "sensitive_prescan",
+        "content_fallback",
+    ]
+
+
 async def test_200_refusal_and_http_policy_error_are_distinct_attempts(
     httpx_mock: HTTPXMock,
 ) -> None:
