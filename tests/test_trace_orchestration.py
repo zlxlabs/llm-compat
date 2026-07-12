@@ -310,6 +310,22 @@ async def test_format_capability_classification_ignores_structured_metadata(
     ]
 
 
+async def test_format_capability_classification_does_not_scan_structured_code(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(
+        status_code=400,
+        json={"error": {"code": "response_format json_schema is unsupported"}},
+    )
+    async with LLMClient(
+        base_url="http://test/v1", api_key="secret", max_retries=0
+    ) as client:
+        with pytest.raises(FatalError):
+            await client.chat_json("gpt-5-mini", MESSAGES, schema=TagResult)
+
+    assert len(httpx_mock.get_requests()) == 1
+
+
 async def test_self_correction_success_and_parse_exhaustion_are_call_outcomes(
     httpx_mock: HTTPXMock,
 ) -> None:

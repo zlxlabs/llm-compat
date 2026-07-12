@@ -61,6 +61,14 @@ def _is_format_error(error: Exception) -> bool:
                             if isinstance(value, str):
                                 body = value
                                 break
+                        else:
+                            return False
+                    else:
+                        return False
+                elif isinstance(payload, str):
+                    body = payload
+                else:
+                    return False
             body = body.lower()
             body = re.sub(
                 r"\\?(['\"])(response_format|json_schema)\\?\1",
