@@ -224,6 +224,8 @@ async def test_fatal_http_status_keeps_specific_error_kind(
     [
         "Invalid json_schema: required field 'name' is missing",
         "json_schema contains unsupported keyword 'oneOf'",
+        "unsupported json_schema keyword 'oneOf'",
+        "json_schema unsupported keyword 'oneOf'",
         "This model does not support keyword oneOf in json_schema",
         "This model does not support the json_schema keyword 'oneOf'",
     ],

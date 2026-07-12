@@ -51,6 +51,13 @@ def _is_format_error(error: Exception) -> bool:
                 r"\2",
                 body,
             )
+            schema_feature = r"(?:keyword|property|field|constraint)"
+            if re.search(
+                rf"(?:\bjson_schema\b.{{0,60}}\b{schema_feature}\b|"
+                rf"\b{schema_feature}\b.{{0,60}}\bjson_schema\b)",
+                body,
+            ):
+                return False
             format_target = (
                 r"(?:response_format(?:\s+json_schema)?|json_schema|structured outputs?)"
             )
