@@ -104,7 +104,7 @@ src/llm_compat/
 └── _compat.py        — 配置校验
 
 collector/            — Sidecar 服务（FastAPI + SQLite）
-tests/                359 tests
+tests/                360 tests
 ```
 
 ## 依赖

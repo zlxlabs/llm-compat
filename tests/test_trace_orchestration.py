@@ -249,6 +249,7 @@ async def test_malformed_schema_is_not_treated_as_unsupported_capability(
     "error_message",
     [
         "response_format json_schema is unsupported",
+        "response_format 'json_schema' is unsupported",
         "model does not currently support response_format json_schema",
         "Invalid parameter: 'response_format' of type 'json_schema' is not supported "
         "with this model",

@@ -46,6 +46,7 @@ def _is_format_error(error: Exception) -> bool:
     while current is not None:
         if isinstance(current, httpx.HTTPStatusError) and current.response.status_code == 400:
             body = current.response.text.lower()
+            body = re.sub(r"(['\"])(response_format|json_schema)\1", r"\2", body)
             format_target = (
                 r"(?:response_format(?:\s+json_schema)?|json_schema|structured outputs?)"
             )
