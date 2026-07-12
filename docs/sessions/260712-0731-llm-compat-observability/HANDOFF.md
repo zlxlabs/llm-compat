@@ -1,9 +1,9 @@
 ---
-status: implemented-pending-final-gate
+status: complete
 branch: main
 created_at: 2026-07-12T07:31:54-04:00
 topic: llm-compat fallback 可观测性阶段 1
-review_status: CEO + ENG CLEARED; CODEX GATE PENDING
+review_status: CEO + ENG + CODEX CLEARED
 ---
 
 # LLM Compat fallback 可观测性实施交接
@@ -43,13 +43,14 @@ review_status: CEO + ENG CLEARED; CODEX GATE PENDING
   `error.message`/字符串 error，非 JSON 才回退正文；连续清洁计数重置为 0/2。
 - Codex gate 第 13 轮：新增 1 个 P2（结构化 JSON 缺少 message 时仍扫描 metadata），
   已对无认可字符串 message 的结构化响应直接判定非 capability；连续清洁计数重置为 0/2。
-- 最终完成条件：仍需独立 Codex gate Review 连续两轮无新增实质性意见。
+- Codex gate 第 14、15 轮：连续两轮无新增实质性意见，最终 gate 达成 2/2。
+- 最终完成条件：已满足。v0.6.0 实现、文档、正式门禁和独立 review 全部完成。
 
 ## 1. 当前结论
 
-fallback HTTP 失败被消费项目误记为 `json_parse_failed` 的问题已经确认存在。
-CEO Review、Engineer Review 和独立技术复核均已完成，阶段 1 可以直接进入实施，
-没有未决策项。
+fallback HTTP 失败被消费项目误记为 `json_parse_failed` 的问题已在 v0.6.0 阶段 1 修复。
+CEO Review、Engineer Review、实施、正式门禁和独立 Codex gate 均已完成，
+没有未决策或未完成项。
 
 完整方案与评审：
 
