@@ -56,6 +56,9 @@ def _is_format_error(error: Exception) -> bool:
                 r"\b(?:model|provider|api|endpoint)\b.{0,80}"
                 r"\b(?:does not(?: currently)? support|doesn't support)\b.{0,80}"
                 rf"\b{format_target}\b",
+                r"['\"]?response_format['\"]?\s+of\s+type\s+"
+                r"['\"]?json_schema['\"]?\s+is\s+not\s+supported\s+"
+                r"(?:with|by|for)\s+(?:this\s+)?(?:model|provider|api|endpoint)\b",
             )
             return any(re.search(pattern, body) for pattern in explicit_capability_patterns)
         current = current.__cause__

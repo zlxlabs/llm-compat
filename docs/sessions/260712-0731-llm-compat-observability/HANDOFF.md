@@ -15,7 +15,7 @@ review_status: CEO + ENG CLEARED; CODEX GATE PENDING
 - T2 Error contract：已完成，新增兼容父类 `LLMCallError`，稳定元数据和包根导出。
 - T3 Shared orchestration：已完成，async/sync 共享模型级轨迹，收紧 generic HTTP 400
   降级并修复错误统计类型。
-- T4 Regression matrix：已完成，正式 pytest 门禁当前为 357 项。
+- T4 Regression matrix：已完成，正式 pytest 门禁当前为 358 项。
 - T5 Release/docs：代码与用户文档已更新到 v0.6.0。
 - 正式门禁：`uv run pytest`、`uv run ruff check src tests`、`uv run mypy src` 均通过。
 - Codex gate 第 1 轮：发现 2 个 P1、1 个 P2，均已修复并补回归测试；连续清洁轮次
@@ -27,6 +27,8 @@ review_status: CEO + ENG CLEARED; CODEX GATE PENDING
   回归测试；连续清洁计数重置为 0/2。
 - Codex gate 第 5 轮：新增 1 个 P1（unsupported schema keyword 被误认为 capability），
   已改为受限句式匹配并补回归测试；连续清洁计数重置为 0/2。
+- Codex gate 第 6 轮：新增 1 个 P1（带引号的 `response_format of type json_schema`
+  capability 文案），已增加受限模式并补回归测试；连续清洁计数重置为 0/2。
 - 最终完成条件：仍需独立 Codex gate Review 连续两轮无新增实质性意见。
 
 ## 1. 当前结论

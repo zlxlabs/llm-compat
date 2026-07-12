@@ -249,6 +249,8 @@ async def test_malformed_schema_is_not_treated_as_unsupported_capability(
     [
         "response_format json_schema is unsupported",
         "model does not currently support response_format json_schema",
+        "Invalid parameter: 'response_format' of type 'json_schema' is not supported "
+        "with this model",
     ],
 )
 async def test_explicit_schema_unsupported_downgrades_and_records_both_attempts(
