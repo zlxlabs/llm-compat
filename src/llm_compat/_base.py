@@ -45,7 +45,23 @@ def _is_format_error(error: Exception) -> bool:
     current: BaseException | None = error
     while current is not None:
         if isinstance(current, httpx.HTTPStatusError) and current.response.status_code == 400:
-            body = current.response.text.lower()
+            body = current.response.text
+            try:
+                payload = current.response.json()
+            except ValueError:
+                pass
+            else:
+                if isinstance(payload, dict):
+                    error_payload = payload.get("error")
+                    if isinstance(error_payload, str):
+                        body = error_payload
+                    elif isinstance(error_payload, dict):
+                        for key in ("message", "detail", "description"):
+                            value = error_payload.get(key)
+                            if isinstance(value, str):
+                                body = value
+                                break
+            body = body.lower()
             body = re.sub(
                 r"\\?(['\"])(response_format|json_schema)\\?\1",
                 r"\2",

@@ -285,6 +285,31 @@ async def test_explicit_schema_unsupported_downgrades_and_records_both_attempts(
     assert result.trace.model_attempts[0].error_kind == "unsupported_response_format"
 
 
+async def test_format_capability_classification_ignores_structured_metadata(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(
+        status_code=400,
+        json={
+            "error": {
+                "message": "response_format json_schema is unsupported",
+                "field": "response_format",
+            }
+        },
+    )
+    httpx_mock.add_response(json=_chat_response('{"tags": ["ok"]}'))
+    async with LLMClient(
+        base_url="http://test/v1", api_key="secret", max_retries=0
+    ) as client:
+        result = await client.chat_json("gpt-5-mini", MESSAGES, schema=TagResult)
+
+    assert result.trace is not None
+    assert [item.json_mode for item in result.trace.model_attempts] == [
+        "json_schema",
+        "json_object",
+    ]
+
+
 async def test_self_correction_success_and_parse_exhaustion_are_call_outcomes(
     httpx_mock: HTTPXMock,
 ) -> None:
