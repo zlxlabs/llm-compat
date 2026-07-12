@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    import ahocorasick
+    import ahocorasick  # type: ignore[import-not-found]
 
     _HAS_AHOCORASICK = True
 except ImportError:

@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import httpx
 from pydantic import BaseModel
@@ -19,6 +19,9 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class LLMClient(BaseClient):
+    _http: httpx.AsyncClient | None = None
+    _semaphore: asyncio.Semaphore | None
+
     def _get_http(self) -> httpx.AsyncClient:
         if not hasattr(self, "_http") or self._http is None or self._http.is_closed:
             self._http = httpx.AsyncClient(
@@ -50,10 +53,10 @@ class LLMClient(BaseClient):
             async with sem:
                 response = await http.post("/chat/completions", json=payload)
                 response.raise_for_status()
-                return response.json()
+                return cast(dict[str, Any], response.json())
         response = await http.post("/chat/completions", json=payload)
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     async def _single_chat(
         self,

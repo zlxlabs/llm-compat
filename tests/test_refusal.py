@@ -44,7 +44,14 @@ class TestCheckStructuredSignals:
         assert check_structured_signals(data) is False
 
     def test_refusal_field(self):
-        data = {"choices": [{"message": {"refusal": "I can't help with that"}, "finish_reason": "stop"}]}
+        data = {
+            "choices": [
+                {
+                    "message": {"refusal": "I can't help with that"},
+                    "finish_reason": "stop",
+                }
+            ]
+        }
         assert check_structured_signals(data) is True
 
     def test_none_content_with_stop(self):

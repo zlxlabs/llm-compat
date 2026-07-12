@@ -1,7 +1,5 @@
-"""Tests for llm_compat.json_utils — JSON response cleaning, Pydantic validation, and schema conversion."""
+"""Tests for JSON response cleaning, Pydantic validation, and schema conversion."""
 from __future__ import annotations
-
-from typing import Optional
 
 import pytest
 from pydantic import BaseModel
@@ -86,7 +84,7 @@ class TestParseJsonModel:
 class NestedModel(BaseModel):
     name: str
     items: list[str]
-    score: Optional[float] = None
+    score: float | None = None
 
 
 class TestPydanticToJsonSchema:

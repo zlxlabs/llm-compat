@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+collect_ignore = ["integration_test.py"]
+
 
 @pytest.fixture(autouse=True)
 def _clear_proxy_env(monkeypatch: pytest.MonkeyPatch) -> None:

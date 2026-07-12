@@ -1,4 +1,4 @@
-"""Tests for structured JSON output: response_format injection, self-correction, hooks, concurrency."""
+"""Tests for structured JSON output, self-correction, hooks, and concurrency."""
 from __future__ import annotations
 
 import asyncio
@@ -10,9 +10,8 @@ from pydantic import BaseModel
 from pytest_httpx import HTTPXMock
 
 from llm_compat._base import BaseClient
-from llm_compat._types import ChatResult
 from llm_compat.client import LLMClient
-from llm_compat.errors import ContentPolicyError, JSONParseError, SkipRequestError
+from llm_compat.errors import ContentPolicyError, FatalError, JSONParseError, SkipRequestError
 
 
 class TagResult(BaseModel):
@@ -112,7 +111,11 @@ class TestResponseFormatInjection:
         httpx_mock.add_response(json=_chat_response('{"tags": ["a"]}'))
         httpx_mock.add_response(json=_chat_response('{"tags": ["b"]}'))
         async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            await client.chat_json("gpt-5-mini", [{"role": "user", "content": "1"}], schema=TagResult)
+            await client.chat_json(
+                "gpt-5-mini",
+                [{"role": "user", "content": "1"}],
+                schema=TagResult,
+            )
             await client.chat_json(
                 "deepseek-v4-flash", [{"role": "user", "content": "2"}], schema=TagResult,
             )
@@ -181,7 +184,8 @@ class TestSelfCorrection:
         assert len(messages) >= 3
         assert messages[-2]["role"] == "assistant"
         assert messages[-1]["role"] == "user"
-        assert "error" in messages[-1]["content"].lower() or "failed" in messages[-1]["content"].lower()
+        correction_prompt = messages[-1]["content"].lower()
+        assert "error" in correction_prompt or "failed" in correction_prompt
 
 
 class TestHooks:
@@ -205,7 +209,7 @@ class TestHooks:
         async with LLMClient(
             base_url="http://test/v1", api_key="sk-test", on_error=hook, max_retries=0,
         ) as client:
-            with pytest.raises(Exception):
+            with pytest.raises(FatalError):
                 await client.chat("gpt-4o", [{"role": "user", "content": "hi"}])
         hook.assert_called_once()
         args = hook.call_args[0]
@@ -227,7 +231,7 @@ class TestHooks:
         async with LLMClient(
             base_url="http://test/v1", api_key="sk-test", on_error=hook, max_retries=0,
         ) as client:
-            with pytest.raises(Exception):
+            with pytest.raises(FatalError):
                 await client.chat("gpt-4o", [{"role": "user", "content": "hi"}])
 
     async def test_pre_request_false_skips(self, httpx_mock: HTTPXMock) -> None:
@@ -259,12 +263,6 @@ class TestHooks:
 
 class TestMaxConcurrency:
     async def test_concurrency_limits_parallel(self, httpx_mock: HTTPXMock) -> None:
-        call_count = 0
-        max_concurrent = 0
-        current = 0
-
-        original_add = httpx_mock.add_response
-
         for _ in range(5):
             httpx_mock.add_response(json=_chat_response("ok"))
 
@@ -391,7 +389,13 @@ class TestContentFallbackWithJson:
             "id": "chatcmpl-refused",
             "object": "chat.completion",
             "model": "deepseek-v4",
-            "choices": [{"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": content},
+                    "finish_reason": "stop",
+                }
+            ],
             "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
         }
 

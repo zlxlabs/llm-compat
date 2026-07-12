@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import httpx
 from pydantic import BaseModel
@@ -16,6 +16,8 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class SyncLLMClient(BaseClient):
+    _http: httpx.Client | None = None
+
     def _get_http(self) -> httpx.Client:
         if not hasattr(self, "_http") or self._http is None or self._http.is_closed:
             self._http = httpx.Client(
@@ -39,7 +41,7 @@ class SyncLLMClient(BaseClient):
         http = self._get_http()
         response = http.post("/chat/completions", json=payload)
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def _single_chat(
         self,

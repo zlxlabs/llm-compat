@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -26,6 +26,7 @@ class CollectorClient:
         self._cache_path = Path(cache_path) if cache_path else None
         self._api_key = api_key
         self._http = http
+        self._own_http: httpx.AsyncClient | None = None
         self._words_hash: str = ""
 
     def _auth_headers(self) -> dict[str, str]:
@@ -36,7 +37,7 @@ class CollectorClient:
     def _get_http(self) -> Any:
         if self._http is not None:
             return self._http
-        if not hasattr(self, "_own_http") or self._own_http is None:
+        if self._own_http is None:
             self._own_http = httpx.AsyncClient(
                 base_url=self._url, timeout=5.0, headers=self._auth_headers(),
             )
@@ -96,7 +97,7 @@ class CollectorClient:
             resp = await http.get(f"{self._url}/words")
             data = resp.json()
             self._words_hash = data.get("hash", "")
-            return data.get("words", [])
+            return cast(list[str], data.get("words", []))
         except Exception:
             logger.debug("Collector unavailable, returning empty word list")
             return []
@@ -127,6 +128,6 @@ class CollectorClient:
         return full[: self._preview_length]
 
     async def close(self) -> None:
-        if hasattr(self, "_own_http") and self._own_http is not None:
+        if self._own_http is not None:
             await self._own_http.aclose()
             self._own_http = None

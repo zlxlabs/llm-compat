@@ -38,7 +38,7 @@ def _get_retry_after(exc: Exception) -> float | None:
 
 def _compute_backoff(attempt: int, base_delay: float, max_delay: float) -> float:
     delay = min(base_delay * (2**attempt), max_delay)
-    return delay * (0.5 + random.random())
+    return float(delay * (0.5 + random.random()))
 
 
 async def async_retry_call(
