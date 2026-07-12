@@ -4,10 +4,12 @@
 # .env must be in the same directory as docker-compose.yml on the server.
 services:
   llm-compat-collector:
-    image: ghcr.io/zj1123581321/llm-compat-collector:latest
+    image: ghcr.io/zlxlabs/llm-compat-collector:latest
     container_name: llm-compat-collector
     env_file:
       - .env
+      - path: ops.env
+        required: false
     ports:
       - "127.0.0.1:8234:8000"
     volumes:
