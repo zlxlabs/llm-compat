@@ -106,3 +106,27 @@
 2. **版本计数器**: `_keyword_cache` 加计数器，`LLMClient` 每次请求做 O(1) 整数比较，变化时才重建 → 最小改动，低耦合
 
 **决定**: 版本计数器方案。`_cache_version` 字典 + `get_cache_version()` API，`LLMClient._get_sensitive_detector()` 做懒重建。相比 LLM API 调用延迟，O(1) 整数比较可忽略。
+
+---
+
+## 2026-07-12: fallback 可观测性采用统一模型级 CallTrace
+
+**问题**: fallback 的 HTTP 失败只保留异常，没有保存敏感词预检、实际模型和格式降级事实。
+消费项目将失败转换为 `None` 后，会把上游 HTTP 失败误记为 `json_parse_failed`。
+
+**决定**:
+
+1. 成功通过 `ChatResult.trace`、稳定运行失败通过 `LLMCallError.trace` 暴露同一种不可变
+   `CallTrace`。
+2. 路由决策与真实模型请求分层：预检跳过只写 `RouteDecision`；每个共享 generator yield
+   写一条 `ModelAttempt`。
+3. `response_received` 只表达上游可用性；JSON 解析结果只写 `final_outcome`。
+4. 保留既有具体异常和字段，插入兼容父类 `LLMCallError`；`SkipRequestError` 不加入该层级，
+   未知异常不统一包装。
+5. generic HTTP 400 默认终止。只有错误同时明确指向 `response_format` / `json_schema` 等
+   格式能力并表达不支持时，才执行 schema→object。
+6. v0.6.0 限于模型级事实，不改变 retry、timeout、`LLMStats.total_calls` 或生产 fallback
+   策略。
+
+**延期**: transport retry 明细、安全错误摘要、`on_trace` 和新统计口径进入阶段 2；消费项目
+迁移进入阶段 3；`chat_stream()` 完整 trace、availability fallback 和总 deadline 修复另行设计。

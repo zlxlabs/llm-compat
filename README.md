@@ -20,6 +20,7 @@ llm-compat 统一处理这些差异，业务代码只需改配置不改代码。
 | **统一对话 API** | `chat()` / `chat_json()` / `chat_stream()` / `chat_image()` + 同步版本 |
 | **结构化 JSON 输出** | 自动选择 json_schema 或 json_object 模式，Pydantic 校验，self-correction |
 | **内容审查降级** | 国内模型被拒时自动切换海外模型，`chat()` 和 `chat_json()` 均支持 |
+| **调用轨迹** | 成功和失败共享不可变 `CallTrace`，区分路由决策、真实模型尝试与终态 |
 | **Provider 翻译** | reasoning_effort 跨 10 个 provider 族自动翻译 |
 | **智能重试** | 指数退避 + jitter，错误分类（可重试/致命/超时） |
 | **并发控制** | `max_concurrency` 参数，防止打爆 API |
@@ -58,7 +59,25 @@ async with LLMClient(
     result = await client.chat_json("deepseek-v4-pro", messages, schema=TagResult)
     print(result.parsed)       # TagResult(tags=[...])
     print(result.fallback_from) # 降级时显示原始模型，否则 None
+    print(result.trace.to_dict()) # 安全、可序列化的模型级调用事实
 ```
+
+失败也使用同一套轨迹，不需要把 HTTP 错误猜成 JSON 解析失败：
+
+```python
+from llm_compat import LLMCallError
+
+try:
+    result = await client.chat_json("deepseek-v4-pro", messages, schema=TagResult)
+except LLMCallError as error:
+    print(error.error_kind, error.http_status)
+    print(error.trace.to_dict() if error.trace else None)
+```
+
+`requested_model` 是调用方请求的模型；被预检跳过的模型只出现在
+`route_decisions`；真正发出请求的模型才出现在 `model_attempts`；`final_model`
+是成功模型或最后失败模型；`final_outcome` 是整个逻辑调用的结果。一次 attempt 的
+`response_received` 只表示上游返回成功，不代表后续 JSON 解析成功。
 
 ## 文档
 
@@ -79,12 +98,13 @@ src/llm_compat/
 ├── sensitive.py      — 前置敏感词检测（可选依赖）
 ├── json_utils.py     — JSON 清洗 + Pydantic 校验 + Schema 转换
 ├── errors.py         — 错误层级
+├── _trace.py         — 不可变 CallTrace / RouteDecision / ModelAttempt
 ├── _types.py         — ChatResult, TokenUsage, LLMStats
 ├── _collector.py     — Collector 服务客户端
 └── _compat.py        — 配置校验
 
 collector/            — Sidecar 服务（FastAPI + SQLite）
-tests/                340 tests
+tests/                350 tests
 ```
 
 ## 依赖

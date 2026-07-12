@@ -574,7 +574,7 @@ class LLMClient:
 
 ### 迁移检查清单
 
-- [ ] 安装 llm-compat（v0.5.0+）
+- [ ] 安装 llm-compat（v0.6.0+）
 - [ ] 创建薄封装 LLMClient（保留配置解析，删除 HTTP/重试/翻译）
 - [ ] `reasoning_effort: "none"` → `"disabled"`
 - [ ] 删除重试逻辑、JSON 清洗、response_format 注入、并发信号量
@@ -627,19 +627,64 @@ class LLMClient:
 | `provider` | `str` | provider 族 |
 | `fallback_from` | `str \| None` | 降级时为原始模型，未降级时为 None |
 | `fallback_chain` | `list[str]` | 降级时尝试过的模型链 |
+| `trace` | `CallTrace \| None` | v0.6.0 模型级调用轨迹；旧代码不传时保持 `None` |
+
+### CallTrace：成功与失败的统一事实
+
+`chat()` 和 `chat_json()` 成功时通过 `ChatResult.trace` 返回轨迹。进入共享调用编排后
+发生的稳定运行错误通过 `LLMCallError.trace` 返回同一种轨迹：
+
+```python
+from llm_compat import LLMCallError
+
+try:
+    result = await client.chat_json(model, messages, schema=TagResult)
+    trace = result.trace
+except LLMCallError as error:
+    trace = error.trace
+    print(error.error_kind, error.http_status)
+
+if trace is not None:
+    record = trace.to_dict()  # 只含安全标量、字典和列表
+```
+
+几个模型字段不能混用：
+
+| 概念 | 位置 | 含义 |
+|------|------|------|
+| requested model | `CallTrace.requested_model` | 调用方最初请求的模型，即使后来被预检跳过也不变 |
+| skipped model | `route_decisions[action="skipped"]` | 被路由决策跳过，没有向上游发请求 |
+| attempted model | `model_attempts[*].model` | 确实向上游发出过请求；每个 `_ChatRequest` 一条 |
+| final model | `CallTrace.final_model` | 成功模型，或终态错误前最后尝试的模型 |
+| final outcome | `CallTrace.final_outcome` | 整个逻辑调用结果，如 `success`、`json_parse`、`content_policy` |
+
+`ModelAttempt.outcome="response_received"` 只说明收到上游响应。对于 `chat_json()`，响应
+仍可能解析失败；解析终态只看 `CallTrace.final_outcome`。trace 不包含 prompt、messages、
+payload、响应正文、headers、API key 或原始异常。公共对象是 frozen dataclass，且内部 tuple
+不可变；超过 100 条模型事件时 `truncated=True` 并记录 `dropped_events`。
 
 ### 错误类型
 
 | 错误 | 父类 | 说明 | 是否重试 |
 |------|------|------|---------|
 | `LLMError` | `Exception` | 所有错误的基类 | — |
-| `RetryableError` | `LLMError` | 可重试错误（502/503/429/网络错误） | 是 |
+| `LLMCallError` | `LLMError` | 稳定运行错误父类，提供 `error_kind` / `http_status` / `trace` | — |
+| `RetryableError` | `LLMCallError` | 可重试错误（502/503/429/网络错误） | 是 |
 | `TimeoutError` | `RetryableError` | 请求超时 | 否 |
 | `TruncationError` | `RetryableError` | 输出被截断 | 否 |
-| `FatalError` | `LLMError` | 不可恢复错误（401/403/404） | 否 |
-| `JSONParseError` | `LLMError` | JSON 解析失败（附带 raw_content, model, request_id） | 否 |
-| `ContentPolicyError` | `LLMError` | 所有模型拒绝（附带 attempted_models, raw_content, original_model） | 否 |
+| `FatalError` | `LLMCallError` | 不可恢复错误（400/401/403/404） | 否 |
+| `JSONParseError` | `LLMCallError` | JSON 解析失败（兼容保留 raw_content, model, request_id） | 否 |
+| `ContentPolicyError` | `LLMCallError` | 所有模型拒绝（兼容保留 attempted_models 等字段） | 否 |
 | `SkipRequestError` | `LLMError` | pre_request hook 返回 False | 否 |
+
+稳定 `error_kind` 包括 `invalid_request`、`authentication`、`permission_denied`、
+`model_not_found`、`rate_limited`、`upstream_server_error`、`timeout`、`network_error`、
+`content_policy`、`unsupported_response_format`、`json_parse` 和 `unknown`。未知异常不会被
+blanket-wrap 成 `LLMCallError`，仍保持原异常类型。
+
+v0.6.0 只提供模型级事实。transport 内每次 HTTP retry、脱敏错误摘要、`on_trace` hook、
+新统计口径属于阶段 2；消费项目迁移属于阶段 3。当前版本不改变 timeout/retry 行为、
+`LLMStats.total_calls` 口径或 `chat_stream()` 的 trace 支持范围。
 
 ---
 
