@@ -236,12 +236,20 @@ async def test_malformed_schema_is_not_treated_as_unsupported_capability(
     assert exc_info.value.error_kind == "invalid_request"
 
 
+@pytest.mark.parametrize(
+    "error_message",
+    [
+        "response_format json_schema is unsupported",
+        "model does not currently support response_format json_schema",
+    ],
+)
 async def test_explicit_schema_unsupported_downgrades_and_records_both_attempts(
     httpx_mock: HTTPXMock,
+    error_message: str,
 ) -> None:
     httpx_mock.add_response(
         status_code=400,
-        json={"error": {"message": "response_format json_schema is unsupported"}},
+        json={"error": {"message": error_message}},
     )
     httpx_mock.add_response(json=_chat_response('{"tags": ["ok"]}'))
     async with LLMClient(

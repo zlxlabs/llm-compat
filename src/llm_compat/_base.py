@@ -51,7 +51,13 @@ def _is_format_error(error: Exception) -> bool:
             )
             rejects_capability = any(
                 marker in body
-                for marker in ("unsupported", "not support", "doesn't support")
+                for marker in (
+                    "unsupported",
+                    "not support",
+                    "does not support",
+                    "does not currently support",
+                    "doesn't support",
+                )
             )
             return names_format and rejects_capability
         current = current.__cause__
