@@ -219,12 +219,20 @@ async def test_fatal_http_status_keeps_specific_error_kind(
     assert error.trace.model_attempts[0].error_kind == error_kind
 
 
+@pytest.mark.parametrize(
+    "error_message",
+    [
+        "Invalid json_schema: required field 'name' is missing",
+        "json_schema contains unsupported keyword 'oneOf'",
+    ],
+)
 async def test_malformed_schema_is_not_treated_as_unsupported_capability(
     httpx_mock: HTTPXMock,
+    error_message: str,
 ) -> None:
     httpx_mock.add_response(
         status_code=400,
-        json={"error": "Invalid json_schema: required field 'name' is missing"},
+        json={"error": error_message},
     )
     async with LLMClient(
         base_url="http://test/v1", api_key="secret", max_retries=0

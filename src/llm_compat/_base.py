@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 import time
 import uuid
 from collections.abc import Callable, Generator
@@ -45,21 +46,18 @@ def _is_format_error(error: Exception) -> bool:
     while current is not None:
         if isinstance(current, httpx.HTTPStatusError) and current.response.status_code == 400:
             body = current.response.text.lower()
-            names_format = any(
-                marker in body
-                for marker in ("response_format", "json_schema", "structured output")
+            format_target = (
+                r"(?:response_format(?:\s+json_schema)?|json_schema|structured outputs?)"
             )
-            rejects_capability = any(
-                marker in body
-                for marker in (
-                    "unsupported",
-                    "not support",
-                    "does not support",
-                    "does not currently support",
-                    "doesn't support",
-                )
+            explicit_capability_patterns = (
+                rf"\b{format_target}\b\s+(?:is\s+|are\s+)?"
+                r"(?:unsupported|not supported|unavailable)\b",
+                rf"\b(?:unsupported|not supported)\s+{format_target}\b",
+                r"\b(?:model|provider|api|endpoint)\b.{0,80}"
+                r"\b(?:does not(?: currently)? support|doesn't support)\b.{0,80}"
+                rf"\b{format_target}\b",
             )
-            return names_format and rejects_capability
+            return any(re.search(pattern, body) for pattern in explicit_capability_patterns)
         current = current.__cause__
     return False
 
