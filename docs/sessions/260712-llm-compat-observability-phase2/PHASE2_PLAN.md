@@ -1,5 +1,5 @@
 ---
-status: draft-for-cross-repo-review
+status: consumer-reviewed-not-ready
 created_at: 2026-07-12
 baseline: llm-compat v0.6.0
 target: observability phase 2
@@ -7,6 +7,8 @@ owners:
   producer: llm-compat
   consumer: AI Information Processor
 review_gate: consumer review + TDD + two consecutive clean Codex reviews
+consumer_reviewed_at: 2026-07-12
+consumer_verdict: NOT READY
 ---
 
 # LLM Compat 可观测性阶段二实施计划
@@ -517,3 +519,209 @@ uv run mypy src
 - 不满足第 3 节进入条件时，不开始代码实施。
 
 这份结论是待消费端验证的生产者建议，不是已经冻结的最终公共契约。
+
+## 13. AI Information Processor 消费端 Review 结论（2026-07-12）
+
+### 13.1 总体判断
+
+**VERDICT：`NOT READY`。不建议按本文当前范围直接启动完整 Phase 2。**
+
+v0.6.0 已经解决了此前最核心的消费端问题：敏感词预检或 content fallback 后的上游失败，不再只能以
+`None` 传给下游并被误记为 `json_parse_failed`。`RouteDecision`、`ModelAttempt`、终态
+`final_outcome` 与稳定的 `LLMCallError` 已足以表达该问题的模型级事实。
+
+`TransportAttempt` 解决的是下一层问题，即同一个模型尝试内部的实际 transport 调用次数、重试原因和
+退避耗时。这个方向有长期价值，但当前消费端尚未建立成功 trace 的持久化和查询闭环，因此直接实现完整
+2A 会产生“生产者已经生成、消费端仍然看不到”的数据。2B 当前没有得到真实消费需求支持，应全部延期。
+
+推荐先完成消费端 v0.6.0 闭环和独立的 retry 正确性/日志隐私修复，再根据实际数据决定是否实施缩小后的
+2A-lite。
+
+### 13.2 BLOCKER
+
+以下事项不解决，不应进入当前 2A 实施。
+
+#### B1. 消费端只持久化失败 trace，2A 的主要成功恢复场景会继续丢失
+
+AI Information Processor 已在：
+
+- `src/processing/ai_client.py:265-312` 从成功 `ChatResult.trace` 提取 `call_trace`；
+- `src/processing/ai_client.py:342-361` 从稳定 `LLMCallError.trace` 提取失败 trace。
+
+但 `src/processing/ai_ledger.py:242-255` 只有在 `status == "failed"` 时，才把 trace 写入
+`result_json.failure.trace`。因此以下最需要 transport facts 的场景仍不会落账：
+
+- 429 或 5xx 后重试成功；
+- network error 后重试成功；
+- schema downgrade 后成功；
+- content fallback 后成功。
+
+进入 2A 前，消费端必须先决定成功和失败共用的中性存储位置。推荐：
+
+```text
+article_ai_runs.result_json.observability.trace
+```
+
+不建议继续把公共 trace 放在 `failure.trace` 下。若出于存储量考虑不保存完整成功 trace，也必须先冻结并实现
+成功路径的聚合字段，否则 2A 无法完成其主要目标。
+
+#### B2. 当前消费端丢弃了 `dropped_events`，无法判断 trace 完整性
+
+`src/processing/ai_client.py:294-312` 的 `_trace_summary()` 保存了 `truncated`，但没有保存
+`dropped_events`。即使 2A 发布，消费端也只能知道 trace 被截断，无法知道丢失数量。
+
+消费端在进入 2A 前至少应保存 v0.6.0 已有的 `dropped_events`，并为缺字段的旧事件提供默认值。
+
+#### B3. 不得把当前不严格的 total-timeout 行为固化为 Phase 2 公共兼容要求
+
+当前 `src/llm_compat/retry.py` 会在一次失败后把 sleep 截断到 remaining timeout，但 sleep 返回后不会再次
+检查 deadline，而是可能继续执行下一次 callable。本文第 5.2 节和 T2A-2 当前要求用测试锁定“截断 sleep
+后仍执行下一次 callable”的行为。
+
+该行为可以暂时不在 2A 中顺手修改，但不应被升级为长期不变契约。进入 2A 前应单列 retry deadline 任务，
+明确 `total_timeout` 是 soft timeout 还是 hard deadline；2A 只观测最终批准的语义。若 deadline 修复暂时
+延期，相关测试只能作为现状 characterization，并明确允许后续修正，不能作为兼容门禁。
+
+### 13.3 SHOULD CHANGE
+
+#### S1. 将完整 2A 缩小为按真实查询需求驱动的 2A-lite
+
+建议首版保留：
+
+```python
+@dataclass(frozen=True, slots=True)
+class TransportAttempt:
+    ordinal: int
+    outcome: str
+    error_kind: str | None = None
+    http_status: int | None = None
+    latency_ms: int = 0
+    retry_scheduled: bool = False
+```
+
+其中：
+
+- `outcome` 保持 `success/error` 即可；
+- DNS、connect、read 等细分继续通过稳定 `error_kind` 表达，不扩张 `outcome` 值域；
+- 成功 attempt 不要求 `http_status`，避免仅为记录通常无诊断价值的 2xx 而改变 `_request()` 内部返回形态；
+- `backoff_ms` 只有在消费端已经定义退避延迟查询或告警后才加入首版，否则延期；
+- `retry_source` 延期。
+
+#### S2. transport 分类必须增加响应 envelope 解码失败
+
+当前 async/sync `_request()` 的 callable 同时包含 HTTP 请求、`raise_for_status()` 和 `response.json()`。
+因此 HTTP 2xx 但响应 envelope 不是合法 JSON 时，transport callable 会抛错；现有提案会将它归为
+`unknown`。
+
+建议稳定闭集增加：
+
+```text
+response_decode
+```
+
+它表示 OpenAI-compatible HTTP response envelope 无法解码，不能使用 `json_parse`；后者已用于模型内容或
+业务 JSON/self-correction 解析失败。两层必须保持可区分。
+
+#### S3. 不要扩展旧 `CallTrace.dropped_events` 的既有语义
+
+本文第 5.3 节准备把 `dropped_events` 从“被丢弃的 model event 数”扩展为“被丢弃的 model 或 transport
+event 数”。这与第 2.1 节“旧字段不改变既有语义”的要求冲突，也让消费端无法判断哪个嵌套
+`ModelAttempt.transport_attempts` 不完整。
+
+建议保留旧字段语义，并做加法扩展：
+
+```python
+class CallTrace:
+    dropped_events: int = 0  # 保持 v0.6.0 语义
+    dropped_transport_attempts: int = 0
+
+class ModelAttempt:
+    transport_attempts: tuple[TransportAttempt, ...] = ()
+    transport_attempts_truncated: bool = False
+    dropped_transport_attempts: int = 0
+```
+
+若担心字段重复，至少也应保留 model 级完整性标志；仅有 call 级混合计数不足以解释嵌套数组。
+
+#### S4. 降低 recorder 防御性设计与测试矩阵的实施比重
+
+recorder 不得改变 retry 的返回值、次数和异常链，这一原则正确；但当前计划为 recorder 禁用、计数器再次
+失败、NaN/infinity backoff、恶意 `error_kind` 等场景设计了接近核心路径规模的协议和测试。
+
+建议先锁定以下核心门禁：
+
+- 首次成功；
+- retry 后成功；
+- retry 耗尽；
+- fatal/no-retry；
+- 429/5xx/network/timeout/response_decode；
+- async/sync parity；
+- schema downgrade、fallback、self-correction 的正确归属；
+- recorder 失败不改变业务结果，并明确标记当前 ModelAttempt 不完整；
+- 有界收集。
+
+其他数值异常和攻击性对象测试可在核心契约稳定后补充，不应阻塞首个可验证增量。
+
+#### S5. 隐私工作应先处理现有自由文本异常日志
+
+trace 不保存原始异常是正确的，但当前 `src/llm_compat/retry.py` 的 retry warning 仍直接格式化 `exc`，消费端
+`src/processing/ai_client.py` 也存在记录异常文本的路径。provider message 可能包含请求片段、标识符或其他
+高基数信息。
+
+在设计 `safe_error_code` 前，应先单列日志隐私修复：生产日志默认只输出稳定 `error_kind`、HTTP status、
+model、attempt ordinal 和 request ID；原始异常文本只能进入明确受控的诊断通道。否则 trace 的严格隐私边界
+不能解决整体可观测链路的泄露风险。
+
+### 13.4 CAN DEFER
+
+以下内容不构成 2A-lite 前置条件，当前消费端也没有足够证据支持实施：
+
+- `safe_error_code`：当前没有已批准的 provider/path/value 映射和具体查询用途；
+- `safe_error_message`：继续延期，不持久化任意上游自由文本；
+- `on_trace`：AI Information Processor 已在统一 `_do_chat()` 成功/异常边界读取 trace，不需要新增库级 hook；
+- 新 `LLMStats`：生产事实应从 append-only `article_ai_runs` 或后续 trace 指标聚合，避免扩大无并发保证的
+  进程内统计；
+- 成功 attempt 的 HTTP status；
+- `backoff_ms` 与 `retry_source`，除非先定义实际报表/告警；
+- stream trace、OTel exporter、后台上报与历史回填。
+
+### 13.5 FIELD MAPPING
+
+当前数据库不需要新增列。`ArticleAIRun.result_json` 是 JSON 字段，能够容纳新增嵌套数组；没有严格 Pydantic
+schema 或未知字段拒绝路径，因此 v0.6.0 → 2A 的滚动升级可通过“缺字段即默认空 tuple/零值”兼容。
+
+推荐映射如下：
+
+| 生产者字段 | 消费端位置 | 用途与约束 |
+|---|---|---|
+| `CallTrace.requested_model` | `result_json.observability.trace.requested_model` | 请求模型 |
+| `CallTrace.final_model` | `result_json.observability.trace.final_model` | 实际终态模型 |
+| `CallTrace.final_outcome` | `result_json.observability.trace.final_outcome` | 逻辑调用终态；失败记录的 `reason` 可继续保留为便捷聚合字段 |
+| `CallTrace.route_decisions` | `result_json.observability.trace.route_decisions` | prescan/fallback 路由事实 |
+| `CallTrace.model_attempts` | `result_json.observability.trace.model_attempts` | 模型/格式尝试链 |
+| `ModelAttempt.transport_attempts` | `result_json.observability.trace.model_attempts[].transport_attempts` | transport 明细；旧事件缺失时视为空且标记版本未知，不解释为“确定没有 retry” |
+| `CallTrace.truncated` | `result_json.observability.trace.truncated` | trace 完整性告警 |
+| `CallTrace.dropped_events` | `result_json.observability.trace.dropped_events` | v0.6.0 model event 丢弃数，保持旧语义 |
+| 新 transport 截断字段 | 同层或所属 `model_attempts[]` | transport 完整性，必须与旧 `dropped_events` 分开 |
+| `TransportAttempt.error_kind` | 不单独建索引，先从 JSON 聚合 | 低基数失败分类 |
+| `TransportAttempt.http_status` | 不单独建索引，先从 JSON 聚合 | 仅错误 attempt 有实际诊断价值 |
+| `TransportAttempt.latency_ms` | 不单独建索引，先从 JSON 聚合 | retry 延迟分析 |
+| `TransportAttempt.retry_scheduled` | 不单独建索引，先从 JSON 聚合 | retry 发生率与恢复率 |
+
+当前不建议为 transport 字段新增数据库列或索引。先验证查询频率和 JSON 扫描成本；只有形成稳定 dashboard
+或告警后，再考虑生成列、独立事件表或指标管道。`request_id` 与时间戳属于高基数维度，如后续保存，只用于
+单次诊断，不作为 metrics label。
+
+### 13.6 调整后的推荐执行顺序
+
+1. **消费端 v0.6.0 闭环**：成功/失败共用中性 trace 存储位置，补存 `dropped_events`，增加最小查询或报告，
+   验证现有模型级事实是否已满足生产诊断。
+2. **独立正确性与隐私任务**：明确并修复 retry deadline 语义；停止默认日志直接输出 provider-controlled
+   异常文本。不得与 2A 混成同一行为变更发布。
+3. **需求门禁**：用真实样本证明至少存在一个 v0.6.0 无法回答的查询，例如 retry 次数、retry 恢复率、
+   transport 错误分布或 backoff 延迟贡献。
+4. **实施 2A-lite**：采用嵌套结构、稳定分类、局部完整性标志和有界 recorder；不加入未被消费的字段。
+5. **重新审查 2B**：2A-lite 稳定并实际消费后，再基于新证据决定是否存在 2B，而不是默认继续实施。
+
+满足上述第 1～3 项、关闭 B1～B3，并按 S1～S5 更新公共契约后，消费端可重新给出
+`READY FOR 2A-LITE`。在此之前，不开始 T2A-1 的公共类型实现。
