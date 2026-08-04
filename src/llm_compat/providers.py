@@ -211,7 +211,7 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
     if effort == "disabled":
         mode = caps["disable_mode"]
         if mode == "native":
-            return {"extra_body": {"thinking": {"type": "disabled"}}}
+            return {"thinking": {"type": "disabled"}}
         if mode == "effort_none":
             return {"reasoning_effort": "none"}
         if mode == "minimal_fallback":
@@ -287,15 +287,13 @@ def describe_from_payload(
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
 
     effort = payload.get("reasoning_effort") if isinstance(payload, dict) else None
-    extra_body = payload.get("extra_body") if isinstance(payload, dict) else None
+    thinking = payload.get("thinking") if isinstance(payload, dict) else None
     thinking_type = None
-    if isinstance(extra_body, dict):
-        thinking_cfg = extra_body.get("thinking")
-        if isinstance(thinking_cfg, dict):
-            thinking_type = thinking_cfg.get("type")
+    if isinstance(thinking, dict):
+        thinking_type = thinking.get("type")
 
-    if thinking_type == "disabled":
-        mode, source = "disabled", "extra_body.thinking"
+    if thinking_type in ("disabled", "enabled"):
+        mode, source = str(thinking_type), "thinking"
     elif effort == "none":
         mode, source = "disabled", "reasoning_effort=none"
     elif effort:

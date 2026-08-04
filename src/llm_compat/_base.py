@@ -28,6 +28,7 @@ from .errors import (
 from .fallback import filter_by_modality, resolve_fallback_chain
 from .json_utils import parse_json, parse_json_model, pydantic_to_json_schema
 from .providers import (
+    _deep_merge,
     build_request_payload,
     describe_from_payload,
     detect_provider,
@@ -242,7 +243,17 @@ class BaseClient:
     ) -> dict[str, Any]:
         effort = normalize_reasoning_effort(reasoning_effort)
         base: dict[str, Any] = {"model": model, "messages": messages, **extra}
-        return build_request_payload(model, effort, base)
+        payload = build_request_payload(model, effort, base)
+        if "extra_body" not in payload:
+            return payload
+
+        extra_body = payload.pop("extra_body")
+        if not isinstance(extra_body, dict):
+            logger.warning("extra_body must be a dict; dropping invalid value.")
+            return payload
+
+        # Caller-supplied extra_body is an explicit override of provider defaults.
+        return _deep_merge(payload, extra_body)
 
     def _extract_result(
         self,
