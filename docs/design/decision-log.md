@@ -130,3 +130,20 @@
 
 **延期**: transport retry 明细、安全错误摘要、`on_trace` 和新统计口径进入阶段 2；消费项目
 迁移进入阶段 3；`chat_stream()` 完整 trace、availability fallback 和总 deadline 修复另行设计。
+
+---
+
+## 2026-08-04: `extra_body` 展开与 thinking 入口契约
+
+**问题**: OpenAI SDK 的 `extra_body` 容器形状不适用于本库通过 httpx 直接发送请求的场景；
+issue #7 暴露了 DeepSeek 思考关闭的静默失效，第二轮 review 实测还发现 provider-specific
+`thinking` 字段会在 content fallback 中污染下一个 provider，形成 P1 风险。
+
+**决定**:
+
+1. 库内部只由 `reasoning_effort` 生成顶层 `thinking`；实际 wire 形状以各 provider 官方文档为准，
+   不使用 OpenAI SDK 的 `extra_body` 容器形状。
+2. 调用方经 `extra_body` 传入的 `thinking` 会被保留键阻断；思考开关的唯一入口是
+   `reasoning_effort`。
+3. content fallback 对每个目标模型重新翻译参数，不复用上一个 provider 的 provider-specific
+   字段。
