@@ -114,7 +114,10 @@ class TestChat:
         assert describe_from_payload(body)["thinking_mode"] != "disabled"
         assert any(
             record.getMessage()
-            == "extra_body attempted to override reserved request field thinking; dropping value."
+            == (
+                "extra_body attempted to override reserved request field thinking; "
+                "dropping value. Use reasoning_effort to control thinking."
+            )
             for record in caplog.records
         )
 
@@ -135,7 +138,10 @@ class TestChat:
         assert "extra_body" not in body
         assert any(
             record.getMessage()
-            == "extra_body attempted to override reserved request field thinking; dropping value."
+            == (
+                "extra_body attempted to override reserved request field thinking; "
+                "dropping value. Use reasoning_effort to control thinking."
+            )
             for record in caplog.records
         )
 
@@ -176,7 +182,7 @@ class TestChat:
             record.getMessage()
             == (
                 "extra_body attempted to override reserved request field extra_body; "
-                "dropping value."
+                "dropping value. Use reasoning_effort to control thinking."
             )
             for record in caplog.records
         )
@@ -217,7 +223,7 @@ class TestChat:
         assert any(
             record.getMessage()
             == f"extra_body attempted to override reserved request field {reserved_key}; "
-            "dropping value."
+            "dropping value. Use reasoning_effort to control thinking."
             for record in caplog.records
         )
 

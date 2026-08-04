@@ -260,7 +260,8 @@ class BaseClient:
         for key, value in extra_body.items():
             if key in _RESERVED_PAYLOAD_KEYS:
                 logger.warning(
-                    "extra_body attempted to override reserved request field %s; dropping value.",
+                    "extra_body attempted to override reserved request field %s; "
+                    "dropping value. Use reasoning_effort to control thinking.",
                     key,
                 )
                 continue
