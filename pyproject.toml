@@ -1,6 +1,6 @@
 [project]
 name = "llm-compat"
-version = "0.6.2"
+version = "0.6.3"
 description = "轻量 Python 包，抹平 OpenAI 兼容 API 的多 provider 差异"
 requires-python = ">=3.11"
 dependencies = [

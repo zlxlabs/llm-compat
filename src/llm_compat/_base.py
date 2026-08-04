@@ -39,7 +39,9 @@ from .sensitive import SensitiveDetector
 
 logger = logging.getLogger(__name__)
 
-_RESERVED_PAYLOAD_KEYS = frozenset({"model", "messages", "stream", "extra_body"})
+_RESERVED_PAYLOAD_KEYS = frozenset(
+    {"model", "messages", "stream", "extra_body", "thinking"}
+)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -258,7 +260,8 @@ class BaseClient:
         for key, value in extra_body.items():
             if key in _RESERVED_PAYLOAD_KEYS:
                 logger.warning(
-                    "extra_body attempted to override a reserved request field; dropping value."
+                    "extra_body attempted to override reserved request field %s; dropping value.",
+                    key,
                 )
                 continue
             filtered_extra_body[key] = value
