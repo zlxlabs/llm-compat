@@ -257,11 +257,15 @@ class TestDescribeFromPayload:
         assert desc["thinking_mode"] == "disabled"
         assert desc["thinking_source"] == "thinking"
 
-    def test_deepseek_enabled(self) -> None:
-        payload = {"model": "deepseek-v4-flash", "thinking": {"type": "enabled"}}
+    def test_deepseek_enabled_with_effort_reports_effort(self) -> None:
+        payload = {
+            "model": "deepseek-v4-flash",
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": "high",
+        }
         desc = providers.describe_from_payload(payload)
-        assert desc["thinking_mode"] == "enabled"
-        assert desc["thinking_source"] == "thinking"
+        assert desc["thinking_mode"] == "high"
+        assert desc["thinking_source"] == "reasoning_effort"
 
     def test_reasoning_effort_set(self) -> None:
         payload = {"model": "gpt-5", "reasoning_effort": "high"}
@@ -322,20 +326,20 @@ class TestDeepMerge:
     def test_basic_merge(self) -> None:
         base = {"a": 1, "b": 2}
         overlay = {"b": 3, "c": 4}
-        result = providers._deep_merge(base, overlay)
+        result = providers.deep_merge_payload(base, overlay)
         assert result == {"a": 1, "b": 3, "c": 4}
 
     def test_nested_merge(self) -> None:
         base = {"extra_body": {"foo": "bar"}}
         overlay = {"extra_body": {"thinking": {"type": "disabled"}}}
-        result = providers._deep_merge(base, overlay)
+        result = providers.deep_merge_payload(base, overlay)
         assert result["extra_body"]["foo"] == "bar"
         assert result["extra_body"]["thinking"]["type"] == "disabled"
 
     def test_does_not_mutate_inputs(self) -> None:
         base = {"a": {"b": 1}}
         overlay = {"a": {"c": 2}}
-        result = providers._deep_merge(base, overlay)
+        result = providers.deep_merge_payload(base, overlay)
         assert "c" not in base["a"]
         assert result["a"] == {"b": 1, "c": 2}
 

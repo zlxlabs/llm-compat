@@ -257,11 +257,11 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
     return {"reasoning_effort": clamped}
 
 
-def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+def deep_merge_payload(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
     result = dict(base)
     for key, value in overlay.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = _deep_merge(result[key], value)
+            result[key] = deep_merge_payload(result[key], value)
         else:
             result[key] = value
     return result
@@ -275,7 +275,7 @@ def build_request_payload(
 ) -> dict[str, Any]:
     family = detect_provider(model, custom_patterns)
     translation = _translate(family, reasoning_effort)
-    return _deep_merge(base_payload, translation)
+    return deep_merge_payload(base_payload, translation)
 
 
 def describe_from_payload(
@@ -292,8 +292,8 @@ def describe_from_payload(
     if isinstance(thinking, dict):
         thinking_type = thinking.get("type")
 
-    if thinking_type in ("disabled", "enabled"):
-        mode, source = str(thinking_type), "thinking"
+    if thinking_type == "disabled":
+        mode, source = "disabled", "thinking"
     elif effort == "none":
         mode, source = "disabled", "reasoning_effort=none"
     elif effort:

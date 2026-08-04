@@ -123,7 +123,26 @@ class TestChat:
         assert body["thinking"] == {"type": "enabled"}
         assert "extra_body" not in body
 
+    @pytest.mark.parametrize("invalid_extra_body", [None, [], "", "not-a-dict"])
     async def test_chat_invalid_extra_body_is_dropped_with_warning(
+        self,
+        httpx_mock: HTTPXMock,
+        caplog: pytest.LogCaptureFixture,
+        invalid_extra_body: object,
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response("ok"))
+        with caplog.at_level("WARNING"):
+            async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+                await client.chat(
+                    "gpt-4o",
+                    [{"role": "user", "content": "hi"}],
+                    extra_body=invalid_extra_body,
+                )
+        body = json.loads(httpx_mock.get_request().content)
+        assert "extra_body" not in body
+        assert "extra_body must be a dict; dropping invalid value." in caplog.text
+
+    async def test_chat_nested_extra_body_is_not_reintroduced(
         self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         httpx_mock.add_response(json=_chat_response("ok"))
@@ -132,11 +151,50 @@ class TestChat:
                 await client.chat(
                     "gpt-4o",
                     [{"role": "user", "content": "hi"}],
-                    extra_body="not-a-dict",
+                    extra_body={"extra_body": {"foo": "bar"}},
                 )
         body = json.loads(httpx_mock.get_request().content)
         assert "extra_body" not in body
-        assert "extra_body must be a dict; dropping invalid value." in caplog.text
+        assert "foo" not in body
+        assert "extra_body attempted to override a reserved request field; dropping value." in (
+            caplog.text
+        )
+
+    @pytest.mark.parametrize(
+        ("reserved_key", "reserved_value"),
+        [
+            ("model", "overridden-model"),
+            ("messages", [{"role": "assistant", "content": "overridden"}]),
+            ("stream", True),
+            ("extra_body", {"foo": "bar"}),
+        ],
+    )
+    async def test_chat_extra_body_reserved_keys_are_dropped(
+        self,
+        httpx_mock: HTTPXMock,
+        caplog: pytest.LogCaptureFixture,
+        reserved_key: str,
+        reserved_value: object,
+    ) -> None:
+        messages = [{"role": "user", "content": "hi"}]
+        httpx_mock.add_response(json=_chat_response("ok"))
+        with caplog.at_level("WARNING"):
+            async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+                result = await client.chat(
+                    "gpt-4o",
+                    messages,
+                    extra_body={reserved_key: reserved_value},
+                )
+        body = json.loads(httpx_mock.get_request().content)
+        assert result.content == "ok"
+        assert body["model"] == "gpt-4o"
+        assert body["messages"] == messages
+        assert "stream" not in body
+        assert "extra_body" not in body
+        assert caplog.records
+        assert "extra_body attempted to override a reserved request field; dropping value." in (
+            caplog.text
+        )
 
     async def test_401_raises_fatal(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(status_code=401, json={"error": "unauthorized"})

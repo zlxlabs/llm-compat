@@ -28,8 +28,8 @@ from .errors import (
 from .fallback import filter_by_modality, resolve_fallback_chain
 from .json_utils import parse_json, parse_json_model, pydantic_to_json_schema
 from .providers import (
-    _deep_merge,
     build_request_payload,
+    deep_merge_payload,
     describe_from_payload,
     detect_provider,
     get_provider_caps,
@@ -38,6 +38,8 @@ from .refusal import RefusalDetector, detect_refusal
 from .sensitive import SensitiveDetector
 
 logger = logging.getLogger(__name__)
+
+_RESERVED_PAYLOAD_KEYS = frozenset({"model", "messages", "stream", "extra_body"})
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -252,8 +254,17 @@ class BaseClient:
             logger.warning("extra_body must be a dict; dropping invalid value.")
             return payload
 
+        filtered_extra_body: dict[str, Any] = {}
+        for key, value in extra_body.items():
+            if key in _RESERVED_PAYLOAD_KEYS:
+                logger.warning(
+                    "extra_body attempted to override a reserved request field; dropping value."
+                )
+                continue
+            filtered_extra_body[key] = value
+
         # Caller-supplied extra_body is an explicit override of provider defaults.
-        return _deep_merge(payload, extra_body)
+        return deep_merge_payload(payload, filtered_extra_body)
 
     def _extract_result(
         self,
