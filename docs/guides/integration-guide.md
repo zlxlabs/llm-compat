@@ -436,6 +436,16 @@ warnings = validate_fallback_config({"gpt-4.1-*": ["deepseek-chat"]})
 
 支持 10 个 provider 族：`deepseek` / `gemini_25` / `gemini_3` / `gemini` / `openai_gpt5` / `openai_gpt4` / `openai_o` / `doubao_seed` / `doubao` / `openai`
 
+### `extra_body` 请求体契约
+
+`extra_body` 中的字段会展开到请求 body 顶层发送，不会保留为名为 `extra_body` 的嵌套字段。
+`model`、`messages`、`stream`、`extra_body`、`thinking` 是保留键；调用方通过 `extra_body`
+传入这些键时，值会被丢弃并记录 warning。
+
+思考开关请使用 `reasoning_effort="disabled"`（或兼容别名 `"none"`），不要通过
+`extra_body` 传 `thinking`。库会根据目标 provider 将 `reasoning_effort` 翻译成对应的 wire
+字段，content fallback 切换模型时也会重新翻译。
+
 ### 自定义 Provider
 
 代理服务重命名了模型时：

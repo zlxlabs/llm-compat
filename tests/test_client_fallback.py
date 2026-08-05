@@ -1,11 +1,14 @@
 """Tests for content fallback integration in LLMClient."""
 from __future__ import annotations
 
+import json
+
 import pytest
 from pytest_httpx import HTTPXMock
 
 from llm_compat.client import LLMClient
 from llm_compat.errors import ContentPolicyError
+from llm_compat.providers import describe_from_payload
 
 
 def _chat_response(content: str, *, finish_reason: str = "stop") -> dict:
@@ -69,6 +72,54 @@ class TestFallbackBasic:
             assert result.fallback_from == "deepseek-v4"
             assert result.model == "gpt-4.1-mini"
             assert "deepseek-v4" in result.fallback_chain
+
+    async def test_fallback_drops_extra_body_thinking_for_gemini(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_refusal_response())
+        httpx_mock.add_response(json=_chat_response("fallback answer"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gemini-2.5-flash"]},
+        ) as client:
+            await client.chat(
+                "deepseek-v4-flash",
+                MESSAGES,
+                extra_body={"thinking": {"type": "disabled"}},
+            )
+
+        requests = httpx_mock.get_requests()
+        primary_body = json.loads(requests[0].content)
+        fallback_body = json.loads(requests[1].content)
+        assert "thinking" not in primary_body
+        assert fallback_body["model"] == "gemini-2.5-flash"
+        assert "thinking" not in fallback_body
+        assert describe_from_payload(fallback_body)["thinking_mode"] != "disabled"
+
+    async def test_fallback_drops_direct_extra_thinking_for_gemini(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_refusal_response())
+        httpx_mock.add_response(json=_chat_response("fallback answer"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gemini-2.5-flash"]},
+        ) as client:
+            await client.chat(
+                "deepseek-v4-flash",
+                MESSAGES,
+                thinking={"type": "disabled"},
+            )
+
+        requests = httpx_mock.get_requests()
+        primary_body = json.loads(requests[0].content)
+        fallback_body = json.loads(requests[1].content)
+        assert "thinking" not in primary_body
+        assert fallback_body["model"] == "gemini-2.5-flash"
+        assert "thinking" not in fallback_body
+        assert describe_from_payload(fallback_body)["thinking_source"] == "model_default"
 
     async def test_structured_signal_triggers_fallback(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json=_content_filter_response())

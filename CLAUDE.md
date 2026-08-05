@@ -22,6 +22,18 @@ Always respond in 中文
   - `integration-guide.md` — 从零接入指南（三步渐进式 + 已有项目迁移附录）
 - `docs/research/` — API 调研资料
 
+## 风险等级
+
+**personal**（与 `.github/workflows/gate.yml` 的 `tier: personal` 保持一致，改一处必须改另一处）。
+
+- P1 红线：数据丢失、**静默出错（结果错但不报错）**、崩溃。本库最典型的 P1 形态是静默出错——
+  provider 参数翻译错了但 API 不报错（例：issue #7，thinking 没关成还报告已关闭），
+  下游 10+ 项目完全不可见。
+- review 轮次上限 3，收敛条件「连续 1 轮无新增 P1」。
+- **例外**：改动核心落在失败路径（fallback 链、retry、错误分类）或 provider 能力表/翻译层时，
+  按 core-lead 的 infra 例外走上一档收敛，即「连续 2 轮无新增 P1」。这类改动的缺陷
+  正好都是静默型的。
+
 ## 设计约束
 
 - 零重依赖（核心只依赖 httpx，Pydantic 可选）

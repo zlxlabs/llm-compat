@@ -29,6 +29,7 @@ from .fallback import filter_by_modality, resolve_fallback_chain
 from .json_utils import parse_json, parse_json_model, pydantic_to_json_schema
 from .providers import (
     build_request_payload,
+    deep_merge_payload,
     describe_from_payload,
     detect_provider,
     get_provider_caps,
@@ -37,6 +38,11 @@ from .refusal import RefusalDetector, detect_refusal
 from .sensitive import SensitiveDetector
 
 logger = logging.getLogger(__name__)
+
+_RESERVED_PAYLOAD_KEYS = frozenset(
+    {"model", "messages", "stream", "extra_body", "thinking", "reasoning_effort"}
+)
+_DIRECT_EXTRA_RESERVED_KEYS = frozenset({"thinking", "stream"})
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -233,16 +239,71 @@ class BaseClient:
         self._sensitive_version_sum = version_sum
         return self._sensitive_detector_cached
 
+    @staticmethod
+    def _filter_reserved_payload_fields(
+        fields: dict[str, Any],
+        *,
+        source: str,
+        reserved_keys: frozenset[str],
+    ) -> dict[str, Any]:
+        filtered: dict[str, Any] = {}
+        for key, value in fields.items():
+            if key in reserved_keys:
+                guidance = (
+                    "Use chat_stream to enable streaming."
+                    if key == "stream"
+                    else "Use reasoning_effort to control thinking."
+                )
+                logger.warning(
+                    "%s attempted to override reserved request field %s; "
+                    "dropping value. %s",
+                    source,
+                    key,
+                    guidance,
+                )
+                continue
+            filtered[key] = value
+        return filtered
+
+    @classmethod
+    def _filter_direct_extra(cls, extra: dict[str, Any]) -> dict[str, Any]:
+        return cls._filter_reserved_payload_fields(
+            extra,
+            source="extra",
+            reserved_keys=_DIRECT_EXTRA_RESERVED_KEYS,
+        )
+
     def _build_payload(
         self,
         model: str,
         messages: list[dict[str, Any]],
         reasoning_effort: str | None = None,
+        *,
+        stream: bool | None = None,
         **extra: Any,
     ) -> dict[str, Any]:
         effort = normalize_reasoning_effort(reasoning_effort)
-        base: dict[str, Any] = {"model": model, "messages": messages, **extra}
-        return build_request_payload(model, effort, base)
+        filtered_extra = self._filter_direct_extra(extra)
+        base: dict[str, Any] = {"model": model, "messages": messages, **filtered_extra}
+        if stream is not None:
+            base["stream"] = stream
+        payload = build_request_payload(model, effort, base)
+        if "extra_body" not in payload:
+            return payload
+
+        extra_body = payload.pop("extra_body")
+        if not isinstance(extra_body, dict):
+            logger.warning("extra_body must be a dict; dropping invalid value.")
+            return payload
+
+        filtered_extra_body = self._filter_reserved_payload_fields(
+            extra_body,
+            source="extra_body",
+            reserved_keys=_RESERVED_PAYLOAD_KEYS,
+        )
+
+        # Caller-supplied extra_body is an explicit override of provider defaults.
+        return deep_merge_payload(payload, filtered_extra_body)
 
     def _extract_result(
         self,
@@ -478,6 +539,9 @@ class BaseClient:
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
         request_id = uuid.uuid4().hex[:8]
+        # Filter before calling _build_payload because ``stream`` is now a named
+        # parameter and Python would otherwise bind a caller's **extra value to it.
+        extra = self._filter_direct_extra(extra)
         trace = _CallTraceBuilder(request_id=request_id, requested_model=model)
         chain = resolve_fallback_chain(model, self._content_fallbacks)
         deadline_start = time.monotonic()

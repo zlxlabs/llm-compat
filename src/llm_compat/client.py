@@ -189,6 +189,7 @@ class LLMClient(BaseClient):
         import uuid
 
         request_id = uuid.uuid4().hex[:8]
+        extra = self._filter_direct_extra(extra)
         payload = self._build_payload(model, messages, reasoning_effort, stream=True, **extra)
         self._log_single_chat(payload, request_id, messages)
 

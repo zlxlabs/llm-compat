@@ -84,9 +84,10 @@ class TestBuildPayloadDeepSeek:
     def _base(self, model: str = "deepseek-v4-flash") -> dict:
         return {"model": model, "messages": [{"role": "user", "content": "hi"}]}
 
-    def test_disabled_sets_extra_body(self) -> None:
+    def test_disabled_sets_thinking(self) -> None:
         payload = providers.build_request_payload("deepseek-v4-flash", "disabled", self._base())
-        assert payload["extra_body"] == {"thinking": {"type": "disabled"}}
+        assert payload["thinking"] == {"type": "disabled"}
+        assert "extra_body" not in payload
         assert "reasoning_effort" not in payload
 
     def test_high_sets_reasoning_effort(self) -> None:
@@ -110,11 +111,11 @@ class TestBuildPayloadDeepSeek:
             )
         assert payload.get("reasoning_effort") == "low"
 
-    def test_existing_extra_body_preserved(self) -> None:
+    def test_existing_extra_body_stays_for_wire_expansion(self) -> None:
         base = {**self._base(), "extra_body": {"foo": "bar"}}
         payload = providers.build_request_payload("deepseek-v4-flash", "disabled", base)
         assert payload["extra_body"]["foo"] == "bar"
-        assert payload["extra_body"]["thinking"]["type"] == "disabled"
+        assert payload["thinking"]["type"] == "disabled"
 
 
 class TestBuildPayloadGemini25:
@@ -250,10 +251,21 @@ class TestBuildPayloadDoubao:
 
 class TestDescribeFromPayload:
     def test_deepseek_disabled(self) -> None:
-        payload = {"model": "deepseek-v4-flash", "extra_body": {"thinking": {"type": "disabled"}}}
+        payload = {"model": "deepseek-v4-flash", "thinking": {"type": "disabled"}}
         desc = providers.describe_from_payload(payload)
         assert desc["provider"] == "deepseek"
         assert desc["thinking_mode"] == "disabled"
+        assert desc["thinking_source"] == "thinking"
+
+    def test_deepseek_enabled_with_effort_reports_effort(self) -> None:
+        payload = {
+            "model": "deepseek-v4-flash",
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": "high",
+        }
+        desc = providers.describe_from_payload(payload)
+        assert desc["thinking_mode"] == "high"
+        assert desc["thinking_source"] == "reasoning_effort"
 
     def test_reasoning_effort_set(self) -> None:
         payload = {"model": "gpt-5", "reasoning_effort": "high"}
@@ -314,19 +326,58 @@ class TestDeepMerge:
     def test_basic_merge(self) -> None:
         base = {"a": 1, "b": 2}
         overlay = {"b": 3, "c": 4}
-        result = providers._deep_merge(base, overlay)
+        result = providers.deep_merge_payload(base, overlay)
         assert result == {"a": 1, "b": 3, "c": 4}
 
     def test_nested_merge(self) -> None:
         base = {"extra_body": {"foo": "bar"}}
         overlay = {"extra_body": {"thinking": {"type": "disabled"}}}
-        result = providers._deep_merge(base, overlay)
+        result = providers.deep_merge_payload(base, overlay)
         assert result["extra_body"]["foo"] == "bar"
         assert result["extra_body"]["thinking"]["type"] == "disabled"
 
     def test_does_not_mutate_inputs(self) -> None:
         base = {"a": {"b": 1}}
         overlay = {"a": {"c": 2}}
-        result = providers._deep_merge(base, overlay)
+        result = providers.deep_merge_payload(base, overlay)
         assert "c" not in base["a"]
         assert result["a"] == {"b": 1, "c": 2}
+
+
+class TestThinkingModeMatrix:
+    @pytest.mark.parametrize(
+        "model,effort,expected_fields,expected_mode",
+        [
+            (
+                "deepseek-v4-flash",
+                "disabled",
+                {"thinking": {"type": "disabled"}},
+                "disabled",
+            ),
+            ("deepseek-v4-flash", "high", {"reasoning_effort": "high"}, "high"),
+            ("deepseek-v4-flash", None, {}, "default(deepseek)"),
+            ("gemini-2.5-flash", "disabled", {"reasoning_effort": "none"}, "disabled"),
+            ("gemini-3-flash", "disabled", {"reasoning_effort": "minimal"}, "minimal"),
+            ("gpt-5", "disabled", {"reasoning_effort": "minimal"}, "minimal"),
+            ("doubao-seed-2.0", "disabled", {"reasoning_effort": "minimal"}, "minimal"),
+            ("o3-mini", "disabled", {}, "default(openai_o)"),
+            ("gpt-4o", "disabled", {}, "n/a"),
+            ("doubao-pro-256k", "disabled", {}, "n/a"),
+        ],
+    )
+    def test_thinking_mode_matches_wire_fields(
+        self,
+        model: str,
+        effort: str | None,
+        expected_fields: dict[str, object],
+        expected_mode: str,
+    ) -> None:
+        base = {"model": model, "messages": []}
+        payload = providers.build_request_payload(model, effort, base)
+        wire_fields = {
+            key: value for key, value in payload.items() if key not in {"model", "messages"}
+        }
+
+        assert wire_fields == expected_fields
+        assert "extra_body" not in payload
+        assert providers.describe_from_payload(payload)["thinking_mode"] == expected_mode

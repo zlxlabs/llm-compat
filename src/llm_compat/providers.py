@@ -211,7 +211,7 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
     if effort == "disabled":
         mode = caps["disable_mode"]
         if mode == "native":
-            return {"extra_body": {"thinking": {"type": "disabled"}}}
+            return {"thinking": {"type": "disabled"}}
         if mode == "effort_none":
             return {"reasoning_effort": "none"}
         if mode == "minimal_fallback":
@@ -257,11 +257,11 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
     return {"reasoning_effort": clamped}
 
 
-def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+def deep_merge_payload(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
     result = dict(base)
     for key, value in overlay.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = _deep_merge(result[key], value)
+            result[key] = deep_merge_payload(result[key], value)
         else:
             result[key] = value
     return result
@@ -275,7 +275,7 @@ def build_request_payload(
 ) -> dict[str, Any]:
     family = detect_provider(model, custom_patterns)
     translation = _translate(family, reasoning_effort)
-    return _deep_merge(base_payload, translation)
+    return deep_merge_payload(base_payload, translation)
 
 
 def describe_from_payload(
@@ -287,15 +287,13 @@ def describe_from_payload(
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
 
     effort = payload.get("reasoning_effort") if isinstance(payload, dict) else None
-    extra_body = payload.get("extra_body") if isinstance(payload, dict) else None
+    thinking = payload.get("thinking") if isinstance(payload, dict) else None
     thinking_type = None
-    if isinstance(extra_body, dict):
-        thinking_cfg = extra_body.get("thinking")
-        if isinstance(thinking_cfg, dict):
-            thinking_type = thinking_cfg.get("type")
+    if isinstance(thinking, dict):
+        thinking_type = thinking.get("type")
 
     if thinking_type == "disabled":
-        mode, source = "disabled", "extra_body.thinking"
+        mode, source = "disabled", "thinking"
     elif effort == "none":
         mode, source = "disabled", "reasoning_effort=none"
     elif effort:
