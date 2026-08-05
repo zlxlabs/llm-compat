@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 import logging
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -42,80 +42,60 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
     "deepseek": {
         "disable_mode": "native",
         "efforts": frozenset({"low", "high", "max", "xhigh"}),
-        "min_effort": "low",
-        "max_effort": "xhigh",
         "supports_vision": False,
         "json_mode": "json_object",
     },
     "gemini_25": {
         "disable_mode": "effort_none",
         "efforts": frozenset({"low", "medium", "high"}),
-        "min_effort": "low",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_schema",
     },
     "gemini_3": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
-        "min_effort": "minimal",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_schema",
     },
     "gemini": {
         "disable_mode": "effort_none",
         "efforts": frozenset({"low", "medium", "high"}),
-        "min_effort": "low",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_object",
     },
     "openai_gpt5": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
-        "min_effort": "minimal",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_schema",
     },
     "openai_gpt4": {
         "disable_mode": "na",
         "efforts": frozenset(),
-        "min_effort": None,
-        "max_effort": None,
         "supports_vision": True,
         "json_mode": "json_object",
     },
     "openai_o": {
         "disable_mode": "unsupported",
         "efforts": frozenset({"low", "medium", "high"}),
-        "min_effort": "low",
-        "max_effort": "high",
         "supports_vision": False,
         "json_mode": "json_schema",
     },
     "doubao_seed": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
-        "min_effort": "minimal",
-        "max_effort": "high",
         "supports_vision": False,
         "json_mode": "json_schema",
     },
     "doubao": {
         "disable_mode": "na",
         "efforts": frozenset(),
-        "min_effort": None,
-        "max_effort": None,
         "supports_vision": False,
         "json_mode": "json_schema",
     },
     "openai": {
         "disable_mode": "na",
         "efforts": frozenset({"low", "medium", "high"}),
-        "min_effort": "low",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_schema",
     },
@@ -124,8 +104,6 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
 _DEFAULT_CAPS: dict[str, Any] = {
     "disable_mode": "na",
     "efforts": frozenset(),
-    "min_effort": None,
-    "max_effort": None,
     "supports_vision": True,
     "json_mode": "json_schema",
 }
@@ -202,13 +180,34 @@ def detect_provider(
     return "openai"
 
 
+def resolve_effort_clamp(family: str, effort: str) -> str | None:
+    """Resolve an effort to the nearest value supported by a provider family."""
+    caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
+    accepted = cast(frozenset[str], caps["efforts"])
+    if not accepted:
+        return None
+    if effort in accepted:
+        return effort
+
+    requested_rank = _EFFORT_RANK.get(effort, _EFFORT_RANK["high"])
+    ranked_efforts = sorted(accepted, key=lambda accepted_effort: _EFFORT_RANK[accepted_effort])
+    return next(
+        (
+            accepted_effort
+            for accepted_effort in ranked_efforts
+            if _EFFORT_RANK[accepted_effort] >= requested_rank
+        ),
+        ranked_efforts[-1],
+    )
+
+
 def _translate(family: str, effort: str | None) -> dict[str, Any]:
     if effort is None:
         return {}
 
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
 
-    if effort == "disabled":
+    if effort in {"disabled", "none"}:
         mode = caps["disable_mode"]
         if mode == "native":
             return {"thinking": {"type": "disabled"}}
@@ -224,8 +223,8 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
             return {}
         return {}
 
-    accepted = caps["efforts"]
-    if not accepted:
+    clamped = resolve_effort_clamp(family, effort)
+    if clamped is None:
         logger.warning(
             "Provider %r effort unsupported: request=%r -> actual=dropped; direction=drop.",
             family,
@@ -233,19 +232,10 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
         )
         return {}
 
-    if effort in accepted:
+    if clamped == effort:
         return {"reasoning_effort": effort}
 
     requested_rank = _EFFORT_RANK.get(effort, _EFFORT_RANK["high"])
-    ranked_efforts = sorted(accepted, key=lambda accepted_effort: _EFFORT_RANK[accepted_effort])
-    clamped = next(
-        (
-            accepted_effort
-            for accepted_effort in ranked_efforts
-            if _EFFORT_RANK[accepted_effort] >= requested_rank
-        ),
-        ranked_efforts[-1],
-    )
     actual_rank = _EFFORT_RANK[clamped]
     direction = "upward" if actual_rank > requested_rank else "downward"
     logger.warning(
