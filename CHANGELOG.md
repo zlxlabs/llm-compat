@@ -43,6 +43,8 @@
 
 ### Changed
 
+- `extra_body` 不再模拟 OpenAI SDK 的展开逻辑，而是作为普通 wire 字段原样透传到请求体顶层；
+  Gemini 用户可直接使用 `extra_body={"google": {...}}` 承载原生能力。
 - **Breaking-ish**：`extra_body` 现在会展开到请求 body 顶层。`model`、`messages`、`stream`、`extra_body`、`thinking` 五个保留键会被丢弃，并记录 warning。
 - `providers._deep_merge` 更名为公开的 `deep_merge_payload`。
 

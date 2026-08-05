@@ -438,13 +438,54 @@ warnings = validate_fallback_config({"gpt-4.1-*": ["deepseek-chat"]})
 
 ### `extra_body` 请求体契约
 
-`extra_body` 中的字段会展开到请求 body 顶层发送，不会保留为名为 `extra_body` 的嵌套字段。
-`model`、`messages`、`stream`、`extra_body`、`thinking` 是保留键；调用方通过 `extra_body`
-传入这些键时，值会被丢弃并记录 warning。
+`extra_body` 是普通的 wire 字段，会原样保留在请求 body 顶层的 `extra_body` 对象中，不会被
+展开、校验或过滤。这样可以直接透传 provider 的原生扩展字段；例如 Gemini 的 thinking 配置：
+
+```python
+result = await client.chat(
+    "gemini-3.6-flash",
+    messages,
+    extra_body={
+        "google": {
+            "thinking_config": {
+                "thinking_level": "low",
+                "include_thoughts": True,
+            }
+        }
+    },
+)
+```
+
+请求体中的形状是：
+
+```json
+{
+  "extra_body": {
+    "google": {
+      "thinking_config": {"thinking_level": "low", "include_thoughts": true}
+    }
+  }
+}
+```
+
+注意不要照抄 Google 官方文档中针对 OpenAI Python SDK 的双层写法。SDK 调用需要外层
+`extra_body` 容器，SDK 会把内层内容展开；llm-compat 直接发送 HTTP body，只需要单层：
+
+```python
+# 正确：llm-compat 直接发送这一层
+extra_body={"google": {"thinking_config": {"thinking_level": "low"}}}
+
+# 错误：这是 OpenAI SDK 的写法，会得到多一层嵌套
+extra_body={"extra_body": {"google": {"thinking_config": {"thinking_level": "low"}}}}
+```
+
+第二种写法会被原样发送为 `{"extra_body": {"extra_body": {"google": ...}}}`，不会触发
+llm-compat 的展开逻辑。
 
 思考开关请使用 `reasoning_effort="disabled"`（或兼容别名 `"none"`），不要通过
-`extra_body` 传 `thinking`。库会根据目标 provider 将 `reasoning_effort` 翻译成对应的 wire
-字段，content fallback 切换模型时也会重新翻译。
+直接 `**extra` 传 `thinking`；该字段会被防护逻辑丢弃并记录 warning。`extra_body` 中的
+`thinking` 只是嵌套字段，不会覆盖顶层翻译结果。库会根据目标 provider 将
+`reasoning_effort` 翻译成对应的 wire 字段，content fallback 切换模型时也会重新翻译。
 
 ### 自定义 Provider
 

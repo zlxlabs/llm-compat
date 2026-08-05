@@ -331,7 +331,7 @@ class TestBuildPayloadDeepSeek:
             )
         assert payload.get("reasoning_effort") == "low"
 
-    def test_existing_extra_body_stays_for_wire_expansion(self) -> None:
+    def test_existing_extra_body_is_preserved_alongside_translation(self) -> None:
         base = {**self._base(), "extra_body": {"foo": "bar"}}
         payload = providers.build_request_payload("deepseek-v4-flash", "disabled", base)
         assert payload["extra_body"]["foo"] == "bar"
