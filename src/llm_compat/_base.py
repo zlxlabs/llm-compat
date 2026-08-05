@@ -404,7 +404,6 @@ class BaseClient:
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
         detection = detect_provider(model)
-        assert detection.family is not None
         provider = detection.family
         payload = self._build_payload(model, messages, reasoning_effort, **extra)
         self._log_single_chat(payload, request_id, messages)
@@ -438,7 +437,6 @@ class BaseClient:
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
         detection = detect_provider(model)
-        assert detection.family is not None
         provider = detection.family
         working_messages = list(messages)
         attempts = 0
@@ -596,9 +594,7 @@ class BaseClient:
             if remaining <= 0 and attempted:
                 break
 
-            detection = detect_provider(current_model)
-            assert detection.family is not None
-            current_provider = detection.family
+            current_provider = detect_provider(current_model).family
 
             if attempted:
                 trace.add_route_decision(
@@ -885,7 +881,6 @@ class BaseClient:
         **extra: Any,
     ) -> tuple[dict[str, Any], str, list[dict[str, Any]]]:
         detection = detect_provider(model)
-        assert detection.family is not None
         family = detection.family
         caps = get_provider_caps(family)
         json_mode = caps["json_mode"]

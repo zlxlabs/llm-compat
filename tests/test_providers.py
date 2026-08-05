@@ -209,50 +209,50 @@ class TestDetectProvider:
         ],
     )
     def test_family_recognition(self, model: str, expected: str) -> None:
-        assert providers.detect_provider(model) == expected
+        assert providers.detect_provider(model).family == expected
 
     def test_case_insensitive(self) -> None:
-        assert providers.detect_provider("DeepSeek-V4-Flash") == "deepseek"
-        assert providers.detect_provider("Gemini-3-Flash") == "gemini_3"
+        assert providers.detect_provider("DeepSeek-V4-Flash").family == "deepseek"
+        assert providers.detect_provider("Gemini-3-Flash").family == "gemini_3"
 
     def test_empty_model_returns_openai_with_warn(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING):
-            assert providers.detect_provider("") == "openai"
+            assert providers.detect_provider("").family == "openai"
         assert caplog.text
 
     def test_none_model_returns_openai(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING):
-            assert providers.detect_provider(None) == "openai"  # type: ignore[arg-type]
+            assert providers.detect_provider(None).family == "openai"  # type: ignore[arg-type]
 
     def test_unknown_model_returns_openai(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING):
-            assert providers.detect_provider("unknown-model-xyz") == "openai"
+            assert providers.detect_provider("unknown-model-xyz").family == "openai"
 
     def test_custom_patterns_override(self) -> None:
         custom = (("myproxy-*", "deepseek"),)
-        assert providers.detect_provider("myproxy-v1", custom) == "deepseek"
-        assert providers.detect_provider("myproxy-v1") == "openai"
+        assert providers.detect_provider("myproxy-v1", custom).family == "deepseek"
+        assert providers.detect_provider("myproxy-v1").family == "openai"
 
     def test_set_custom_patterns_dict(self) -> None:
         providers.set_custom_patterns({"dsproxy-*": "deepseek"})
         try:
-            assert providers.detect_provider("dsproxy-alpha") == "deepseek"
-            assert providers.detect_provider("gpt-4o") == "openai_gpt4"
+            assert providers.detect_provider("dsproxy-alpha").family == "deepseek"
+            assert providers.detect_provider("gpt-4o").family == "openai_gpt4"
         finally:
             providers.set_custom_patterns(None)
-        assert providers.detect_provider("dsproxy-alpha") == "openai"
+        assert providers.detect_provider("dsproxy-alpha").family == "openai"
 
     def test_set_custom_patterns_list(self) -> None:
         providers.set_custom_patterns([["myai-*", "deepseek"]])
         try:
-            assert providers.detect_provider("myai-v1") == "deepseek"
+            assert providers.detect_provider("myai-v1").family == "deepseek"
         finally:
             providers.set_custom_patterns(None)
 
     def test_invalid_patterns_ignored(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING):
             providers.set_custom_patterns("not a list")
-        assert providers.detect_provider("gpt-4o") == "openai_gpt4"
+        assert providers.detect_provider("gpt-4o").family == "openai_gpt4"
 
 
 class TestBuildPayloadDeepSeek:
@@ -425,7 +425,7 @@ class TestDetectProviderDoubao:
         ],
     )
     def test_doubao_family_recognition(self, model: str, expected: str) -> None:
-        assert providers.detect_provider(model) == expected
+        assert providers.detect_provider(model).family == expected
 
 
 class TestBuildPayloadDoubaoSeed:

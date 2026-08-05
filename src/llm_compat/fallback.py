@@ -28,7 +28,6 @@ def filter_by_modality(
     result = []
     for model in chain:
         detection = detect_provider(model)
-        assert detection.family is not None
         family = detection.family
         caps = get_provider_caps(family)
         if caps["supports_vision"]:

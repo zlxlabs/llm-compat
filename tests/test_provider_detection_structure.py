@@ -62,6 +62,4 @@ class TestProviderPatternDetection:
     def test_broad_pattern_is_unresolved(self) -> None:
         result = providers.detect_provider_for_pattern("*")
 
-        assert result.family is None
-        assert result.matched is False
-        assert result.family != "openai"
+        assert result is None

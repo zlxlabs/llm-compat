@@ -12,18 +12,8 @@ logger = logging.getLogger(__name__)
 class ProviderDetection:
     """Provider family plus whether the model/pattern matched a known family."""
 
-    family: str | None
+    family: str
     matched: bool
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, str):
-            return self.family == other
-        if isinstance(other, ProviderDetection):
-            return (self.family, self.matched) == (other.family, other.matched)
-        return False
-
-    def __str__(self) -> str:
-        return self.family or "unknown"
 
 _DEFAULT_PROVIDER_PATTERNS: tuple[tuple[str, str], ...] = (
     ("deepseek-chat", "deepseek"),
@@ -227,7 +217,7 @@ def _effective_patterns(
 
 
 def detect_provider(
-    model: object,
+    model: str | None,
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
 ) -> ProviderDetection:
     if not model or not isinstance(model, str):
@@ -245,16 +235,16 @@ def detect_provider(
 def detect_provider_for_pattern(
     pattern: str,
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
-) -> ProviderDetection:
+) -> ProviderDetection | None:
     """Resolve a fallback pattern without fabricating a model name."""
     if not pattern or not isinstance(pattern, str):
-        return ProviderDetection(family=None, matched=False)
+        return None
 
     pattern_lower = pattern.lower()
     for known_pattern, family in _effective_patterns(custom_patterns):
         if fnmatch.fnmatch(pattern_lower, known_pattern.lower()):
             return ProviderDetection(family=family, matched=True)
-    return ProviderDetection(family=None, matched=False)
+    return None
 
 
 def _effort_rank(effort: str) -> int:
@@ -361,7 +351,6 @@ def build_request_payload(
 ) -> dict[str, Any]:
     reasoning_effort = normalize_reasoning_effort(reasoning_effort)
     detection = detect_provider(model, custom_patterns)
-    assert detection.family is not None
     family = detection.family
     translation = _translate(family, reasoning_effort)
     return deep_merge_payload(base_payload, translation)
@@ -373,7 +362,6 @@ def describe_from_payload(
 ) -> dict[str, str]:
     model = payload.get("model", "unknown") if isinstance(payload, dict) else "unknown"
     detection = detect_provider(model, custom_patterns)
-    assert detection.family is not None
     family = detection.family
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
 

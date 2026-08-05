@@ -18,7 +18,6 @@ def validate_config(model: str, effort: str | None) -> list[str]:
 
     warnings: list[str] = []
     detection = detect_provider(model)
-    assert detection.family is not None
     family = detection.family
     caps = get_provider_caps(family)
 
@@ -57,13 +56,12 @@ def validate_fallback_config(
     warnings: list[str] = []
     for pattern, chain in config.items():
         primary_detection = detect_provider_for_pattern(pattern)
-        primary_caps = get_provider_caps(primary_detection.family)
+        primary_caps = get_provider_caps(primary_detection.family if primary_detection else None)
         primary_has_vision = primary_caps["supports_vision"]
         any_vision_fb = False
 
         for fb_model in chain:
             fb_detection = detect_provider(fb_model)
-            assert fb_detection.family is not None
             fb_caps = get_provider_caps(fb_detection.family)
             if fb_caps["supports_vision"]:
                 any_vision_fb = True
