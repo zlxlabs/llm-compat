@@ -6,6 +6,13 @@
 早于 0.7.0 的变更未记录于此，请查阅 git log。当前已发布的 tag 只有 `v0.2.0`、`v0.6.0`，
 以及本次的 `v0.8.0`。
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING**：`detect_provider()` 的返回值从 `str` 改为 `ProviderDetection`；下游需要读取
+  `.family` 获取原来的 provider 字符串。
+
 ## [0.8.0] - 2026-08-05
 
 ### Fixed

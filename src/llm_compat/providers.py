@@ -2,9 +2,22 @@ from __future__ import annotations
 
 import fnmatch
 import logging
+from dataclasses import dataclass
 from typing import Any, cast
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ProviderDetection:
+    """Provider family plus whether the model/pattern matched a known family.
+
+    Migration: use ``.family`` where older versions returned the provider string
+    directly.
+    """
+
+    family: str
+    matched: bool
 
 _DEFAULT_PROVIDER_PATTERNS: tuple[tuple[str, str], ...] = (
     ("deepseek-chat", "deepseek"),
@@ -130,8 +143,14 @@ _DEFAULT_CAPS: dict[str, Any] = {
 }
 
 
-def get_provider_caps(family: str) -> dict[str, Any]:
-    return _FAMILY_CAPABILITIES.get(family, _DEFAULT_CAPS)
+def get_provider_caps(family: str | ProviderDetection | None) -> dict[str, Any]:
+    family_name = family.family if isinstance(family, ProviderDetection) else family
+    if family_name is None:
+        return dict(_DEFAULT_CAPS)
+    caps = _FAMILY_CAPABILITIES.get(family_name)
+    if caps is None:
+        return dict(_DEFAULT_CAPS)
+    return {**_DEFAULT_CAPS, **caps}
 
 
 def _validate_ranked_efforts(family: str, caps: dict[str, Any]) -> None:
@@ -207,17 +226,32 @@ def _effective_patterns(
 def detect_provider(
     model: str | None,
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
-) -> str:
+) -> ProviderDetection:
     if not model or not isinstance(model, str):
         logger.warning("detect_provider: invalid model name %r, defaulting to 'openai'", model)
-        return "openai"
+        return ProviderDetection(family="openai", matched=False)
     patterns = _effective_patterns(custom_patterns)
     model_lower = model.lower()
     for pattern, family in patterns:
         if fnmatch.fnmatch(model_lower, pattern.lower()):
-            return family
+            return ProviderDetection(family=family, matched=True)
     logger.warning("detect_provider: unknown model %r, defaulting to 'openai'", model)
-    return "openai"
+    return ProviderDetection(family="openai", matched=False)
+
+
+def detect_provider_for_pattern(
+    pattern: str,
+    custom_patterns: tuple[tuple[str, str], ...] | None = None,
+) -> ProviderDetection | None:
+    """Resolve a fallback pattern without fabricating a model name."""
+    if not pattern or not isinstance(pattern, str):
+        return None
+
+    pattern_lower = pattern.lower()
+    for known_pattern, family in _effective_patterns(custom_patterns):
+        if fnmatch.fnmatch(pattern_lower, known_pattern.lower()):
+            return ProviderDetection(family=family, matched=True)
+    return None
 
 
 def _effort_rank(effort: str) -> int:
@@ -245,6 +279,20 @@ def resolve_effort_clamp(family: str, effort: str) -> str | None:
     )
 
 
+# _translate decision tree:
+#
+#   effort=None ────────────────────────────────────────────────> {}
+#   effort=disabled
+#     ├─ native             ────────────────────────────────────> thinking=disabled
+#     ├─ effort_none        ────────────────────────────────────> reasoning_effort=none
+#     ├─ minimal_fallback   ────────────────────────────────────> reasoning_effort=minimal
+#     ├─ unsupported        ────────────────────────────────────> warn + {}
+#     └─ na                 ─────────────────────────────────────> {}
+#   other effort ───────────────> resolve_effort_clamp
+#     ├─ accepted as-is ────────────────────────────────────────> reasoning_effort=requested
+#     ├─ nearest supported rank >= requested ───────────────────> reasoning_effort=clamped
+#     ├─ no higher rank ─────────────────────────────────────────> highest supported rank
+#     └─ no supported efforts ──────────────────────────────────> warn + {}
 def _translate(family: str, effort: str | None) -> dict[str, Any]:
     if effort is None:
         return {}
@@ -309,7 +357,8 @@ def build_request_payload(
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
 ) -> dict[str, Any]:
     reasoning_effort = normalize_reasoning_effort(reasoning_effort)
-    family = detect_provider(model, custom_patterns)
+    detection = detect_provider(model, custom_patterns)
+    family = detection.family
     translation = _translate(family, reasoning_effort)
     return deep_merge_payload(base_payload, translation)
 
@@ -319,7 +368,8 @@ def describe_from_payload(
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
 ) -> dict[str, str]:
     model = payload.get("model", "unknown") if isinstance(payload, dict) else "unknown"
-    family = detect_provider(model, custom_patterns)
+    detection = detect_provider(model, custom_patterns)
+    family = detection.family
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
 
     effort = payload.get("reasoning_effort") if isinstance(payload, dict) else None
