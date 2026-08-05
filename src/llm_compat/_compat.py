@@ -1,27 +1,13 @@
 from __future__ import annotations
 
-import logging
+from .providers import (
+    detect_provider,
+    get_provider_caps,
+    normalize_reasoning_effort,
+    resolve_effort_clamp,
+)
 
-from .providers import detect_provider, get_provider_caps, resolve_effort_clamp
-
-logger = logging.getLogger(__name__)
-
-
-def normalize_reasoning_effort(value: str | None) -> str | None:
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    if not stripped:
-        return None
-    if stripped == "none":
-        logger.warning(
-            "reasoning_effort='none' is deprecated, use 'disabled' instead. "
-            "Auto-converting to 'disabled'."
-        )
-        return "disabled"
-    return stripped
+__all__ = ["normalize_reasoning_effort", "validate_config", "validate_fallback_config"]
 
 
 def validate_config(model: str, effort: str | None) -> list[str]:

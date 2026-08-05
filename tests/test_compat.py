@@ -51,6 +51,13 @@ class TestNormalizeReasoningEffort:
     def test_strips_whitespace(self) -> None:
         assert normalize_reasoning_effort(" high ") == "high"
 
+    @pytest.mark.parametrize(
+        "value",
+        ["NONE", " disabled ", "OFF", " false "],
+    )
+    def test_disable_aliases_are_case_insensitive(self, value: str) -> None:
+        assert normalize_reasoning_effort(value) == "disabled"
+
 
 class TestValidateConfig:
     def test_covers_every_provider_family_and_unknown(self) -> None:
@@ -113,7 +120,7 @@ class TestValidateConfig:
         self, family: str, model: str, effort: str
     ) -> None:
         warnings = validate_config(model, effort)
-        payload = providers._translate(family, effort)
+        payload = providers._translate(family, normalize_reasoning_effort(effort))
         mode = providers.get_provider_caps(family)["disable_mode"]
 
         if mode == "unsupported":

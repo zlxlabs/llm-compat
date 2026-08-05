@@ -38,6 +38,27 @@ _EFFORT_RANK: dict[str, int] = {
     "xhigh": 5,
 }
 
+
+def normalize_reasoning_effort(value: str | None) -> str | None:
+    """Normalize caller-provided reasoning effort values to canonical values."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return None
+
+    normalized = value.strip().casefold()
+    if not normalized:
+        return None
+    if normalized in {"none", "off", "false"}:
+        logger.warning(
+            "reasoning_effort alias %r is deprecated, use 'disabled' instead. "
+            "Auto-converting to 'disabled'.",
+            value,
+        )
+        return "disabled"
+    return normalized
+
+
 _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
     "deepseek": {
         "disable_mode": "native",
@@ -112,6 +133,22 @@ _DEFAULT_CAPS: dict[str, Any] = {
 def get_provider_caps(family: str) -> dict[str, Any]:
     return _FAMILY_CAPABILITIES.get(family, _DEFAULT_CAPS)
 
+
+def _validate_ranked_efforts(family: str, caps: dict[str, Any]) -> None:
+    efforts = caps.get("efforts", ())
+    invalid_efforts = [
+        effort
+        for effort in efforts
+        if not isinstance(effort, str) or effort not in _EFFORT_RANK
+    ]
+    if invalid_efforts:
+        invalid_values = ", ".join(sorted(repr(value) for value in invalid_efforts))
+        raise ValueError(
+            f"Provider family {family!r} has unranked effort values: {invalid_values}. "
+            "Custom caps['efforts'] must contain only ranked effort values."
+        )
+
+
 _custom_patterns: tuple[tuple[str, str], ...] | None = None
 
 
@@ -122,6 +159,9 @@ def register_provider(
     caps: dict[str, Any] | None = None,
 ) -> None:
     global _custom_patterns
+    if caps is not None:
+        _validate_ranked_efforts(family, caps)
+
     entry = (pattern, family)
     if _custom_patterns:
         _custom_patterns = (entry,) + _custom_patterns
@@ -180,6 +220,10 @@ def detect_provider(
     return "openai"
 
 
+def _effort_rank(effort: str) -> int:
+    return _EFFORT_RANK.get(effort, _EFFORT_RANK["high"])
+
+
 def resolve_effort_clamp(family: str, effort: str) -> str | None:
     """Resolve an effort to the nearest value supported by a provider family."""
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
@@ -189,13 +233,13 @@ def resolve_effort_clamp(family: str, effort: str) -> str | None:
     if effort in accepted:
         return effort
 
-    requested_rank = _EFFORT_RANK.get(effort, _EFFORT_RANK["high"])
-    ranked_efforts = sorted(accepted, key=lambda accepted_effort: _EFFORT_RANK[accepted_effort])
+    requested_rank = _effort_rank(effort)
+    ranked_efforts = sorted(accepted, key=_effort_rank)
     return next(
         (
             accepted_effort
             for accepted_effort in ranked_efforts
-            if _EFFORT_RANK[accepted_effort] >= requested_rank
+            if _effort_rank(accepted_effort) >= requested_rank
         ),
         ranked_efforts[-1],
     )
@@ -207,7 +251,7 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
 
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
 
-    if effort in {"disabled", "none"}:
+    if effort == "disabled":
         mode = caps["disable_mode"]
         if mode == "native":
             return {"thinking": {"type": "disabled"}}
@@ -235,8 +279,8 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
     if clamped == effort:
         return {"reasoning_effort": effort}
 
-    requested_rank = _EFFORT_RANK.get(effort, _EFFORT_RANK["high"])
-    actual_rank = _EFFORT_RANK[clamped]
+    requested_rank = _effort_rank(effort)
+    actual_rank = _effort_rank(clamped)
     direction = "upward" if actual_rank > requested_rank else "downward"
     logger.warning(
         "Provider family %r effort clamp: requested=%r -> actual=%r; direction=%s.",
@@ -264,6 +308,7 @@ def build_request_payload(
     base_payload: dict[str, Any],
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
 ) -> dict[str, Any]:
+    reasoning_effort = normalize_reasoning_effort(reasoning_effort)
     family = detect_provider(model, custom_patterns)
     translation = _translate(family, reasoning_effort)
     return deep_merge_payload(base_payload, translation)

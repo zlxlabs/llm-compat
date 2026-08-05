@@ -31,13 +31,6 @@ class ChatResult:
 
 
 @dataclass
-class ProviderCaps:
-    efforts: frozenset[str]
-    disable_mode: str
-    max_effort: str
-
-
-@dataclass
 class LLMStats:
     total_calls: int = 0
     success_count: int = 0

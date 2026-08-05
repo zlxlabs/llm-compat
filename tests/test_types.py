@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from llm_compat._types import ChatResult, LLMStats, ProviderCaps, TokenUsage
+from llm_compat._types import ChatResult, LLMStats, TokenUsage
 
 
 class TestTokenUsage:
@@ -42,17 +42,6 @@ class TestChatResult:
     def test_parsed_field(self):
         r = ChatResult(content='{"key": "val"}', parsed={"key": "val"})
         assert r.parsed == {"key": "val"}
-
-
-class TestProviderCaps:
-    def test_basic(self):
-        caps = ProviderCaps(
-            efforts=frozenset({"low", "medium", "high"}),
-            disable_mode="effort_none",
-            max_effort="high",
-        )
-        assert "high" in caps.efforts
-        assert caps.disable_mode == "effort_none"
 
 
 class TestLLMStats:

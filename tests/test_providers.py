@@ -6,6 +6,8 @@ import logging
 import pytest
 
 from llm_compat import providers
+from llm_compat._base import BaseClient
+from llm_compat._compat import validate_config
 
 _EFFORT_CLAMP_MATRIX: dict[str, dict[str, str | None]] = {
     "deepseek": {
@@ -144,6 +146,43 @@ class TestEffortClampMatrix:
         assert "requested='medium' -> actual='high'; direction=upward" in caplog.text
 
 
+class TestCustomProviderEfforts:
+    def test_register_rejects_unranked_effort(self) -> None:
+        family = "vendor_unranked"
+        caps = {
+            "disable_mode": "na",
+            "efforts": frozenset({"low", "ultra"}),
+            "supports_vision": False,
+            "json_mode": "json_object",
+        }
+
+        with pytest.raises(ValueError, match=r"vendor_unranked.*ultra"):
+            providers.register_provider("vendor-unranked-*", family, caps=caps)
+
+        assert family not in providers._FAMILY_CAPABILITIES
+
+    def test_resolver_handles_unranked_effort_after_direct_capability_mutation(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        caps = dict(providers._FAMILY_CAPABILITIES["openai"])
+        caps["efforts"] = frozenset({"low", "ultra"})
+        monkeypatch.setitem(providers._FAMILY_CAPABILITIES, "vendor_mutated", caps)
+        monkeypatch.setattr(
+            providers,
+            "_custom_patterns",
+            (("vendor-mutated-*", "vendor_mutated"),),
+        )
+
+        assert providers.resolve_effort_clamp("vendor_mutated", "high") == "ultra"
+        assert validate_config("vendor-mutated-model", "high")
+        payload = providers.build_request_payload(
+            "vendor-mutated-model",
+            "high",
+            {"model": "vendor-mutated-model", "messages": []},
+        )
+        assert payload["reasoning_effort"] == "ultra"
+
+
 class TestDetectProvider:
     @pytest.mark.parametrize(
         "model,expected",
@@ -226,6 +265,11 @@ class TestBuildPayloadDeepSeek:
         assert "extra_body" not in payload
         assert "reasoning_effort" not in payload
 
+    def test_stripped_none_disables_deepseek_at_public_boundary(self) -> None:
+        payload = providers.build_request_payload("deepseek-v4-flash", " none ", self._base())
+        assert payload["thinking"] == {"type": "disabled"}
+        assert "reasoning_effort" not in payload
+
     def test_high_sets_reasoning_effort(self) -> None:
         payload = providers.build_request_payload("deepseek-v4-flash", "high", self._base())
         assert payload["reasoning_effort"] == "high"
@@ -239,6 +283,46 @@ class TestBuildPayloadDeepSeek:
         payload = providers.build_request_payload("deepseek-v4-flash", None, self._base())
         assert "reasoning_effort" not in payload
         assert "extra_body" not in payload
+
+    @pytest.mark.parametrize(
+        "effort",
+        [
+            None,
+            "",
+            "  ",
+            "none",
+            " NONE ",
+            "disabled",
+            " DISABLED ",
+            "off",
+            " OFF ",
+            "false",
+            " FALSE ",
+            "minimal",
+            " MINIMAL ",
+            "low",
+            " LOW ",
+            "medium",
+            " Medium ",
+            "high",
+            " HIGH ",
+            "max",
+            " MAX ",
+            "xhigh",
+            " XHIGH ",
+        ],
+    )
+    def test_public_and_base_payloads_share_normalization(self, effort: str | None) -> None:
+        model = "deepseek-v4-flash"
+        messages: list[dict[str, object]] = []
+        base = {"model": model, "messages": messages}
+
+        public_payload = providers.build_request_payload(model, effort, base)
+        client_payload = BaseClient("http://test", "test-key")._build_payload(
+            model, messages, effort
+        )
+
+        assert public_payload == client_payload
 
     def test_minimal_clamps(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING):
