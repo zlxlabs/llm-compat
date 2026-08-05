@@ -5,7 +5,22 @@ import logging
 
 import pytest
 
+from llm_compat import providers
 from llm_compat._compat import normalize_reasoning_effort, validate_config
+
+_VALIDATION_FAMILY_MODELS: dict[str, str] = {
+    "deepseek": "deepseek-v4-flash",
+    "gemini_25": "gemini-2.5-flash",
+    "gemini_3": "gemini-3-flash",
+    "gemini": "gemini-pro",
+    "openai_gpt5": "gpt-5",
+    "openai_o": "o3-mini",
+    "doubao_seed": "doubao-seed-2.0",
+    "doubao": "doubao-pro-256k",
+    "openai_gpt4": "gpt-4o",
+    "openai": "qwen-turbo",
+    "unknown": "unknown-model",
+}
 
 
 class TestNormalizeReasoningEffort:
@@ -36,8 +51,26 @@ class TestNormalizeReasoningEffort:
     def test_strips_whitespace(self) -> None:
         assert normalize_reasoning_effort(" high ") == "high"
 
+    @pytest.mark.parametrize(
+        "value",
+        ["NONE", " disabled ", "OFF", " false "],
+    )
+    def test_disable_aliases_are_case_insensitive(self, value: str) -> None:
+        assert normalize_reasoning_effort(value) == "disabled"
+
 
 class TestValidateConfig:
+    def test_covers_every_provider_family_and_unknown(self) -> None:
+        assert set(_VALIDATION_FAMILY_MODELS) == set(providers._FAMILY_CAPABILITIES) | {"unknown"}
+        assert set(providers._EFFORT_RANK) == {
+            "minimal",
+            "low",
+            "medium",
+            "high",
+            "max",
+            "xhigh",
+        }
+
     def test_valid_config_no_warnings(self) -> None:
         warnings = validate_config("deepseek-v4-flash", "high")
         assert warnings == []
@@ -63,3 +96,36 @@ class TestValidateConfig:
     def test_valid_disabled_on_deepseek(self) -> None:
         warnings = validate_config("deepseek-v4-flash", "disabled")
         assert warnings == []
+
+    @pytest.mark.parametrize("family,model", _VALIDATION_FAMILY_MODELS.items())
+    @pytest.mark.parametrize("effort", providers._EFFORT_RANK)
+    def test_clamp_prediction_matches_translation(
+        self, family: str, model: str, effort: str
+    ) -> None:
+        warnings = validate_config(model, effort)
+        actual = providers._translate(family, effort).get("reasoning_effort")
+
+        if actual is None:
+            assert len(warnings) == 1
+            assert "dropped at runtime" in warnings[0]
+        elif actual == effort:
+            assert warnings == []
+        else:
+            assert len(warnings) == 1
+            assert f"will clamp to '{actual}' at runtime" in warnings[0]
+
+    @pytest.mark.parametrize("family,model", _VALIDATION_FAMILY_MODELS.items())
+    @pytest.mark.parametrize("effort", ["disabled", "none"])
+    def test_disable_alias_prediction_matches_translation(
+        self, family: str, model: str, effort: str
+    ) -> None:
+        warnings = validate_config(model, effort)
+        payload = providers._translate(family, normalize_reasoning_effort(effort))
+        mode = providers.get_provider_caps(family)["disable_mode"]
+
+        if mode == "unsupported":
+            assert len(warnings) == 1
+            assert "dropped at runtime" in warnings[0]
+            assert payload == {}
+        else:
+            assert warnings == []

@@ -47,7 +47,7 @@ class TestSyncChat:
         body = json.loads(request.content)
         assert body["reasoning_effort"] == "high"
 
-    def test_chat_extra_body_is_expanded_into_wire_body(self, httpx_mock: HTTPXMock) -> None:
+    def test_chat_extra_body_is_forwarded_as_wire_field(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response("quick"))
         with SyncLLMClient(base_url="http://test/v1", api_key="sk-test") as client:
             result = client.chat(
@@ -59,8 +59,8 @@ class TestSyncChat:
         body = json.loads(httpx_mock.get_request().content)
         assert result.content == "quick"
         assert body["thinking"] == {"type": "disabled"}
-        assert body["foo"] == "bar"
-        assert "extra_body" not in body
+        assert body["extra_body"] == {"foo": "bar"}
+        assert "foo" not in body
 
 
 class TestSyncChatJson:

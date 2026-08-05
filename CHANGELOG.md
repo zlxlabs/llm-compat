@@ -4,6 +4,37 @@
 
 0.6.1、0.6.2、0.6.3 是本分支上的中间版本号，从未打 tag 发布，因此在此处跳过。
 
+## [0.8.0] - 2026-08-05
+
+### Changed
+
+- `_FAMILY_CAPABILITIES` / `get_provider_caps()` 返回结构移除了 `min_effort` / `max_effort`；
+  `ProviderCaps` 类型已删除。自定义 caps 的 `efforts` 现在必须全部使用已排名的 effort。
+
+### Fixed
+
+- 公开 `build_request_payload()` 现在与 `BaseClient` 共用 reasoning effort 归一化，关闭思考的
+  空白、大小写和兼容别名不会再被误判为最高档。
+- 注册包含未排名 effort 的自定义 provider caps 时立即抛出明确异常，能力解析对绕过注册校验的
+  未知 effort 也会使用安全的 high rank 兜底。
+
+## [0.7.3] - 2026-08-05
+
+### Fixed
+
+- 收敛 `validate_config` 与运行时翻译的 effort clamp 决策为单一来源，修复预检警告与实际
+  `reasoning_effort` 不一致的问题。
+
+## [0.7.2] - 2026-08-05
+
+### Fixed
+
+- 修复不受支持的 `reasoning_effort` 在 provider family 支持集合内部空洞处无脑跳到最高档的
+  问题（[#9](https://github.com/zlxlabs/llm-compat/issues/9)）。现在按 `_EFFORT_RANK` 向上
+  取最近邻，边界才钳制到集合最值。
+- 移除 DeepSeek 官方未文档化的 `medium` effort；请求该值现在稳定翻译为 `high`，不再透传
+  未定义的 provider 行为（[#8](https://github.com/zlxlabs/llm-compat/issues/8)）。
+
 ## [0.7.0] - 2026-08-04
 
 ### Fixed
@@ -12,6 +43,8 @@
 
 ### Changed
 
+- `extra_body` 不再模拟 OpenAI SDK 的展开逻辑，而是作为普通 wire 字段原样透传到请求体顶层；
+  Gemini 用户可直接使用 `extra_body={"google": {...}}` 承载原生能力。
 - **Breaking-ish**：`extra_body` 现在会展开到请求 body 顶层。`model`、`messages`、`stream`、`extra_body`、`thinking` 五个保留键会被丢弃，并记录 warning。
 - `providers._deep_merge` 更名为公开的 `deep_merge_payload`。
 

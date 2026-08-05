@@ -163,3 +163,41 @@ issue #7 暴露了 DeepSeek 思考关闭的静默失效，第二轮 review 实�
    `reasoning_effort` 只能由翻译层决定，调用方冲突记录 warning 并使用正确的具名入口。
 3. `extra_body` 仍可提供非保留 provider 扩展字段，但不能覆盖 `model`、`messages`、`stream`、
    `extra_body`、`thinking`、`reasoning_effort`。
+
+---
+
+## 2026-08-05: reasoning_effort clamp 采用向上就近策略
+
+**问题**: 不同 provider family 支持的 `reasoning_effort` 集合可能存在空洞。旧逻辑只要请求值
+不低于 family 的最小值，就直接取最大值，导致请求落在空洞时发生跳档放大；DeepSeek 未文档化的
+`medium` 也会因此被错误抬到 `xhigh`。
+
+**决定**:
+
+1. 对不在 `efforts` 集合内的请求值，按全局 `_EFFORT_RANK` 在该集合中向上取最近邻；向上无解时
+   钳制到集合最大值，向下边界则取集合最小值。
+2. `reasoning_effort` 表达质量下限而非成本上限，因此固定采用向上就近，避免把请求翻译成低于
+   调用方意图的推理档位。
+
+---
+
+## 2026-08-05: `extra_body` 改为普通 wire 字段透传
+
+**问题**: OpenAI Python SDK 的 `extra_body` 是为 `create()` 的强类型签名准备的逃生舱；SDK
+会在发请求前将其内容展开到 HTTP body 顶层，因此网络上不会出现 `extra_body`。llm-compat
+直接通过 httpx 发送请求，`chat(..., **extra)` 本来就能接收任意字段，继续模拟 SDK 展开反而
+破坏了 provider 的真实 wire 契约。此前的展开逻辑还需要保留键过滤，导致 Gemini 的
+`thinking_config`、`cached_content`、thought signatures 和 `safety_settings` 等能力不可用。
+
+**决定**:
+
+1. 删除 `_build_payload` 中的 `extra_body` 展开、类型检查和保留键过滤；`extra_body` 从此与
+   `top_k` 一样作为普通 kwarg 原样透传，不再有专用配置或 provider 特判。
+2. 保留直接 `**extra` 侧对 `thinking` 和 `stream` 的防护，因为它们会进入顶层并可能在
+   content fallback 中污染下一个 provider。
+3. Gemini 原生能力使用单层 `extra_body={"google": {...}}` 即可，支持该真实 wire 字段不需要
+   新增任何代码；OpenAI SDK 文档中的双层写法不适用于本库。
+3. DeepSeek 的能力集合移除官方未文档化的 `medium`，所以请求 `medium` 明确翻译为 `high`。
+
+该决策对应 [issue #8](https://github.com/zlxlabs/llm-compat/issues/8) 与
+[issue #9](https://github.com/zlxlabs/llm-compat/issues/9)。

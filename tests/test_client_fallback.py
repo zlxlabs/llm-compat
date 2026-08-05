@@ -73,7 +73,7 @@ class TestFallbackBasic:
             assert result.model == "gpt-4.1-mini"
             assert "deepseek-v4" in result.fallback_chain
 
-    async def test_fallback_drops_extra_body_thinking_for_gemini(
+    async def test_fallback_keeps_extra_body_thinking_nested_for_gemini(
         self, httpx_mock: HTTPXMock
     ):
         httpx_mock.add_response(json=_refusal_response())
@@ -93,8 +93,10 @@ class TestFallbackBasic:
         primary_body = json.loads(requests[0].content)
         fallback_body = json.loads(requests[1].content)
         assert "thinking" not in primary_body
+        assert primary_body["extra_body"] == {"thinking": {"type": "disabled"}}
         assert fallback_body["model"] == "gemini-2.5-flash"
         assert "thinking" not in fallback_body
+        assert fallback_body["extra_body"] == {"thinking": {"type": "disabled"}}
         assert describe_from_payload(fallback_body)["thinking_mode"] != "disabled"
 
     async def test_fallback_drops_direct_extra_thinking_for_gemini(

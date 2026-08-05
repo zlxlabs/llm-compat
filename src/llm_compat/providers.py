@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import fnmatch
 import logging
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -38,84 +38,85 @@ _EFFORT_RANK: dict[str, int] = {
     "xhigh": 5,
 }
 
+
+def normalize_reasoning_effort(value: str | None) -> str | None:
+    """Normalize caller-provided reasoning effort values to canonical values."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return None
+
+    normalized = value.strip().casefold()
+    if not normalized:
+        return None
+    if normalized in {"none", "off", "false"}:
+        logger.warning(
+            "reasoning_effort alias %r is deprecated, use 'disabled' instead. "
+            "Auto-converting to 'disabled'.",
+            value,
+        )
+        return "disabled"
+    return normalized
+
+
 _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
     "deepseek": {
         "disable_mode": "native",
-        "efforts": frozenset({"low", "medium", "high", "max", "xhigh"}),
-        "min_effort": "low",
-        "max_effort": "xhigh",
+        "efforts": frozenset({"low", "high", "max", "xhigh"}),
         "supports_vision": False,
         "json_mode": "json_object",
     },
     "gemini_25": {
         "disable_mode": "effort_none",
         "efforts": frozenset({"low", "medium", "high"}),
-        "min_effort": "low",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_schema",
     },
     "gemini_3": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
-        "min_effort": "minimal",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_schema",
     },
     "gemini": {
         "disable_mode": "effort_none",
         "efforts": frozenset({"low", "medium", "high"}),
-        "min_effort": "low",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_object",
     },
     "openai_gpt5": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
-        "min_effort": "minimal",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_schema",
     },
     "openai_gpt4": {
         "disable_mode": "na",
         "efforts": frozenset(),
-        "min_effort": None,
-        "max_effort": None,
         "supports_vision": True,
         "json_mode": "json_object",
     },
     "openai_o": {
         "disable_mode": "unsupported",
         "efforts": frozenset({"low", "medium", "high"}),
-        "min_effort": "low",
-        "max_effort": "high",
         "supports_vision": False,
         "json_mode": "json_schema",
     },
     "doubao_seed": {
         "disable_mode": "minimal_fallback",
         "efforts": frozenset({"minimal", "low", "medium", "high"}),
-        "min_effort": "minimal",
-        "max_effort": "high",
         "supports_vision": False,
         "json_mode": "json_schema",
     },
     "doubao": {
         "disable_mode": "na",
         "efforts": frozenset(),
-        "min_effort": None,
-        "max_effort": None,
         "supports_vision": False,
         "json_mode": "json_schema",
     },
     "openai": {
         "disable_mode": "na",
         "efforts": frozenset({"low", "medium", "high"}),
-        "min_effort": "low",
-        "max_effort": "high",
         "supports_vision": True,
         "json_mode": "json_schema",
     },
@@ -124,8 +125,6 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
 _DEFAULT_CAPS: dict[str, Any] = {
     "disable_mode": "na",
     "efforts": frozenset(),
-    "min_effort": None,
-    "max_effort": None,
     "supports_vision": True,
     "json_mode": "json_schema",
 }
@@ -133,6 +132,22 @@ _DEFAULT_CAPS: dict[str, Any] = {
 
 def get_provider_caps(family: str) -> dict[str, Any]:
     return _FAMILY_CAPABILITIES.get(family, _DEFAULT_CAPS)
+
+
+def _validate_ranked_efforts(family: str, caps: dict[str, Any]) -> None:
+    efforts = caps.get("efforts", ())
+    invalid_efforts = [
+        effort
+        for effort in efforts
+        if not isinstance(effort, str) or effort not in _EFFORT_RANK
+    ]
+    if invalid_efforts:
+        invalid_values = ", ".join(sorted(repr(value) for value in invalid_efforts))
+        raise ValueError(
+            f"Provider family {family!r} has unranked effort values: {invalid_values}. "
+            "Custom caps['efforts'] must contain only ranked effort values."
+        )
+
 
 _custom_patterns: tuple[tuple[str, str], ...] | None = None
 
@@ -144,6 +159,9 @@ def register_provider(
     caps: dict[str, Any] | None = None,
 ) -> None:
     global _custom_patterns
+    if caps is not None:
+        _validate_ranked_efforts(family, caps)
+
     entry = (pattern, family)
     if _custom_patterns:
         _custom_patterns = (entry,) + _custom_patterns
@@ -202,6 +220,31 @@ def detect_provider(
     return "openai"
 
 
+def _effort_rank(effort: str) -> int:
+    return _EFFORT_RANK.get(effort, _EFFORT_RANK["high"])
+
+
+def resolve_effort_clamp(family: str, effort: str) -> str | None:
+    """Resolve an effort to the nearest value supported by a provider family."""
+    caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
+    accepted = cast(frozenset[str], caps["efforts"])
+    if not accepted:
+        return None
+    if effort in accepted:
+        return effort
+
+    requested_rank = _effort_rank(effort)
+    ranked_efforts = sorted(accepted, key=_effort_rank)
+    return next(
+        (
+            accepted_effort
+            for accepted_effort in ranked_efforts
+            if _effort_rank(accepted_effort) >= requested_rank
+        ),
+        ranked_efforts[-1],
+    )
+
+
 def _translate(family: str, effort: str | None) -> dict[str, Any]:
     if effort is None:
         return {}
@@ -224,35 +267,27 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
             return {}
         return {}
 
-    accepted = caps["efforts"]
-    if not accepted:
+    clamped = resolve_effort_clamp(family, effort)
+    if clamped is None:
         logger.warning(
-            "Provider family %r does not support reasoning_effort; dropping %r.",
+            "Provider %r effort unsupported: request=%r -> actual=dropped; direction=drop.",
             family,
             effort,
         )
         return {}
 
-    if effort in accepted:
+    if clamped == effort:
         return {"reasoning_effort": effort}
 
-    requested_rank = _EFFORT_RANK.get(effort, _EFFORT_RANK["high"])
-    min_effort = caps.get("min_effort")
-    max_effort = caps.get("max_effort")
-    if min_effort and requested_rank < _EFFORT_RANK[min_effort]:
-        clamped = min_effort
-    elif max_effort:
-        clamped = max_effort
-    else:
-        clamped = next(iter(sorted(accepted))) if accepted else None
-    if clamped is None:
-        logger.warning("Provider family %r has no accepted effort; dropping %r.", family, effort)
-        return {}
+    requested_rank = _effort_rank(effort)
+    actual_rank = _effort_rank(clamped)
+    direction = "upward" if actual_rank > requested_rank else "downward"
     logger.warning(
-        "Provider family %r does not accept effort %r, clamping to %r.",
+        "Provider family %r effort clamp: requested=%r -> actual=%r; direction=%s.",
         family,
         effort,
         clamped,
+        direction,
     )
     return {"reasoning_effort": clamped}
 
@@ -273,6 +308,7 @@ def build_request_payload(
     base_payload: dict[str, Any],
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
 ) -> dict[str, Any]:
+    reasoning_effort = normalize_reasoning_effort(reasoning_effort)
     family = detect_provider(model, custom_patterns)
     translation = _translate(family, reasoning_effort)
     return deep_merge_payload(base_payload, translation)

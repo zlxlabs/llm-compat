@@ -6,6 +6,181 @@ import logging
 import pytest
 
 from llm_compat import providers
+from llm_compat._base import BaseClient
+from llm_compat._compat import validate_config
+
+_EFFORT_CLAMP_MATRIX: dict[str, dict[str, str | None]] = {
+    "deepseek": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "high",
+        "high": "high",
+        "max": "max",
+        "xhigh": "xhigh",
+    },
+    "gemini_25": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "gemini_3": {
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "gemini": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "openai_gpt5": {
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "openai_o": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "doubao_seed": {
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "doubao": {
+        "minimal": None,
+        "low": None,
+        "medium": None,
+        "high": None,
+        "max": None,
+        "xhigh": None,
+    },
+    "openai": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "openai_gpt4": {
+        "minimal": None,
+        "low": None,
+        "medium": None,
+        "high": None,
+        "max": None,
+        "xhigh": None,
+    },
+}
+
+
+class TestEffortClampMatrix:
+    def test_covers_every_provider_family(self) -> None:
+        assert set(_EFFORT_CLAMP_MATRIX) == set(providers._FAMILY_CAPABILITIES)
+
+    @pytest.mark.parametrize("family,expected_by_effort", _EFFORT_CLAMP_MATRIX.items())
+    def test_all_families_and_efforts(
+        self,
+        family: str,
+        expected_by_effort: dict[str, str | None],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        accepted = providers.get_provider_caps(family)["efforts"]
+        assert set(expected_by_effort) == set(providers._EFFORT_RANK)
+
+        for requested, expected in expected_by_effort.items():
+            caplog.clear()
+            with caplog.at_level(logging.WARNING):
+                payload = providers._translate(family, requested)
+
+            if expected is None:
+                assert payload == {}
+                assert "effort unsupported" in caplog.text
+                continue
+
+            assert expected in accepted
+            assert payload == {"reasoning_effort": expected}
+
+            requested_rank = providers._EFFORT_RANK[requested]
+            actual_rank = providers._EFFORT_RANK[expected]
+            if requested in accepted:
+                assert not caplog.records
+            else:
+                assert caplog.records
+                expected_direction = "upward" if actual_rank > requested_rank else "downward"
+                assert f"direction={expected_direction}" in caplog.text
+
+            assert abs(actual_rank - requested_rank) <= min(
+                abs(providers._EFFORT_RANK[candidate] - requested_rank)
+                for candidate in accepted
+            )
+
+    def test_deepseek_medium_clamps_to_high_not_xhigh(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base = {"model": "deepseek-v4-flash", "messages": []}
+        with caplog.at_level(logging.WARNING):
+            payload = providers.build_request_payload("deepseek-v4-flash", "medium", base)
+
+        assert payload["reasoning_effort"] == "high"
+        assert "medium" not in providers.get_provider_caps("deepseek")["efforts"]
+        assert "requested='medium' -> actual='high'; direction=upward" in caplog.text
+
+
+class TestCustomProviderEfforts:
+    def test_register_rejects_unranked_effort(self) -> None:
+        family = "vendor_unranked"
+        caps = {
+            "disable_mode": "na",
+            "efforts": frozenset({"low", "ultra"}),
+            "supports_vision": False,
+            "json_mode": "json_object",
+        }
+
+        with pytest.raises(ValueError, match=r"vendor_unranked.*ultra"):
+            providers.register_provider("vendor-unranked-*", family, caps=caps)
+
+        assert family not in providers._FAMILY_CAPABILITIES
+
+    def test_resolver_handles_unranked_effort_after_direct_capability_mutation(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        caps = dict(providers._FAMILY_CAPABILITIES["openai"])
+        caps["efforts"] = frozenset({"low", "ultra"})
+        monkeypatch.setitem(providers._FAMILY_CAPABILITIES, "vendor_mutated", caps)
+        monkeypatch.setattr(
+            providers,
+            "_custom_patterns",
+            (("vendor-mutated-*", "vendor_mutated"),),
+        )
+
+        assert providers.resolve_effort_clamp("vendor_mutated", "high") == "ultra"
+        assert validate_config("vendor-mutated-model", "high")
+        payload = providers.build_request_payload(
+            "vendor-mutated-model",
+            "high",
+            {"model": "vendor-mutated-model", "messages": []},
+        )
+        assert payload["reasoning_effort"] == "ultra"
 
 
 class TestDetectProvider:
@@ -90,6 +265,11 @@ class TestBuildPayloadDeepSeek:
         assert "extra_body" not in payload
         assert "reasoning_effort" not in payload
 
+    def test_stripped_none_disables_deepseek_at_public_boundary(self) -> None:
+        payload = providers.build_request_payload("deepseek-v4-flash", " none ", self._base())
+        assert payload["thinking"] == {"type": "disabled"}
+        assert "reasoning_effort" not in payload
+
     def test_high_sets_reasoning_effort(self) -> None:
         payload = providers.build_request_payload("deepseek-v4-flash", "high", self._base())
         assert payload["reasoning_effort"] == "high"
@@ -104,6 +284,46 @@ class TestBuildPayloadDeepSeek:
         assert "reasoning_effort" not in payload
         assert "extra_body" not in payload
 
+    @pytest.mark.parametrize(
+        "effort",
+        [
+            None,
+            "",
+            "  ",
+            "none",
+            " NONE ",
+            "disabled",
+            " DISABLED ",
+            "off",
+            " OFF ",
+            "false",
+            " FALSE ",
+            "minimal",
+            " MINIMAL ",
+            "low",
+            " LOW ",
+            "medium",
+            " Medium ",
+            "high",
+            " HIGH ",
+            "max",
+            " MAX ",
+            "xhigh",
+            " XHIGH ",
+        ],
+    )
+    def test_public_and_base_payloads_share_normalization(self, effort: str | None) -> None:
+        model = "deepseek-v4-flash"
+        messages: list[dict[str, object]] = []
+        base = {"model": model, "messages": messages}
+
+        public_payload = providers.build_request_payload(model, effort, base)
+        client_payload = BaseClient("http://test", "test-key")._build_payload(
+            model, messages, effort
+        )
+
+        assert public_payload == client_payload
+
     def test_minimal_clamps(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING):
             payload = providers.build_request_payload(
@@ -111,7 +331,7 @@ class TestBuildPayloadDeepSeek:
             )
         assert payload.get("reasoning_effort") == "low"
 
-    def test_existing_extra_body_stays_for_wire_expansion(self) -> None:
+    def test_existing_extra_body_is_preserved_alongside_translation(self) -> None:
         base = {**self._base(), "extra_body": {"foo": "bar"}}
         payload = providers.build_request_payload("deepseek-v4-flash", "disabled", base)
         assert payload["extra_body"]["foo"] == "bar"

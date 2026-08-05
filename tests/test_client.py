@@ -85,7 +85,7 @@ class TestChat:
         assert "reasoning_effort" not in body
         assert describe_from_payload(body)["thinking_mode"] == "disabled"
 
-    async def test_chat_extra_body_is_merged_into_wire_body(self, httpx_mock: HTTPXMock) -> None:
+    async def test_chat_extra_body_is_forwarded_as_wire_field(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response("ok"))
         async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
             await client.chat(
@@ -94,10 +94,28 @@ class TestChat:
                 extra_body={"foo": "bar"},
             )
         body = json.loads(httpx_mock.get_request().content)
-        assert body["foo"] == "bar"
-        assert "extra_body" not in body
+        assert body["extra_body"] == {"foo": "bar"}
+        assert "foo" not in body
 
-    async def test_chat_extra_body_thinking_is_dropped_with_warning(
+    async def test_chat_gemini_extra_body_is_forwarded_as_wire_field(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        extra_body = {
+            "google": {
+                "thinking_config": {"thinking_level": "low", "include_thoughts": True}
+            }
+        }
+        httpx_mock.add_response(json=_chat_response("ok"))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            await client.chat(
+                "gemini-3-flash",
+                [{"role": "user", "content": "hi"}],
+                extra_body=extra_body,
+            )
+        body = json.loads(httpx_mock.get_request().content)
+        assert body["extra_body"] == extra_body
+
+    async def test_chat_extra_body_thinking_is_nested_without_warning(
         self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         httpx_mock.add_response(json=_chat_response("ok"))
@@ -109,19 +127,11 @@ class TestChat:
                     extra_body={"thinking": {"type": "disabled"}},
                 )
         body = json.loads(httpx_mock.get_request().content)
+        assert body["extra_body"] == {"thinking": {"type": "disabled"}}
         assert "thinking" not in body
-        assert "extra_body" not in body
-        assert describe_from_payload(body)["thinking_mode"] != "disabled"
-        assert any(
-            record.getMessage()
-            == (
-                "extra_body attempted to override reserved request field thinking; "
-                "dropping value. Use reasoning_effort to control thinking."
-            )
-            for record in caplog.records
-        )
+        assert not caplog.records
 
-    async def test_chat_extra_body_cannot_override_provider_thinking(
+    async def test_chat_extra_body_does_not_override_provider_thinking(
         self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         httpx_mock.add_response(json=_chat_response("ok"))
@@ -135,15 +145,8 @@ class TestChat:
                 )
         body = json.loads(httpx_mock.get_request().content)
         assert body["thinking"] == {"type": "disabled"}
-        assert "extra_body" not in body
-        assert any(
-            record.getMessage()
-            == (
-                "extra_body attempted to override reserved request field thinking; "
-                "dropping value. Use reasoning_effort to control thinking."
-            )
-            for record in caplog.records
-        )
+        assert body["extra_body"] == {"thinking": {"type": "enabled"}}
+        assert not caplog.records
 
     @pytest.mark.parametrize(
         "model",
@@ -199,7 +202,7 @@ class TestChat:
         assert "thinking" not in body or expected_field == "thinking"
         assert describe_from_payload(body)["thinking_mode"] == "disabled"
 
-    async def test_chat_extra_body_reasoning_effort_cannot_override_translation(
+    async def test_chat_extra_body_reasoning_effort_does_not_override_translation(
         self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         httpx_mock.add_response(json=_chat_response("ok"))
@@ -213,15 +216,9 @@ class TestChat:
                 )
         body = json.loads(httpx_mock.get_request().content)
         assert body["reasoning_effort"] == "none"
+        assert body["extra_body"] == {"reasoning_effort": "high"}
         assert describe_from_payload(body)["thinking_mode"] == "disabled"
-        assert any(
-            record.getMessage()
-            == (
-                "extra_body attempted to override reserved request field reasoning_effort; "
-                "dropping value. Use reasoning_effort to control thinking."
-            )
-            for record in caplog.records
-        )
+        assert not caplog.records
 
     async def test_chat_direct_extra_stream_is_dropped(
         self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
@@ -254,12 +251,12 @@ class TestChat:
         with pytest.raises(TypeError):
             client._build_payload("gpt-4o", [], "high", **{"messages": []})
 
-    @pytest.mark.parametrize("invalid_extra_body", [None, [], "", "not-a-dict"])
-    async def test_chat_invalid_extra_body_is_dropped_with_warning(
+    @pytest.mark.parametrize("extra_body", [None, [], "", "not-a-dict"])
+    async def test_chat_extra_body_values_are_forwarded_without_validation(
         self,
         httpx_mock: HTTPXMock,
         caplog: pytest.LogCaptureFixture,
-        invalid_extra_body: object,
+        extra_body: object,
     ) -> None:
         httpx_mock.add_response(json=_chat_response("ok"))
         with caplog.at_level("WARNING"):
@@ -267,13 +264,13 @@ class TestChat:
                 await client.chat(
                     "gpt-4o",
                     [{"role": "user", "content": "hi"}],
-                    extra_body=invalid_extra_body,
+                    extra_body=extra_body,
                 )
         body = json.loads(httpx_mock.get_request().content)
-        assert "extra_body" not in body
-        assert "extra_body must be a dict; dropping invalid value." in caplog.text
+        assert body["extra_body"] == extra_body
+        assert not caplog.records
 
-    async def test_chat_nested_extra_body_is_not_reintroduced(
+    async def test_chat_nested_extra_body_is_preserved(
         self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
     ) -> None:
         httpx_mock.add_response(json=_chat_response("ok"))
@@ -285,16 +282,9 @@ class TestChat:
                     extra_body={"extra_body": {"foo": "bar"}},
                 )
         body = json.loads(httpx_mock.get_request().content)
-        assert "extra_body" not in body
+        assert body["extra_body"] == {"extra_body": {"foo": "bar"}}
         assert "foo" not in body
-        assert any(
-            record.getMessage()
-            == (
-                "extra_body attempted to override reserved request field extra_body; "
-                "dropping value. Use reasoning_effort to control thinking."
-            )
-            for record in caplog.records
-        )
+        assert not caplog.records
 
     @pytest.mark.parametrize(
         ("reserved_key", "reserved_value"),
@@ -307,7 +297,7 @@ class TestChat:
             ("reasoning_effort", "high"),
         ],
     )
-    async def test_chat_extra_body_reserved_keys_are_dropped(
+    async def test_chat_extra_body_reserved_keys_are_forwarded_as_nested_fields(
         self,
         httpx_mock: HTTPXMock,
         caplog: pytest.LogCaptureFixture,
@@ -328,19 +318,8 @@ class TestChat:
         assert body["model"] == "gpt-4o"
         assert body["messages"] == messages
         assert "stream" not in body
-        assert "extra_body" not in body
-        assert caplog.records
-        assert any(
-            record.getMessage()
-            == (
-                f"extra_body attempted to override reserved request field {reserved_key}; "
-                "dropping value. Use chat_stream to enable streaming."
-                if reserved_key == "stream"
-                else f"extra_body attempted to override reserved request field {reserved_key}; "
-                "dropping value. Use reasoning_effort to control thinking."
-            )
-            for record in caplog.records
-        )
+        assert body["extra_body"] == {reserved_key: reserved_value}
+        assert not caplog.records
 
     async def test_401_raises_fatal(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(status_code=401, json={"error": "unauthorized"})
@@ -404,6 +383,24 @@ class TestChatJson:
         assert body["thinking"] == {"type": "disabled"}
         assert "extra_body" not in body
         assert "reasoning_effort" not in body
+
+    async def test_json_extra_body_response_format_does_not_override_top_level(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        nested_response_format = {"type": "json_object"}
+        httpx_mock.add_response(json=_chat_response('{"tags": ["python"]}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            result = await client.chat_json(
+                "gpt-5-mini",
+                [{"role": "user", "content": "tag this"}],
+                schema=TagResult,
+                extra_body={"response_format": nested_response_format},
+            )
+            assert client.stats.json_schema_calls == 1
+        assert result.parsed.tags == ["python"]
+        body = json.loads(httpx_mock.get_request().content)
+        assert body["response_format"]["type"] == "json_schema"
+        assert body["extra_body"]["response_format"] == nested_response_format
 
 
 class TestChatStream:
