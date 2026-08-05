@@ -7,6 +7,142 @@ import pytest
 
 from llm_compat import providers
 
+_EFFORT_CLAMP_MATRIX: dict[str, dict[str, str | None]] = {
+    "deepseek": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "high",
+        "high": "high",
+        "max": "max",
+        "xhigh": "xhigh",
+    },
+    "gemini_25": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "gemini_3": {
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "gemini": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "openai_gpt5": {
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "openai_o": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "doubao_seed": {
+        "minimal": "minimal",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "doubao": {
+        "minimal": None,
+        "low": None,
+        "medium": None,
+        "high": None,
+        "max": None,
+        "xhigh": None,
+    },
+    "openai": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
+    "openai_gpt4": {
+        "minimal": None,
+        "low": None,
+        "medium": None,
+        "high": None,
+        "max": None,
+        "xhigh": None,
+    },
+}
+
+
+class TestEffortClampMatrix:
+    def test_covers_every_provider_family(self) -> None:
+        assert set(_EFFORT_CLAMP_MATRIX) == set(providers._FAMILY_CAPABILITIES)
+
+    @pytest.mark.parametrize("family,expected_by_effort", _EFFORT_CLAMP_MATRIX.items())
+    def test_all_families_and_efforts(
+        self,
+        family: str,
+        expected_by_effort: dict[str, str | None],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        accepted = providers.get_provider_caps(family)["efforts"]
+        assert set(expected_by_effort) == set(providers._EFFORT_RANK)
+
+        for requested, expected in expected_by_effort.items():
+            caplog.clear()
+            with caplog.at_level(logging.WARNING):
+                payload = providers._translate(family, requested)
+
+            if expected is None:
+                assert payload == {}
+                assert "effort unsupported" in caplog.text
+                continue
+
+            assert expected in accepted
+            assert payload == {"reasoning_effort": expected}
+
+            requested_rank = providers._EFFORT_RANK[requested]
+            actual_rank = providers._EFFORT_RANK[expected]
+            if requested in accepted:
+                assert not caplog.records
+            else:
+                assert caplog.records
+                expected_direction = "upward" if actual_rank > requested_rank else "downward"
+                assert f"direction={expected_direction}" in caplog.text
+
+            assert abs(actual_rank - requested_rank) <= min(
+                abs(providers._EFFORT_RANK[candidate] - requested_rank)
+                for candidate in accepted
+            )
+
+    def test_deepseek_medium_clamps_to_high_not_xhigh(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        base = {"model": "deepseek-v4-flash", "messages": []}
+        with caplog.at_level(logging.WARNING):
+            payload = providers.build_request_payload("deepseek-v4-flash", "medium", base)
+
+        assert payload["reasoning_effort"] == "high"
+        assert "medium" not in providers.get_provider_caps("deepseek")["efforts"]
+        assert "requested='medium' -> actual='high'; direction=upward" in caplog.text
+
 
 class TestDetectProvider:
     @pytest.mark.parametrize(

@@ -41,7 +41,7 @@ _EFFORT_RANK: dict[str, int] = {
 _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
     "deepseek": {
         "disable_mode": "native",
-        "efforts": frozenset({"low", "medium", "high", "max", "xhigh"}),
+        "efforts": frozenset({"low", "high", "max", "xhigh"}),
         "min_effort": "low",
         "max_effort": "xhigh",
         "supports_vision": False,
@@ -227,7 +227,7 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
     accepted = caps["efforts"]
     if not accepted:
         logger.warning(
-            "Provider family %r does not support reasoning_effort; dropping %r.",
+            "Provider %r effort unsupported: request=%r -> actual=dropped; direction=drop.",
             family,
             effort,
         )
@@ -237,22 +237,23 @@ def _translate(family: str, effort: str | None) -> dict[str, Any]:
         return {"reasoning_effort": effort}
 
     requested_rank = _EFFORT_RANK.get(effort, _EFFORT_RANK["high"])
-    min_effort = caps.get("min_effort")
-    max_effort = caps.get("max_effort")
-    if min_effort and requested_rank < _EFFORT_RANK[min_effort]:
-        clamped = min_effort
-    elif max_effort:
-        clamped = max_effort
-    else:
-        clamped = next(iter(sorted(accepted))) if accepted else None
-    if clamped is None:
-        logger.warning("Provider family %r has no accepted effort; dropping %r.", family, effort)
-        return {}
+    ranked_efforts = sorted(accepted, key=lambda accepted_effort: _EFFORT_RANK[accepted_effort])
+    clamped = next(
+        (
+            accepted_effort
+            for accepted_effort in ranked_efforts
+            if _EFFORT_RANK[accepted_effort] >= requested_rank
+        ),
+        ranked_efforts[-1],
+    )
+    actual_rank = _EFFORT_RANK[clamped]
+    direction = "upward" if actual_rank > requested_rank else "downward"
     logger.warning(
-        "Provider family %r does not accept effort %r, clamping to %r.",
+        "Provider family %r effort clamp: requested=%r -> actual=%r; direction=%s.",
         family,
         effort,
         clamped,
+        direction,
     )
     return {"reasoning_effort": clamped}
 
