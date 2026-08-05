@@ -97,6 +97,30 @@ class TestFallbackBasic:
         assert "thinking" not in fallback_body
         assert describe_from_payload(fallback_body)["thinking_mode"] != "disabled"
 
+    async def test_fallback_drops_direct_extra_thinking_for_gemini(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_refusal_response())
+        httpx_mock.add_response(json=_chat_response("fallback answer"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gemini-2.5-flash"]},
+        ) as client:
+            await client.chat(
+                "deepseek-v4-flash",
+                MESSAGES,
+                thinking={"type": "disabled"},
+            )
+
+        requests = httpx_mock.get_requests()
+        primary_body = json.loads(requests[0].content)
+        fallback_body = json.loads(requests[1].content)
+        assert "thinking" not in primary_body
+        assert fallback_body["model"] == "gemini-2.5-flash"
+        assert "thinking" not in fallback_body
+        assert describe_from_payload(fallback_body)["thinking_source"] == "model_default"
+
     async def test_structured_signal_triggers_fallback(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json=_content_filter_response())
         httpx_mock.add_response(json=_chat_response("actual answer"))

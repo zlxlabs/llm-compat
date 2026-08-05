@@ -145,6 +145,115 @@ class TestChat:
             for record in caplog.records
         )
 
+    @pytest.mark.parametrize(
+        "model",
+        ["deepseek-v4-flash", "gemini-2.5-flash"],
+    )
+    async def test_chat_direct_extra_thinking_is_dropped_from_wire(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture, model: str
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response("ok"))
+        with caplog.at_level("WARNING"):
+            async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+                await client.chat(
+                    model,
+                    [{"role": "user", "content": "hi"}],
+                    thinking={"type": "disabled"},
+                )
+        body = json.loads(httpx_mock.get_request().content)
+        assert "thinking" not in body
+        assert describe_from_payload(body)["thinking_source"] == "model_default"
+        assert any(
+            record.getMessage()
+            == (
+                "extra attempted to override reserved request field thinking; "
+                "dropping value. Use reasoning_effort to control thinking."
+            )
+            for record in caplog.records
+        )
+
+    @pytest.mark.parametrize(
+        ("model", "expected_field", "expected_value"),
+        [
+            ("deepseek-v4-flash", "thinking", {"type": "disabled"}),
+            ("gemini-2.5-flash", "reasoning_effort", "none"),
+        ],
+    )
+    async def test_named_reasoning_effort_wins_over_direct_extra_thinking(
+        self,
+        httpx_mock: HTTPXMock,
+        model: str,
+        expected_field: str,
+        expected_value: object,
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response("ok"))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            await client.chat(
+                model,
+                [{"role": "user", "content": "hi"}],
+                reasoning_effort="disabled",
+                thinking={"type": "enabled"},
+            )
+        body = json.loads(httpx_mock.get_request().content)
+        assert body[expected_field] == expected_value
+        assert "thinking" not in body or expected_field == "thinking"
+        assert describe_from_payload(body)["thinking_mode"] == "disabled"
+
+    async def test_chat_extra_body_reasoning_effort_cannot_override_translation(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response("ok"))
+        with caplog.at_level("WARNING"):
+            async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+                await client.chat(
+                    "gemini-2.5-flash",
+                    [{"role": "user", "content": "hi"}],
+                    reasoning_effort="disabled",
+                    extra_body={"reasoning_effort": "high"},
+                )
+        body = json.loads(httpx_mock.get_request().content)
+        assert body["reasoning_effort"] == "none"
+        assert describe_from_payload(body)["thinking_mode"] == "disabled"
+        assert any(
+            record.getMessage()
+            == (
+                "extra_body attempted to override reserved request field reasoning_effort; "
+                "dropping value. Use reasoning_effort to control thinking."
+            )
+            for record in caplog.records
+        )
+
+    async def test_chat_direct_extra_stream_is_dropped(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response("ok"))
+        with caplog.at_level("WARNING"):
+            async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+                await client.chat(
+                    "gpt-4o",
+                    [{"role": "user", "content": "hi"}],
+                    stream=True,
+                )
+        body = json.loads(httpx_mock.get_request().content)
+        assert "stream" not in body
+        assert any(
+            record.getMessage()
+            == (
+                "extra attempted to override reserved request field stream; "
+                "dropping value. Use chat_stream to enable streaming."
+            )
+            for record in caplog.records
+        )
+
+    def test_build_payload_named_collisions_remain_type_errors(self) -> None:
+        client = LLMClient(base_url="http://test/v1", api_key="sk-test")
+        with pytest.raises(TypeError):
+            client._build_payload("gpt-4o", [], "high", **{"reasoning_effort": "low"})
+        with pytest.raises(TypeError):
+            client._build_payload("gpt-4o", [], "high", **{"model": "other-model"})
+        with pytest.raises(TypeError):
+            client._build_payload("gpt-4o", [], "high", **{"messages": []})
+
     @pytest.mark.parametrize("invalid_extra_body", [None, [], "", "not-a-dict"])
     async def test_chat_invalid_extra_body_is_dropped_with_warning(
         self,
@@ -195,6 +304,7 @@ class TestChat:
             ("stream", True),
             ("extra_body", {"foo": "bar"}),
             ("thinking", {"type": "disabled"}),
+            ("reasoning_effort", "high"),
         ],
     )
     async def test_chat_extra_body_reserved_keys_are_dropped(
@@ -222,8 +332,13 @@ class TestChat:
         assert caplog.records
         assert any(
             record.getMessage()
-            == f"extra_body attempted to override reserved request field {reserved_key}; "
-            "dropping value. Use reasoning_effort to control thinking."
+            == (
+                f"extra_body attempted to override reserved request field {reserved_key}; "
+                "dropping value. Use chat_stream to enable streaming."
+                if reserved_key == "stream"
+                else f"extra_body attempted to override reserved request field {reserved_key}; "
+                "dropping value. Use reasoning_effort to control thinking."
+            )
             for record in caplog.records
         )
 
@@ -307,6 +422,38 @@ class TestChatStream:
             async for chunk in client.chat_stream("gpt-4o", [{"role": "user", "content": "hi"}]):
                 chunks.append(chunk)
         assert "".join(chunks) == "hello"
+        body = json.loads(httpx_mock.get_request().content)
+        assert body["stream"] is True
+
+    async def test_stream_named_argument_wins_over_direct_extra_stream(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        sse_data = b'data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'
+        httpx_mock.add_response(
+            stream=httpx.ByteStream(sse_data),
+            headers={"content-type": "text/event-stream"},
+        )
+        with caplog.at_level("WARNING"):
+            async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+                chunks = [
+                    chunk
+                    async for chunk in client.chat_stream(
+                        "gpt-4o",
+                        [{"role": "user", "content": "hi"}],
+                        stream=False,
+                    )
+                ]
+        assert chunks == ["ok"]
+        body = json.loads(httpx_mock.get_request().content)
+        assert body["stream"] is True
+        assert any(
+            record.getMessage()
+            == (
+                "extra attempted to override reserved request field stream; "
+                "dropping value. Use chat_stream to enable streaming."
+            )
+            for record in caplog.records
+        )
 
     async def test_stream_deepseek_disabled_wire_shape(self, httpx_mock: HTTPXMock) -> None:
         sse_data = (
