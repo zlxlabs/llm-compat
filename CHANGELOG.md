@@ -2,63 +2,54 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 记录变更。
 
-0.6.1、0.6.2、0.6.3 是本分支上的中间版本号，从未打 tag 发布，因此在此处跳过。
+0.6.1–0.7.3 是本分支上的中间版本号，从未打 tag 发布，因此合并到本次 0.8.0 说明中。
+早于 0.7.0 的变更未记录于此，请查阅 git log。当前已发布的 tag 只有 `v0.2.0`、`v0.6.0`，
+以及本次的 `v0.8.0`。
 
 ## [0.8.0] - 2026-08-05
 
-### Changed
-
-- `_FAMILY_CAPABILITIES` / `get_provider_caps()` 返回结构移除了 `min_effort` / `max_effort`；
-  `ProviderCaps` 类型已删除。自定义 caps 的 `efforts` 现在必须全部使用已排名的 effort。
-
 ### Fixed
 
-- 公开 `build_request_payload()` 现在与 `BaseClient` 共用 reasoning effort 归一化，关闭思考的
-  空白、大小写和兼容别名不会再被误判为最高档。
-- 注册包含未排名 effort 的自定义 provider caps 时立即抛出明确异常，能力解析对绕过注册校验的
-  未知 effort 也会使用安全的 high rank 兜底。
-
-## [0.7.3] - 2026-08-05
-
-### Fixed
-
-- 收敛 `validate_config` 与运行时翻译的 effort clamp 决策为单一来源，修复预检警告与实际
-  `reasoning_effort` 不一致的问题。
-
-## [0.7.2] - 2026-08-05
-
-### Fixed
-
-- 修复不受支持的 `reasoning_effort` 在 provider family 支持集合内部空洞处无脑跳到最高档的
-  问题（[#9](https://github.com/zlxlabs/llm-compat/issues/9)）。现在按 `_EFFORT_RANK` 向上
-  取最近邻，边界才钳制到集合最值。
-- 移除 DeepSeek 官方未文档化的 `medium` effort；请求该值现在稳定翻译为 `high`，不再透传
-  未定义的 provider 行为（[#8](https://github.com/zlxlabs/llm-compat/issues/8)）。
-
-## [0.7.0] - 2026-08-04
-
-### Fixed
-
-- 修复 DeepSeek 思考模式关闭失效（[#7](https://github.com/zlxlabs/llm-compat/issues/7)）。此前请求实际发出的是无效的顶层 `{"extra_body": {"thinking": ...}}`，而 `llm-compat` 通过 httpx 直接发送请求，不会展开 OpenAI SDK 的 `extra_body` 容器；同时 `describe_from_payload` 仍会报告思考已禁用，造成日志与实际行为不一致。
+- 修复 DeepSeek 思考模式关闭失效（[#7](https://github.com/zlxlabs/llm-compat/issues/7)）：此前
+  `_translate` 返回的是 OpenAI SDK 的传参容器形状 `{"extra_body": {"thinking": ...}}`，
+  而 llm-compat 通过 httpx 直接发送，不会展开该容器，DeepSeek 因而忽略未知字段，思考实际
+  从未关闭；`describe_from_payload` 读取同一位置还会使日志报告错误。现在发送顶层
+  `{"thinking": {"type": "disabled"}}`，日志与实际 wire body 使用同一来源。
+- 修复 effort clamp 在支持集合内部空档处跳到最高档的问题（[#9](https://github.com/zlxlabs/llm-compat/issues/9)）：
+  现在按 `_EFFORT_RANK` 选择最近的支持档位并优先向上取邻；请求低于或高于支持范围时，分别
+  钳制到集合内的最低或最高档。
+- 移除 DeepSeek 官方未文档化的 `medium` effort（[#8](https://github.com/zlxlabs/llm-compat/issues/8)），
+  请求该值现在稳定翻译为 `high`。
+- 修复 `validate_config()` 的预检结果与运行时实际翻译结果不一致的问题；两者现在共用
+  `providers.resolve_effort_clamp()` 这一单一来源。
+- 修复公开 `build_request_payload()` 绕过 reasoning effort 归一化的问题；带空白或大小写变体
+  的关闭意图（如 `" none "`、`"NONE"`）现在不会再被误判为最高档。
+- 注册包含未排名 effort 的自定义 provider caps 时立即抛出明确异常；此前这类配置会在请求时
+  抛出 `KeyError`。即使通过其他路径绕过注册校验，能力解析对未知 effort 也会按 `high` rank
+  安全兜底。
 
 ### Changed
 
-- `extra_body` 不再模拟 OpenAI SDK 的展开逻辑，而是作为普通 wire 字段原样透传到请求体顶层；
-  Gemini 用户可直接使用 `extra_body={"google": {...}}` 承载原生能力。
-- **Breaking-ish**：`extra_body` 现在会展开到请求 body 顶层。`model`、`messages`、`stream`、`extra_body`、`thinking` 五个保留键会被丢弃，并记录 warning。
+- **Breaking**：`extra_body` 不再模拟 OpenAI SDK 的展开行为，而是作为普通 wire 字段保留在
+  请求体顶层并原样透传。OpenAI SDK 使用它绕过强类型签名，但 llm-compat 直接通过 httpx
+  发请求，不存在该约束；Gemini 的 OpenAI 兼容层也可用这个同名顶层字段承载 Google 原生能力。
+- **Breaking**：`_FAMILY_CAPABILITIES` / `get_provider_caps()` 的返回结构移除 `min_effort` /
+  `max_effort`；`ProviderCaps` 类型已删除。自定义 caps 的 `efforts` 必须全部使用已排名的
+  effort 值。
+- 思考控制字段收归库管理：经 `**extra` 直接传入的 `thinking` 与 `stream` 会被丢弃并记录
+  warning，不能覆盖翻译层按目标 provider 生成的结果。`extra_body` 内部的字段不受此限制，
+  因为它们保持嵌套，不会在 content fallback 时污染下一个 provider。
 - `providers._deep_merge` 更名为公开的 `deep_merge_payload`。
+- content fallback 为每个目标 model 重新翻译思考控制字段，不复用上一个 provider 的结果。
 
 ### Migration
 
-- 需要关闭思考时，请使用 `reasoning_effort="disabled"`（或兼容别名 `"none"`）。不要通过 `extra_body` 传 `thinking`：该字段会被丢弃，并且在 content fallback 切换模型时，可能把 DeepSeek 专用字段带给不认识它的 provider。
-
-## [0.7.1] - 2026-08-05
-
-### Fixed
-
-- 收口请求参数注入路径：直接经 `**extra` 传入的 `thinking`、`stream`，以及经 `extra_body` 传入的 `thinking`、`reasoning_effort`，都会被丢弃并记录 warning，不能覆盖翻译层按目标 provider 生成的思考控制字段。
-- `chat_stream()` 的 `stream=True` 现在由 `_build_payload` 的具名参数显式注入；content fallback 对每个目标 model 重新生成思考字段，日志中的 `describe_from_payload` 与实际 wire body 保持一致。
-
-### Migration
-
-- 思考开关与强度唯一使用具名参数 `reasoning_effort`；流式请求使用 `chat_stream()`。保留字段冲突会被拒绝，不再静默覆盖 provider 翻译结果。
+- 关闭思考请使用 `reasoning_effort="disabled"`（或别名 `"none"`），不要通过
+  `chat(..., thinking={...})` 传入；后者会被丢弃并记录 warning。
+- 流式请求使用 `chat_stream()`，不要经 `**extra` 传入 `stream=True`。
+- Gemini 用户现在可用 `extra_body={"google": {...}}` 承载 `thinking_config`、`cached_content`
+  等原生能力。只传一层即可：Google 官方文档给出的 OpenAI SDK 写法是
+  `extra_body={'extra_body': {'google': ...}}`，其中外层是 SDK 传参容器；llm-compat 用户照抄
+  会得到错误的 `{"extra_body": {"extra_body": {...}}}`。
+- 读取过 `get_provider_caps()["min_effort"]` / `get_provider_caps()["max_effort"]` 的代码，
+  需要改用 `resolve_effort_clamp()`。
