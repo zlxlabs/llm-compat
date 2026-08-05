@@ -163,3 +163,22 @@ issue #7 暴露了 DeepSeek 思考关闭的静默失效，第二轮 review 实�
    `reasoning_effort` 只能由翻译层决定，调用方冲突记录 warning 并使用正确的具名入口。
 3. `extra_body` 仍可提供非保留 provider 扩展字段，但不能覆盖 `model`、`messages`、`stream`、
    `extra_body`、`thinking`、`reasoning_effort`。
+
+---
+
+## 2026-08-05: reasoning_effort clamp 采用向上就近策略
+
+**问题**: 不同 provider family 支持的 `reasoning_effort` 集合可能存在空洞。旧逻辑只要请求值
+不低于 family 的最小值，就直接取最大值，导致请求落在空洞时发生跳档放大；DeepSeek 未文档化的
+`medium` 也会因此被错误抬到 `xhigh`。
+
+**决定**:
+
+1. 对不在 `efforts` 集合内的请求值，按全局 `_EFFORT_RANK` 在该集合中向上取最近邻；向上无解时
+   钳制到集合最大值，向下边界则取集合最小值。
+2. `reasoning_effort` 表达质量下限而非成本上限，因此固定采用向上就近，避免把请求翻译成低于
+   调用方意图的推理档位。
+3. DeepSeek 的能力集合移除官方未文档化的 `medium`，所以请求 `medium` 明确翻译为 `high`。
+
+该决策对应 [issue #8](https://github.com/zlxlabs/llm-compat/issues/8) 与
+[issue #9](https://github.com/zlxlabs/llm-compat/issues/9)。

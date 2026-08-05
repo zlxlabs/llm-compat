@@ -4,6 +4,16 @@
 
 0.6.1、0.6.2、0.6.3 是本分支上的中间版本号，从未打 tag 发布，因此在此处跳过。
 
+## [0.7.2] - 2026-08-05
+
+### Fixed
+
+- 修复不受支持的 `reasoning_effort` 在 provider family 支持集合内部空洞处无脑跳到最高档的
+  问题（[#9](https://github.com/zlxlabs/llm-compat/issues/9)）。现在按 `_EFFORT_RANK` 向上
+  取最近邻，边界才钳制到集合最值。
+- 移除 DeepSeek 官方未文档化的 `medium` effort；请求该值现在稳定翻译为 `high`，不再透传
+  未定义的 provider 行为（[#8](https://github.com/zlxlabs/llm-compat/issues/8)）。
+
 ## [0.7.0] - 2026-08-04
 
 ### Fixed
