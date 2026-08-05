@@ -258,6 +258,25 @@ class TestResponseParsing:
 
         assert probe_caps._response_observation(response, field).field_error is False
 
+    def test_model_error_that_mentions_field_list_is_not_field_rejection(self) -> None:
+        field = probe_caps.PROBE_FIELDS[0]
+        response = httpx.Response(
+            400,
+            json={
+                "error": {
+                    "message": (
+                        "Invalid model name; supported request fields include reasoning_effort"
+                    )
+                }
+            },
+        )
+
+        observation = probe_caps._response_observation(response, field)
+        outcome = _classify(field, first=observation, second=observation)
+
+        assert observation.field_error is False
+        assert outcome.state == "inconclusive"
+
 
 class TestCredentialsAndRequests:
     def test_environment_key_runs_and_key_or_full_url_never_enters_report(
@@ -291,6 +310,9 @@ class TestCredentialsAndRequests:
         assert "private-gateway.example" in output
         assert "https://private-gateway.example/v1" not in output
         assert secret not in output
+        assert "| `deepseek` |" in output
+        assert '"deepseek": {' in output
+        assert "ProviderDetection" not in output
         requests = httpx_mock.get_requests()
         assert requests[0].headers["authorization"] == f"Bearer {secret}"
         bodies = [json.loads(request.content) for request in requests]
@@ -343,6 +365,30 @@ class TestCredentialsAndRequests:
         assert exit_code == 2
         assert "命令行 API key" in captured.err
         assert inline_secret not in captured.err
+
+    def test_base_url_userinfo_is_rejected_without_network_request(
+        self,
+        httpx_mock: HTTPXMock,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.setenv("LLM_API_KEY", "test-env-only")
+
+        exit_code = probe_caps.main(
+            [
+                "--base-url",
+                "https://user:password@gateway.example/v1",
+                "--model",
+                "deepseek-v4-flash",
+            ]
+        )
+
+        captured = capsys.readouterr()
+        assert exit_code == 2
+        assert "userinfo" in captured.err
+        assert "user:password" not in captured.err
+        assert "password" not in captured.err
+        assert not httpx_mock.get_requests()
 
     def test_help_is_available_without_credentials(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("LLM_API_KEY", raising=False)

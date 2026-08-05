@@ -195,10 +195,13 @@ def _target_host(base_url: str) -> str:
     parsed = urlsplit(base_url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ProbeConfigError("base URL 必须是带主机名的 http(s) URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise ProbeConfigError("base URL 不得包含 userinfo；请只通过 LLM_API_KEY 提供凭据")
     return parsed.hostname
 
 
 def _chat_endpoint(base_url: str) -> str:
+    _target_host(base_url)
     parsed = urlsplit(base_url)
     path = parsed.path.rstrip("/")
     if path.endswith("/chat/completions"):
@@ -235,19 +238,45 @@ def _extract_reasoning_tokens(body: object) -> int | None:
 
 
 _FIELD_ERROR_WORDS = re.compile(
-    r"unrecognized|unrecognised|unknown|unsupported|not supported|not permitted|"
+    r"unrecognized|unrecognised|not recognized|not recognised|unknown|unsupported|"
+    r"not supported|not permitted|"
     r"unexpected|invalid|not allowed|additional propert(?:y|ies)|extra fields|"
     r"does not accept|must be one of",
     re.IGNORECASE,
 )
 
 
+def _field_name(field: ProbeField) -> str:
+    return field.name.split("=", 1)[0]
+
+
 def _error_points_to_field(response: httpx.Response, field: ProbeField) -> bool:
-    """Return true only for an explicit field/value rejection, not any 400."""
-    body = response.text.casefold()
-    field_name = field.name.split("=", 1)[0]
-    field_present = field_name.casefold() in body
-    return field_present and _FIELD_ERROR_WORDS.search(body) is not None
+    """Return true only when a 400 can be attributed to this field."""
+    field_name = _field_name(field)
+    message = response.text
+    param: object | None = None
+    try:
+        body: object = response.json()
+    except ValueError:
+        body = None
+
+    if isinstance(body, dict):
+        error = body.get("error")
+        error_data = error if isinstance(error, dict) else body
+        param = error_data.get("param")
+        message_value = error_data.get("message")
+        if isinstance(message_value, str):
+            message = message_value
+
+    if isinstance(param, str):
+        return param == field_name
+
+    field_name_lower = field_name.casefold()
+    clauses = re.split(r"[;.!?\n]+", message.casefold())
+    return any(
+        field_name_lower in clause and _FIELD_ERROR_WORDS.search(clause) is not None
+        for clause in clauses
+    )
 
 
 def _response_observation(response: httpx.Response, field: ProbeField) -> RequestObservation:
@@ -307,8 +336,8 @@ class ProbeRunner:
             raise ProbeConfigError("重试次数不能为负数")
         if not api_key.strip():
             raise ProbeConfigError("缺少 LLM_API_KEY 环境变量，拒绝在无凭据时发请求")
-        self._endpoint = _chat_endpoint(base_url)
         self._target_host = _target_host(base_url)
+        self._endpoint = _chat_endpoint(base_url)
         self._api_key = api_key
         self._models = tuple(models)
         self._prompt = prompt
@@ -374,7 +403,7 @@ class ProbeRunner:
         raise RuntimeError("unreachable retry loop")
 
     async def _probe_model(self, client: httpx.AsyncClient, model: str) -> ModelProbe:
-        family = detect_provider(model)
+        family = detect_provider(model).family
         control_field = ProbeField("control", {})
         control = await self._request(client, control_field, self._payload(model))
 
@@ -621,8 +650,9 @@ def render_report(report: ProbeReport) -> str:
         "",
         "## Markdown 矩阵",
         "",
-        "| 模型 | family | 字段 | 状态 | HTTP | reasoning_tokens | 思考已关闭 | 尝试次数 | 说明 |",
-        "|---|---|---|---|---|---:|---|---:|---|",
+        "| 模型 | family | 字段 | 状态 | 网关接受 | HTTP | reasoning_tokens | "
+        "思考已关闭 | 尝试次数 | 说明 |",
+        "|---|---|---|---|---|---|---:|---|---:|---|",
     ]
     for probe in report.model_probes:
         control_state = _control_state(probe.control)
@@ -633,11 +663,19 @@ def render_report(report: ProbeReport) -> str:
         )
         lines.append(
             f"| `{probe.model}` | `{probe.family}` | `control` | `{control_state}` | "
+            f"{'是' if control_state == 'supported' else '—'} | "
             f"{_format_http_codes((probe.control.status_code,))} | "
             f"{_format_reasoning((probe.control.reasoning_tokens,))} | — | "
             f"{probe.control.attempts} | {control_detail} |"
         )
         for outcome in probe.outcomes:
+            accepted = (
+                "是"
+                if outcome.state == "supported"
+                else "否"
+                if outcome.state == "unsupported"
+                else "—"
+            )
             closed = (
                 "是"
                 if outcome.thinking_disabled is True
@@ -648,6 +686,7 @@ def render_report(report: ProbeReport) -> str:
             lines.append(
                 f"| `{outcome.model}` | `{outcome.family}` | `{outcome.field}` | "
                 f"`{outcome.state}` | "
+                f"{accepted} | "
                 f"{_format_http_codes(outcome.status_codes)} | "
                 f"{_format_reasoning(outcome.reasoning_tokens)} | {closed} | "
                 f"{_format_attempts(outcome.attempts)} | {outcome.detail} |"
