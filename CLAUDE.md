@@ -10,6 +10,8 @@ Always respond in 中文
 
 核心场景：10+ Python 项目通过 New API（OpenAI 兼容代理）接入多家 LLM（DeepSeek V4、GPT、Gemini 等），需要统一处理 thinking/reasoning_effort 参数翻译、JSON 输出清洗、重试和日志。
 
+发布流程：在 `pyproject.toml` 修改版本号，并在 `CHANGELOG.md` 补充对应的 `## [版本号]` 节，合并到 `main` 后会自动创建版本 tag 和 GitHub Release；CHANGELOG 缺少对应节会导致发布失败。
+
 ## 文档结构
 
 - `docs/design/` — 设计文档

@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - pyproject.toml
+      - CHANGELOG.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Read project version
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(python scripts/release/extract_release_notes.py --version)"
+          {
+            echo "version=${version}"
+            echo "tag=v${version}"
+          } >> "$GITHUB_OUTPUT"
+          echo "当前项目版本：${version}（目标 tag：v${version}）"
+
+      - name: Check whether version tag already exists
+        id: tag_check
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag_exists=false
+
+          if git rev-parse --verify --quiet "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            tag_exists=true
+          else
+            if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+              tag_exists=true
+            else
+              remote_status=$?
+              if [ "$remote_status" -ne 2 ]; then
+                echo "检查远程 tag ${RELEASE_TAG} 失败，拒绝继续发布。" >&2
+                exit "$remote_status"
+              fi
+            fi
+          fi
+
+          echo "exists=${tag_exists}" >> "$GITHUB_OUTPUT"
+          if [ "$tag_exists" = true ]; then
+            echo "版本 ${RELEASE_VERSION} 已有 tag。"
+          else
+            echo "版本 ${RELEASE_VERSION} 尚无 tag，继续准备发布。"
+          fi
+
+      - name: Check whether GitHub Release already exists
+        id: release_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          release_exists=false
+          release_error="$RUNNER_TEMP/release-view-error.txt"
+
+          set +e
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json tagName \
+            >/dev/null 2>"$release_error"
+          release_status=$?
+          set -e
+
+          if [ "$release_status" -eq 0 ]; then
+            release_exists=true
+          elif grep -Fq "release not found" "$release_error"; then
+            release_exists=false
+          else
+            message="错误：查询 GitHub Release ${RELEASE_TAG} 失败，拒绝继续发布；这是查询失败而非 Release 不存在，请人工介入。"
+            echo "$message" >&2
+            cat "$release_error" >&2
+            echo "$message" >> "$GITHUB_STEP_SUMMARY"
+            cat "$release_error" >> "$GITHUB_STEP_SUMMARY"
+            exit "$release_status"
+          fi
+
+          echo "exists=${release_exists}" >> "$GITHUB_OUTPUT"
+          if [ "$release_exists" = true ]; then
+            echo "版本 ${RELEASE_VERSION} 已有 GitHub Release。"
+          else
+            echo "版本 ${RELEASE_VERSION} 尚无 GitHub Release，继续准备发布。"
+          fi
+
+      - name: Resolve release actions
+        id: release_actions
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          TAG_EXISTS: ${{ steps.tag_check.outputs.exists }}
+          RELEASE_EXISTS: ${{ steps.release_check.outputs.exists }}
+        run: |
+          set -euo pipefail
+          python scripts/release/resolve_release_actions.py \
+            --version "$RELEASE_VERSION" \
+            --tag-exists "$TAG_EXISTS" \
+            --release-exists "$RELEASE_EXISTS" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
+      - name: Extract CHANGELOG release notes
+        if: steps.tag_check.outputs.exists != 'true' || steps.release_check.outputs.exists != 'true'
+        run: |
+          set -euo pipefail
+          python scripts/release/extract_release_notes.py \
+            --output "$RUNNER_TEMP/release-notes.md"
+
+      - name: Create and push annotated version tag
+        if: steps.tag_check.outputs.exists != 'true' && steps.release_actions.outputs.create_tag == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate "$RELEASE_TAG" --message "Release $RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"
+
+      - name: Create GitHub Release
+        if: steps.release_check.outputs.exists != 'true' && steps.release_actions.outputs.create_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "$RELEASE_TAG" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --target "$GITHUB_SHA"
