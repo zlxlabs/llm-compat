@@ -82,8 +82,11 @@ def test_partial_registered_caps_are_completed_at_caps_boundary() -> None:
 
         caps = providers.get_provider_caps(family)
         assert {"disable_mode", "efforts", "supports_vision", "json_mode"} <= caps.keys()
+        assert caps["disable_mode"] == "na"
         assert caps["efforts"] is custom_efforts
         assert caps["efforts"] is not providers._DEFAULT_CAPS["efforts"]
+        assert caps["supports_vision"] is True
+        assert caps["json_mode"] == "json_object"
 
         payload = providers.build_request_payload(
             "acme-v1",
@@ -98,6 +101,43 @@ def test_partial_registered_caps_are_completed_at_caps_boundary() -> None:
         )._build_json_payload("acme-v1", [])
         assert effective_mode == "json_object"
         assert json_payload["response_format"] == {"type": "json_object"}
+    finally:
+        providers._custom_patterns = pattern_state
+        if previous_caps is missing:
+            providers._FAMILY_CAPABILITIES.pop(family, None)
+        else:
+            providers._FAMILY_CAPABILITIES[family] = previous_caps
+
+
+def test_unknown_family_keeps_unknown_caps_defaults() -> None:
+    # This locks the intentional distinction from partial custom caps:
+    # unknown families use _DEFAULT_CAPS and therefore json_schema.
+    assert providers.get_provider_caps("nonexistent")["json_mode"] == "json_schema"
+
+
+def test_explicit_custom_caps_override_partial_defaults() -> None:
+    family = "bcme"
+    pattern_state = providers._custom_patterns
+    missing = object()
+    previous_caps = providers._FAMILY_CAPABILITIES.get(family, missing)
+
+    try:
+        providers.register_provider(
+            "bcme-*",
+            family,
+            caps={
+                "json_mode": "",
+                "supports_vision": False,
+                "efforts": frozenset(),
+                "disable_mode": "na",
+            },
+        )
+
+        caps = providers.get_provider_caps(family)
+        assert caps["json_mode"] == ""
+        assert caps["supports_vision"] is False
+        assert caps["efforts"] == frozenset()
+        assert caps["disable_mode"] == "na"
     finally:
         providers._custom_patterns = pattern_state
         if previous_caps is missing:

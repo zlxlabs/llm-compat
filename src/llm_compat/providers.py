@@ -142,6 +142,18 @@ _DEFAULT_CAPS: dict[str, Any] = {
     "json_mode": "json_schema",
 }
 
+# These defaults serve different fallback semantics and must stay separate.
+# _DEFAULT_CAPS describes a completely unknown family, preserving the base
+# behavior for that path. Custom providers may register partial caps, and the
+# defaults below must match the former caps.get(key, default) fallbacks at each
+# call site; in particular, json_mode historically fell back to json_object.
+_PARTIAL_CAPS_DEFAULTS: dict[str, Any] = {
+    "disable_mode": "na",
+    "efforts": frozenset(),
+    "supports_vision": True,
+    "json_mode": "json_object",
+}
+
 
 def get_provider_caps(family: str | ProviderDetection | None) -> dict[str, Any]:
     family_name = family.family if isinstance(family, ProviderDetection) else family
@@ -150,7 +162,7 @@ def get_provider_caps(family: str | ProviderDetection | None) -> dict[str, Any]:
     caps = _FAMILY_CAPABILITIES.get(family_name)
     if caps is None:
         return dict(_DEFAULT_CAPS)
-    return {**_DEFAULT_CAPS, **caps}
+    return {**_PARTIAL_CAPS_DEFAULTS, **caps}
 
 
 def _validate_ranked_efforts(family: str, caps: dict[str, Any]) -> None:
