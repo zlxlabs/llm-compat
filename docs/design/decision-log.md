@@ -147,3 +147,19 @@ issue #7 暴露了 DeepSeek 思考关闭的静默失效，第二轮 review 实�
    `reasoning_effort`。
 3. content fallback 对每个目标模型重新翻译参数，不复用上一个 provider 的 provider-specific
    字段。
+
+---
+
+## 2026-08-05: 请求参数注入路径统一收口
+
+**问题**: `thinking` 既可以从顶层 `**extra` 注入，也可以从 `extra_body` 展开；后者此前还
+能覆盖翻译层生成的 `reasoning_effort`。两条注入路径分别修补会持续复发同类静默失效。
+
+**决定**:
+
+1. `_build_payload` 只接受具名的 `stream` 控制，并由库显式写入 base；调用方经 `**extra`
+   提供的 `stream` 在进入构造器前丢弃。
+2. 直接 `**extra` 与 `extra_body` 展开共用同一套保留键过滤逻辑；`thinking` 与
+   `reasoning_effort` 只能由翻译层决定，调用方冲突记录 warning 并使用正确的具名入口。
+3. `extra_body` 仍可提供非保留 provider 扩展字段，但不能覆盖 `model`、`messages`、`stream`、
+   `extra_body`、`thinking`、`reasoning_effort`。
