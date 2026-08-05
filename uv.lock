@@ -219,7 +219,7 @@ wheels = [
 
 [[package]]
 name = "llm-compat"
-version = "0.7.3"
+version = "0.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "httpx", extra = ["socks"] },
