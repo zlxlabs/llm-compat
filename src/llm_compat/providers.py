@@ -10,7 +10,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ProviderDetection:
-    """Provider family plus whether the model/pattern matched a known family."""
+    """Provider family plus whether the model/pattern matched a known family.
+
+    Migration: use ``.family`` where older versions returned the provider string
+    directly.
+    """
 
     family: str
     matched: bool
@@ -142,8 +146,11 @@ _DEFAULT_CAPS: dict[str, Any] = {
 def get_provider_caps(family: str | ProviderDetection | None) -> dict[str, Any]:
     family_name = family.family if isinstance(family, ProviderDetection) else family
     if family_name is None:
-        return _DEFAULT_CAPS
-    return _FAMILY_CAPABILITIES.get(family_name, _DEFAULT_CAPS)
+        return dict(_DEFAULT_CAPS)
+    caps = _FAMILY_CAPABILITIES.get(family_name)
+    if caps is None:
+        return dict(_DEFAULT_CAPS)
+    return {**_DEFAULT_CAPS, **caps}
 
 
 def _validate_ranked_efforts(family: str, caps: dict[str, Any]) -> None:

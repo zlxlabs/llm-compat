@@ -5,6 +5,7 @@ import logging
 import pytest
 
 from llm_compat import providers
+from llm_compat._base import BaseClient
 
 
 class TestProviderDetectionStructure:
@@ -63,3 +64,43 @@ class TestProviderPatternDetection:
         result = providers.detect_provider_for_pattern("*")
 
         assert result is None
+
+
+def test_partial_registered_caps_are_completed_at_caps_boundary() -> None:
+    family = "acme"
+    pattern_state = providers._custom_patterns
+    missing = object()
+    previous_caps = providers._FAMILY_CAPABILITIES.get(family, missing)
+    custom_efforts = frozenset()
+
+    try:
+        providers.register_provider(
+            "acme-*",
+            family,
+            caps={"efforts": custom_efforts},
+        )
+
+        caps = providers.get_provider_caps(family)
+        assert {"disable_mode", "efforts", "supports_vision", "json_mode"} <= caps.keys()
+        assert caps["efforts"] is custom_efforts
+        assert caps["efforts"] is not providers._DEFAULT_CAPS["efforts"]
+
+        payload = providers.build_request_payload(
+            "acme-v1",
+            "high",
+            {"model": "acme-v1"},
+        )
+        assert payload == {"model": "acme-v1"}
+
+        json_payload, effective_mode, _ = BaseClient(
+            "http://test",
+            "test-key",
+        )._build_json_payload("acme-v1", [])
+        assert effective_mode == "json_object"
+        assert json_payload["response_format"] == {"type": "json_object"}
+    finally:
+        providers._custom_patterns = pattern_state
+        if previous_caps is missing:
+            providers._FAMILY_CAPABILITIES.pop(family, None)
+        else:
+            providers._FAMILY_CAPABILITIES[family] = previous_caps
