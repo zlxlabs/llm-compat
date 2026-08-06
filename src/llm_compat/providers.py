@@ -5,6 +5,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, cast
 
+from .caps_schema import REQUIRED_CAPS_KEYS, validate_family_caps
+
 logger = logging.getLogger(__name__)
 
 
@@ -162,22 +164,16 @@ def get_provider_caps(family: str | ProviderDetection | None) -> dict[str, Any]:
     caps = _FAMILY_CAPABILITIES.get(family_name)
     if caps is None:
         return dict(_DEFAULT_CAPS)
-    return {**_PARTIAL_CAPS_DEFAULTS, **caps}
-
-
-def _validate_ranked_efforts(family: str, caps: dict[str, Any]) -> None:
-    efforts = caps.get("efforts", ())
-    invalid_efforts = [
-        effort
-        for effort in efforts
-        if not isinstance(effort, str) or effort not in _EFFORT_RANK
-    ]
-    if invalid_efforts:
-        invalid_values = ", ".join(sorted(repr(value) for value in invalid_efforts))
-        raise ValueError(
-            f"Provider family {family!r} has unranked effort values: {invalid_values}. "
-            "Custom caps['efforts'] must contain only ranked effort values."
+    missing = REQUIRED_CAPS_KEYS.difference(caps)
+    if missing:
+        logger.warning(
+            "Provider family %r has incomplete caps; missing keys: %s. "
+            "This indicates someone bypassed register_provider and modified "
+            "_FAMILY_CAPABILITIES directly.",
+            family_name,
+            ", ".join(sorted(missing)),
         )
+    return {**_PARTIAL_CAPS_DEFAULTS, **caps}
 
 
 _custom_patterns: tuple[tuple[str, str], ...] | None = None
@@ -191,7 +187,7 @@ def register_provider(
 ) -> None:
     global _custom_patterns
     if caps is not None:
-        _validate_ranked_efforts(family, caps)
+        validate_family_caps(family, caps)
 
     entry = (pattern, family)
     if _custom_patterns:
@@ -199,7 +195,7 @@ def register_provider(
     else:
         _custom_patterns = (entry,)
     if caps is not None:
-        _FAMILY_CAPABILITIES[family] = caps
+        _FAMILY_CAPABILITIES[family] = dict(caps)
 
 
 def set_custom_patterns(patterns: Any) -> None:

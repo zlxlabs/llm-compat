@@ -93,6 +93,15 @@ _EFFORT_CLAMP_MATRIX: dict[str, dict[str, str | None]] = {
 }
 
 
+def _complete_custom_caps() -> dict[str, object]:
+    return {
+        "disable_mode": "na",
+        "efforts": frozenset({"low"}),
+        "supports_vision": True,
+        "json_mode": "json_object",
+    }
+
+
 class TestEffortClampMatrix:
     def test_covers_every_provider_family(self) -> None:
         assert set(_EFFORT_CLAMP_MATRIX) == set(providers._FAMILY_CAPABILITIES)
@@ -160,6 +169,110 @@ class TestCustomProviderEfforts:
             providers.register_provider("vendor-unranked-*", family, caps=caps)
 
         assert family not in providers._FAMILY_CAPABILITIES
+
+    @pytest.mark.parametrize(
+        "missing_key",
+        ["disable_mode", "efforts", "supports_vision", "json_mode"],
+    )
+    def test_register_rejects_each_missing_required_cap_without_state_change(
+        self, missing_key: str
+    ) -> None:
+        family = f"vendor_missing_{missing_key}"
+        caps = _complete_custom_caps()
+        caps.pop(missing_key)
+        before_patterns = providers._custom_patterns
+        before_caps = dict(providers._FAMILY_CAPABILITIES)
+
+        with pytest.raises(ValueError, match=rf"missing required caps keys:.*{missing_key}"):
+            providers.register_provider(f"{family}-*", family, caps=caps)
+
+        assert providers._custom_patterns == before_patterns
+        assert before_caps == providers._FAMILY_CAPABILITIES
+
+    @pytest.mark.parametrize(
+        ("field", "value", "error_fragment"),
+        [
+            ("disable_mode", "invalid", "invalid disable_mode"),
+            ("json_mode", "invalid", "invalid json_mode"),
+            ("supports_vision", "true", "non-bool supports_vision"),
+        ],
+    )
+    def test_register_rejects_invalid_cap_values(
+        self,
+        field: str,
+        value: object,
+        error_fragment: str,
+    ) -> None:
+        family = f"vendor_invalid_{field}"
+        caps = _complete_custom_caps()
+        caps[field] = value
+
+        with pytest.raises(ValueError, match=error_fragment):
+            providers.register_provider(f"{family}-*", family, caps=caps)
+
+        assert family not in providers._FAMILY_CAPABILITIES
+
+    def test_register_complete_caps_detects_provider_and_returns_caps(self) -> None:
+        family = "vendor_complete"
+        pattern_state = providers._custom_patterns
+        previous_caps = providers._FAMILY_CAPABILITIES.get(family)
+        caps = _complete_custom_caps()
+
+        try:
+            providers.register_provider("vendor-complete-*", family, caps=caps)
+
+            assert providers.detect_provider("vendor-complete-v1").family == family
+            assert providers.get_provider_caps(family) == caps
+        finally:
+            providers._custom_patterns = pattern_state
+            if previous_caps is None:
+                providers._FAMILY_CAPABILITIES.pop(family, None)
+            else:
+                providers._FAMILY_CAPABILITIES[family] = previous_caps
+
+    def test_register_isolates_callers_caps_dict(self) -> None:
+        family = "vendor_isolated"
+        pattern_state = providers._custom_patterns
+        previous_caps = providers._FAMILY_CAPABILITIES.get(family)
+        caps = _complete_custom_caps()
+
+        try:
+            providers.register_provider("vendor-isolated-*", family, caps=caps)
+            caps["json_mode"] = "json_schema"
+
+            assert providers.get_provider_caps(family)["json_mode"] == "json_object"
+        finally:
+            providers._custom_patterns = pattern_state
+            if previous_caps is None:
+                providers._FAMILY_CAPABILITIES.pop(family, None)
+            else:
+                providers._FAMILY_CAPABILITIES[family] = previous_caps
+
+    def test_register_without_caps_only_registers_pattern(self) -> None:
+        family = "vendor_pattern_only"
+        pattern_state = providers._custom_patterns
+        before_caps = dict(providers._FAMILY_CAPABILITIES)
+
+        try:
+            providers.register_provider("vendor-pattern-only-*", family)
+
+            assert providers.detect_provider("vendor-pattern-only-v1").family == family
+            assert before_caps == providers._FAMILY_CAPABILITIES
+        finally:
+            providers._custom_patterns = pattern_state
+
+    def test_set_custom_patterns_copies_input_sequence(self) -> None:
+        patterns = [["vendor-sequence-*", "deepseek"]]
+
+        providers.set_custom_patterns(patterns)
+        try:
+            patterns[0][0] = "mutated-*"
+            patterns.append(["another-*", "openai"])
+
+            assert providers.detect_provider("vendor-sequence-v1").family == "deepseek"
+            assert providers.detect_provider("mutated-v1").family == "openai"
+        finally:
+            providers.set_custom_patterns(None)
 
     def test_resolver_handles_unranked_effort_after_direct_capability_mutation(
         self, monkeypatch: pytest.MonkeyPatch
