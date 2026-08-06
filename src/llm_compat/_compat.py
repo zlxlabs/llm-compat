@@ -11,7 +11,12 @@ from .providers import (
 __all__ = ["normalize_reasoning_effort", "validate_config", "validate_fallback_config"]
 
 
-def validate_config(model: str, effort: str | None) -> list[str]:
+def validate_config(
+    model: str,
+    effort: str | None,
+    *,
+    strict: bool = False,
+) -> list[str]:
     effort = normalize_reasoning_effort(effort)
     if effort is None:
         return []
@@ -20,6 +25,13 @@ def validate_config(model: str, effort: str | None) -> list[str]:
     detection = detect_provider(model)
     family = detection.family
     caps = get_provider_caps(family)
+
+    if strict and not detection.matched:
+        warnings.append(
+            f"Model '{model}' did not match any known provider family; strict_unknown_models "
+            f"will drop reasoning_effort '{effort}' at runtime."
+        )
+        return warnings
 
     if effort == "disabled":
         mode = caps["disable_mode"]
@@ -49,6 +61,8 @@ def validate_config(model: str, effort: str | None) -> list[str]:
 
 def validate_fallback_config(
     config: dict[str, list[str]] | None,
+    *,
+    strict: bool = False,
 ) -> list[str]:
     if not config:
         return []
@@ -63,6 +77,8 @@ def validate_fallback_config(
         for fb_model in chain:
             fb_detection = detect_provider(fb_model)
             fb_caps = get_provider_caps(fb_detection.family)
+            if strict and not fb_detection.matched:
+                continue
             if fb_caps["supports_vision"]:
                 any_vision_fb = True
 

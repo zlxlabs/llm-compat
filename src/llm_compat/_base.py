@@ -157,6 +157,7 @@ class BaseClient:
         on_success: Callable[[str, int], None] | None = None,
         on_error: Callable[[str, Exception], None] | None = None,
         pre_request: Callable[[str], bool] | None = None,
+        strict_unknown_models: bool = False,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
@@ -202,6 +203,7 @@ class BaseClient:
         self._on_success = on_success
         self._on_error = on_error
         self._pre_request = pre_request
+        self._strict_unknown_models = strict_unknown_models
         self.stats = LLMStats()
 
     def _get_refusal_keywords(self) -> list[str] | None:
@@ -283,7 +285,12 @@ class BaseClient:
         base: dict[str, Any] = {"model": model, "messages": messages, **filtered_extra}
         if stream is not None:
             base["stream"] = stream
-        return build_request_payload(model, effort, base)
+        return build_request_payload(
+            model,
+            effort,
+            base,
+            strict=self._strict_unknown_models,
+        )
 
     def _extract_result(
         self,
@@ -558,7 +565,11 @@ class BaseClient:
             if sensitive.contains_any(texts):
                 self.stats.record_prescan_skip()
                 needs_vision = self._has_vision_content(messages)
-                effective_chain = filter_by_modality(chain, needs_vision=needs_vision)
+                effective_chain = filter_by_modality(
+                    chain,
+                    needs_vision=needs_vision,
+                    strict=self._strict_unknown_models,
+                )
                 if effective_chain:
                     models_to_try = effective_chain
                     prescan_skipped = True
@@ -755,7 +766,11 @@ class BaseClient:
 
                 if not chain or (current_model == models_to_try[-1]):
                     needs_vision = self._has_vision_content(messages)
-                    effective_chain = filter_by_modality(chain or [], needs_vision=needs_vision)
+                    effective_chain = filter_by_modality(
+                        chain or [],
+                        needs_vision=needs_vision,
+                        strict=self._strict_unknown_models,
+                    )
                     remaining_models = [
                         candidate
                         for candidate in effective_chain
@@ -884,6 +899,13 @@ class BaseClient:
         family = detection.family
         caps = get_provider_caps(family)
         json_mode = caps["json_mode"]
+        if self._strict_unknown_models and not detection.matched:
+            logger.warning(
+                "strict_unknown_models: model %r did not match any known provider family; "
+                "downgrading json_mode to 'json_object' instead of guessing support.",
+                model,
+            )
+            json_mode = "json_object"
 
         use_json_schema = not force_json_object and json_mode == "json_schema"
 
