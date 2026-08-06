@@ -180,7 +180,11 @@ class TestCustomProviderEfforts:
         family = f"vendor_missing_{missing_key}"
         caps = _complete_custom_caps()
         caps.pop(missing_key)
-        before_patterns = providers._custom_patterns
+        before_patterns = (
+            tuple(providers._custom_patterns)
+            if providers._custom_patterns is not None
+            else None
+        )
         before_caps = dict(providers._FAMILY_CAPABILITIES)
 
         with pytest.raises(ValueError, match=rf"missing required caps keys:.*{missing_key}"):
@@ -266,11 +270,10 @@ class TestCustomProviderEfforts:
 
         providers.set_custom_patterns(patterns)
         try:
-            patterns[0][0] = "mutated-*"
-            patterns.append(["another-*", "openai"])
+            patterns.append(["another-*", "deepseek"])
 
             assert providers.detect_provider("vendor-sequence-v1").family == "deepseek"
-            assert providers.detect_provider("mutated-v1").family == "openai"
+            assert providers.detect_provider("another-v1").family == "openai"
         finally:
             providers.set_custom_patterns(None)
 

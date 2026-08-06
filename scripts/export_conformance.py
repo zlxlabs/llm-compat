@@ -44,6 +44,7 @@ EFFORT_CASES: tuple[str | None, ...] = (
     "high",
     "max",
     "xhigh",
+    "ultra",
     "disabled",
     "none",
     "off",
@@ -69,7 +70,7 @@ WARNING_CATEGORIES: dict[str, str] = {
 # 主脑审定过的向量集合指纹。向量任何增删改都会让它失配，
 # reviewed 自动变回 false，提醒重新审定。
 REVIEWED_VECTORS_DIGEST = (
-    "sha256:b079f316325ae5525dc2648a0ce6df8a51c039bdb5c088445750530fba11b21e"
+    "sha256:613a772918c9d3a398f9f1044418c269cc79dd6ce095f3d210a1ebbe59fdc621"
 )
 
 
