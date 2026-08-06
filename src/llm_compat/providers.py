@@ -195,7 +195,14 @@ def register_provider(
     else:
         _custom_patterns = (entry,)
     if caps is not None:
-        _FAMILY_CAPABILITIES[family] = dict(caps)
+        # Caps values must be immutable scalars or explicitly normalized immutable
+        # containers; add any new fields here when the schema grows.
+        _FAMILY_CAPABILITIES[family] = {
+            "disable_mode": caps["disable_mode"],
+            "efforts": frozenset(caps["efforts"]),
+            "supports_vision": caps["supports_vision"],
+            "json_mode": caps["json_mode"],
+        }
 
 
 def set_custom_patterns(patterns: Any) -> None:
