@@ -70,7 +70,7 @@ WARNING_CATEGORIES: dict[str, str] = {
 # 主脑审定过的向量集合指纹。向量任何增删改都会让它失配，
 # reviewed 自动变回 false，提醒重新审定。
 REVIEWED_VECTORS_DIGEST = (
-    "sha256:613a772918c9d3a398f9f1044418c269cc79dd6ce095f3d210a1ebbe59fdc621"
+    "sha256:e14805c5facd9ee43ffd06cf282e99f46d39e695c842ac879badeeabd7338d7f"
 )
 
 
@@ -131,7 +131,7 @@ def _vectors_digest(vectors: list[dict[str, Any]]) -> str:
 
 def _id_part(value: str | None) -> str:
     if value is None:
-        return "none"
+        return "unset"
     if value == "":
         return "empty"
     if not value.strip():

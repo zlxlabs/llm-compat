@@ -252,6 +252,60 @@ class TestCustomProviderEfforts:
             else:
                 providers._FAMILY_CAPABILITIES[family] = previous_caps
 
+    def test_register_normalizes_mutable_efforts_snapshot(self) -> None:
+        family = "vendor_mutable_efforts"
+        pattern_state = providers._custom_patterns
+        previous_caps = providers._FAMILY_CAPABILITIES.get(family)
+        efforts = {"low"}
+        caps = _complete_custom_caps()
+        caps["efforts"] = efforts
+
+        try:
+            providers.register_provider("vendor-mutable-efforts-*", family, caps=caps)
+
+            stored = providers.get_provider_caps(family)
+            assert stored["efforts"] == frozenset({"low"})
+            assert isinstance(stored["efforts"], frozenset)
+
+            efforts.add("high")
+            efforts.clear()
+            efforts.discard("low")
+
+            assert providers.get_provider_caps(family)["efforts"] == frozenset({"low"})
+        finally:
+            providers._custom_patterns = pattern_state
+            if previous_caps is None:
+                providers._FAMILY_CAPABILITIES.pop(family, None)
+            else:
+                providers._FAMILY_CAPABILITIES[family] = previous_caps
+
+    @pytest.mark.parametrize(
+        "efforts",
+        [["low", "high"], ("low", "high")],
+        ids=["list", "tuple"],
+    )
+    def test_register_normalizes_sequence_efforts(
+        self, efforts: list[str] | tuple[str, ...]
+    ) -> None:
+        family = f"vendor_{type(efforts).__name__}_efforts"
+        pattern_state = providers._custom_patterns
+        previous_caps = providers._FAMILY_CAPABILITIES.get(family)
+        caps = _complete_custom_caps()
+        caps["efforts"] = efforts
+
+        try:
+            providers.register_provider(f"{family}-*", family, caps=caps)
+
+            stored = providers.get_provider_caps(family)["efforts"]
+            assert stored == frozenset(efforts)
+            assert isinstance(stored, frozenset)
+        finally:
+            providers._custom_patterns = pattern_state
+            if previous_caps is None:
+                providers._FAMILY_CAPABILITIES.pop(family, None)
+            else:
+                providers._FAMILY_CAPABILITIES[family] = previous_caps
+
     def test_register_without_caps_only_registers_pattern(self) -> None:
         family = "vendor_pattern_only"
         pattern_state = providers._custom_patterns
