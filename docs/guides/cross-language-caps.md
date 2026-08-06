@@ -11,7 +11,8 @@
   有什么能力”。
 - `conformance.json` 是 L1+L2 行为契约：每条向量给出模型名、`reasoning_effort` 和
   `strict` 输入，并规定应得到的 `family`、`matched`、请求体字段 `set` 和 warning 类别。
-  它回答“给定输入，翻译器必须产出什么”。当前文件包含 336 条向量。
+  它回答“给定输入，翻译器必须产出什么”。向量数量以 `conformance.json` 的
+  `vectors` 数组为准（当前为 360 条，随产物更新）。
 
 不要把 `caps.json` 中的 `families` 当成匹配结果：必须先按 `patterns` 得到 family，再
 读取该 family 的能力记录。
@@ -93,7 +94,7 @@ matcher，并用新的 conformance 向量验证。
 ## 3. 按 family 翻译参数
 
 匹配成功后，从 `caps.families[detection.family]` 读取能力。关闭思考时，读取
-`caps.disable_mode_semantics`，五种 `disable_mode` 的 wire 结果是：
+`caps.disable_mode_semantics`，各个 `disable_mode` 的 wire 结果是：
 
 | `disable_mode` | 要加入请求体的字段 |
 | --- | --- |
@@ -106,8 +107,8 @@ matcher，并用新的 conformance 向量验证。
 `reasoning_effort` 未设置（JSON `null`）时也返回 `{}`。`none`、`off`、`false` 是旧别名，
 应先归一化为 `disabled`；`conformance.json` 的 warning 向量会覆盖这些别名。
 
-不在 `caps.effort_rank` 中的 effort 值也不应原样发送或抛错；它们按 `high` 的 rank
-（当前为 3）参与下面的比较，并按同样的规则产生 clamp warning。比如请求未列举的
+不在 `caps.effort_rank` 中的 effort 值也不应原样发送或抛错；它们按
+`caps.effort_rank["high"]` 参与下面的比较，并按同样的规则产生 clamp warning。比如请求未列举的
 `"ultra"` 时，`deepseek` 会得到 `{"reasoning_effort":"high"}` 并记录向下 clamp
 warning；如果 family 的 `efforts` 为空（如 `openai_gpt4`），则丢弃字段并记录
 `effort_dropped_unsupported` warning。
@@ -120,7 +121,7 @@ warning；如果 family 的 `efforts` 为空（如 `openai_gpt4`），则丢弃�
    低于下限会向上钳制到最低档。
 4. family 的 `efforts` 为空时丢弃字段并记录 warning。
 
-例如 `deepseek` 的 `efforts` 是 `low/high/max/xhigh`，请求 `medium` 的 rank 为 2，
+例如 `deepseek` 的 `efforts` 是 `low/high/max/xhigh`，请求 `medium` 时，
 最近的更高支持档是 `high`，所以应发送 `{"reasoning_effort":"high"}`；请求 `xhigh`
 则原样发送。
 
@@ -144,7 +145,7 @@ Python 侧 `thinking` 与 `stream` 是保留键，调用方不能通过 `extra` 
 模式则丢弃 reasoning 字段并记录 warning。下游可以在落日志或配置检查时用
 `matched=false` 找出未知模型，而不能只看 `family`。
 
-## 4. 用 360 条向量自证实现
+## 4. 用 `conformance.json.vectors` 自证实现
 
 只有 `conformance.json.reviewed` 为 `true` 时，才把这批向量当作人工审定过的契约。读取
 每条向量的 `input`，运行自己的 normalize、detect 和 translate，然后至少精确比较：
