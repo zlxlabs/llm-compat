@@ -305,8 +305,29 @@ def resolve_effort_clamp(family: str, effort: str) -> str | None:
 #     ├─ nearest supported rank >= requested ───────────────────> reasoning_effort=clamped
 #     ├─ no higher rank ─────────────────────────────────────────> highest supported rank
 #     └─ no supported efforts ──────────────────────────────────> warn + {}
-def _translate(family: str, effort: str | None) -> dict[str, Any]:
+def _translate(
+    provider: str | ProviderDetection,
+    effort: str | None,
+    *,
+    strict: bool = False,
+    model: str | None = None,
+) -> dict[str, Any]:
+    detection = (
+        provider
+        if isinstance(provider, ProviderDetection)
+        else ProviderDetection(family=provider, matched=True)
+    )
+    family = detection.family
     if effort is None:
+        return {}
+
+    if strict and not detection.matched:
+        logger.warning(
+            "strict_unknown_models: model %r did not match any known provider family; "
+            "dropping reasoning_effort %r instead of guessing openai semantics.",
+            model if model is not None else family,
+            effort,
+        )
         return {}
 
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
@@ -367,11 +388,12 @@ def build_request_payload(
     reasoning_effort: str | None,
     base_payload: dict[str, Any],
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
+    *,
+    strict: bool = False,
 ) -> dict[str, Any]:
     reasoning_effort = normalize_reasoning_effort(reasoning_effort)
     detection = detect_provider(model, custom_patterns)
-    family = detection.family
-    translation = _translate(family, reasoning_effort)
+    translation = _translate(detection, reasoning_effort, strict=strict, model=model)
     return deep_merge_payload(base_payload, translation)
 
 

@@ -8,6 +8,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- 新增 `strict_unknown_models` client 构造参数，默认值为 `False`，不改变任何现有行为。
+  开启后，未匹配任何已知 provider family 的模型会丢弃全部 reasoning 参数、将 JSON 模式降级为
+  `json_object`，并从 vision fallback 链中移除。
+- 可通过 `detect_provider("your-model").matched` 判断模型是否匹配到已知 provider family。
+- 公开函数新增 `strict` 关键字参数：
+  `providers.build_request_payload`、`_compat.validate_config`、
+  `_compat.validate_fallback_config`、`fallback.filter_by_modality`。
+
 ### Changed
 
 - **BREAKING**：`detect_provider()` 的返回值从 `str` 改为 `ProviderDetection`。迁移时请逐项检查：
