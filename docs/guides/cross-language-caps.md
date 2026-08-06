@@ -26,7 +26,8 @@
 3. 用 Python `fnmatch` 语义匹配，首个命中就返回该项的 `family`，并令 `matched=true`。
 4. 全部不命中时返回 `family="openai"`、`matched=false`。
 
-数组顺序是契约的一部分，不能排序、去重或按 family 重组。当前文件中的完整顺序如下：
+数组顺序是契约的一部分，不能排序、去重或按 family 重组。内容以
+`caps.json.patterns` 为准；下表是当前 18 项的完整顺序，随产物更新：
 
 | 顺序 | pattern | family |
 | ---: | --- | --- |
