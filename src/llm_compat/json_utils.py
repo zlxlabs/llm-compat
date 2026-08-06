@@ -60,12 +60,21 @@ def _validate_json_schema_value(
         )
 
     enum_values = schema.get("enum")
-    if isinstance(enum_values, list) and not any(value == candidate for candidate in enum_values):
+    if (
+        isinstance(enum_values, list)
+        and not any(_json_values_equal(value, candidate) for candidate in enum_values)
+    ):
         raise ValueError(
             f"JSON schema validation failed at {path}: expected enum {enum_values!r}, "
             f"got {value!r}"
         )
 
+    if isinstance(value, list):
+        items_schema = schema.get("items")
+        if isinstance(items_schema, dict):
+            for index, item in enumerate(value):
+                _validate_json_schema_value(item, items_schema, f"{path}[{index}]")
+        return
     if not isinstance(value, dict):
         return
 
@@ -105,7 +114,10 @@ def _matches_json_schema_type(value: Any, schema_type: str) -> bool:
     if schema_type == "number":
         return isinstance(value, (int, float)) and not isinstance(value, bool)
     if schema_type == "integer":
-        return isinstance(value, int) and not isinstance(value, bool)
+        return (
+            (isinstance(value, int) and not isinstance(value, bool))
+            or (isinstance(value, float) and value.is_integer())
+        )
     if schema_type == "boolean":
         return isinstance(value, bool)
     if schema_type == "null":
@@ -127,6 +139,24 @@ def _json_value_type(value: Any) -> str:
     if isinstance(value, (int, float)):
         return "number"
     return type(value).__name__
+
+
+def _json_values_equal(left: Any, right: Any) -> bool:
+    left_type = _json_value_type(left)
+    if left_type != _json_value_type(right):
+        return False
+    if left_type == "number":
+        return bool(left == right)
+    if left_type == "array":
+        return len(left) == len(right) and all(
+            _json_values_equal(left_item, right_item)
+            for left_item, right_item in zip(left, right, strict=True)
+        )
+    if left_type == "object":
+        return left.keys() == right.keys() and all(
+            _json_values_equal(left[key], right[key]) for key in left
+        )
+    return bool(left == right)
 
 
 def _json_schema_field_path(parent: str, field_name: str) -> str:

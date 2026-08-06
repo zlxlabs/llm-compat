@@ -116,6 +116,61 @@ class TestParseJsonSchema:
                 self.schema,
             )
 
+    def test_enum_number_distinguishes_boolean_and_accepts_json_numbers(self) -> None:
+        schema = {"enum": [1, 2]}
+
+        assert parse_json_schema("1", schema) == 1
+        assert parse_json_schema("1.0", schema) == 1.0
+        with pytest.raises(ValueError, match="expected enum.*True"):
+            parse_json_schema("true", schema)
+
+    def test_enum_boolean_distinguishes_number(self) -> None:
+        schema = {"enum": [True]}
+
+        assert parse_json_schema("true", schema) is True
+        with pytest.raises(ValueError, match="expected enum.*1"):
+            parse_json_schema("1", schema)
+
+    def test_integer_accepts_integral_float_but_rejects_fraction_and_boolean(self) -> None:
+        schema = {"type": "integer"}
+
+        assert parse_json_schema("1", schema) == 1
+        assert parse_json_schema("1.0", schema) == 1.0
+        with pytest.raises(ValueError, match="expected integer.*number"):
+            parse_json_schema("1.5", schema)
+        with pytest.raises(ValueError, match="expected integer.*boolean"):
+            parse_json_schema("true", schema)
+
+    def test_array_items_validate_element_types_with_index_path(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {"tags": {"type": "array", "items": {"type": "string"}}},
+        }
+
+        assert parse_json_schema('{"tags":["a","b"]}', schema) == {"tags": ["a", "b"]}
+        with pytest.raises(ValueError, match=r"\$\.tags\[1\].*string.*number"):
+            parse_json_schema('{"tags":["a",1]}', schema)
+
+    def test_array_items_validate_nested_required_fields_with_index_path(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "records": {
+                    "type": "array",
+                    "items": {"type": "object", "required": ["x"]},
+                }
+            },
+        }
+
+        with pytest.raises(ValueError, match=r"\$\.records\[0\]\.x.*required.*missing"):
+            parse_json_schema('{"records":[{}]}', schema)
+
+    def test_array_without_items_accepts_any_array_values(self) -> None:
+        schema = {"type": "array"}
+        raw = '["text", 1, true, {"key": "value"}]'
+
+        assert parse_json_schema(raw, schema) == ["text", 1, True, {"key": "value"}]
+
     def test_unknown_keywords_are_ignored(self) -> None:
         schema = {
             "type": "object",
