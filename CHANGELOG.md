@@ -10,6 +10,10 @@
 
 ### Added
 
+- 新增跨语言共享产物 `caps.json`（provider 能力知识）和 `conformance.json`（336 条参数翻译
+  行为向量）；Bun/JS、Go 等下游可按[跨语言能力与契约指南](docs/guides/cross-language-caps.md)
+  读取 family 能力、实现参数翻译并运行向量自证。`conformance.json` 只有在 `reviewed=true`
+  时才可作为人工审定过的契约使用。
 - 新增 `strict_unknown_models` client 构造参数，默认值为 `False`，不改变任何现有行为。
   开启后，未匹配任何已知 provider family 的模型会丢弃全部 reasoning 参数、将 JSON 模式降级为
   `json_object`，并从 vision fallback 链中移除。

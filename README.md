@@ -103,6 +103,8 @@ uv run python scripts/probe_caps.py \
 ## 文档
 
 - **[接入指南](docs/guides/integration-guide.md)** — 完整 API 文档 + 配置参考 + 迁移指南
+- **[跨语言能力与契约指南](docs/guides/cross-language-caps.md)** — Bun/JS 或 Go 如何读取
+  `caps.json`、消费 `conformance.json`，并复现模型匹配与参数翻译。
 - **[RFC: 功能扩展](docs/rfcs/structured-output-and-extensions.md)** — 设计决策与路线图
 
 ## 包结构

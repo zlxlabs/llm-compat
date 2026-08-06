@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from llm_compat import providers
-from scripts.export_conformance import build_conformance_document, classify_warning
+from scripts.export_conformance import (
+    REVIEWED_VECTORS_DIGEST,
+    _vectors_digest,
+    build_conformance_document,
+    classify_warning,
+)
 
 
 CONFORMANCE_PATH = ROOT / "conformance.json"
@@ -79,3 +85,37 @@ def test_every_warning_category_is_covered() -> None:
     }
 
     assert set(categories) <= covered
+
+
+def test_every_provider_family_has_checked_in_conformance_coverage() -> None:
+    provider_families = set(providers._FAMILY_CAPABILITIES)
+    covered_families = {
+        vector["expect"]["family"]
+        for vector in VECTORS
+    }
+    missing_families = sorted(provider_families - covered_families)
+
+    assert not missing_families, (
+        "Missing checked-in conformance vector coverage for provider family: "
+        f"{', '.join(missing_families)}. "
+        "往 scripts/export_conformance.py 的 MODEL_CASES 加一个该 family 的代表模型。"
+    )
+
+
+def test_reviewed_vectors_digest_matches_checked_in_document() -> None:
+    assert _vectors_digest(VECTORS) == REVIEWED_VECTORS_DIGEST
+    assert CONFORMANCE_DOCUMENT["reviewed"] is True
+
+
+def test_changing_one_vector_invalidates_reviewed_digest() -> None:
+    changed_vectors = deepcopy(VECTORS)
+    changed_vectors[0]["id"] += "-changed"
+
+    assert _vectors_digest(changed_vectors) != REVIEWED_VECTORS_DIGEST
+
+
+def test_vectors_digest_is_insensitive_to_dict_key_order() -> None:
+    first = [{"outer": {"b": 2, "a": 1}, "value": "same"}]
+    second = [{"value": "same", "outer": {"a": 1, "b": 2}}]
+
+    assert _vectors_digest(first) == _vectors_digest(second)

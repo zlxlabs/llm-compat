@@ -201,3 +201,54 @@ issue #7 暴露了 DeepSeek 思考关闭的静默失效，第二轮 review 实�
 
 该决策对应 [issue #8](https://github.com/zlxlabs/llm-compat/issues/8) 与
 [issue #9](https://github.com/zlxlabs/llm-compat/issues/9)。
+
+---
+
+## 2026-08-06: T10 保留未知模型的 lenient openai 兜底
+
+**问题**: 未知模型在默认的 lenient 模式下，仍会按 `openai` 族兜底发送
+`reasoning_effort`。
+
+**决定**: 当前刻意保留这一行为，不改变默认值。下游有 10+ 个项目可能依赖现有行为；切换
+默认值前，必须先扫描这些项目里的模型名配置，确认哪些名称会落到未知分支。
+
+**风险**:
+
+- 不支持 `reasoning_effort` 的模型可能直接返回硬 400，上游 issue [#13](https://github.com/zlxlabs/llm-compat/issues/13)
+  已有实测；
+- 更糟的是网关不报错但忽略该参数，调用方会误以为推理档位已生效，形成静默错误。
+
+**缓解**:
+
+- `detect_provider(model).matched` 能区分真正命中的 family 与未知模型的 `openai` 兜底；
+- 开启 `strict_unknown_models=True` 可让未知模型丢弃 reasoning 参数，避免猜测 OpenAI 语义；
+- lenient 未知兜底和 strict 丢弃两条路径都会记录 WARNING，便于日志排查。
+
+**排查清单**:
+
+1. 汇总项目中的默认模型、fallback 模型、批处理/定时任务模型和测试配置，不要只扫描主
+   client 的一个默认值。
+2. 在配置加载完成后，用下面的脚本逐个调用 `detect_provider()`，只打印
+   `matched=False` 的名称；同一个名称去重后再逐项决定是补 pattern、改模型名，还是明确
+   保留未知兜底。
+3. 对每个未知名称确认目标网关是否接受 `reasoning_effort`；不能确认时先启用
+   `strict_unknown_models=True`，再单独验证模型能力。
+4. 扫描结果纳入配置变更检查；新增模型时同时补 provider pattern 或记录一次审查结论。
+
+下面的片段可以直接运行；把 `configured_model_names` 列表替换为项目实际收集到的完整配置
+即可：
+
+```python
+from llm_compat import detect_provider
+
+configured_model_names = [
+    "deepseek-v4-flash",
+    "gpt-5",
+    "vendor-model-from-config",
+]
+
+for model in sorted(set(configured_model_names)):
+    detection = detect_provider(model)
+    if not detection.matched:
+        print(f"UNKNOWN: {model!r} -> fallback family={detection.family!r}")
+```

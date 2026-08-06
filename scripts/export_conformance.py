@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import re
@@ -65,6 +66,13 @@ WARNING_CATEGORIES: dict[str, str] = {
 }
 
 
+# 主脑审定过的向量集合指纹。向量任何增删改都会让它失配，
+# reviewed 自动变回 false，提醒重新审定。
+REVIEWED_VECTORS_DIGEST = (
+    "sha256:b079f316325ae5525dc2648a0ce6df8a51c039bdb5c088445750530fba11b21e"
+)
+
+
 class _WarningCapture(logging.Handler):
     """Capture provider warnings without changing the provider implementation."""
 
@@ -107,6 +115,17 @@ def classify_warning(message: str) -> str:
 
 def _warning_categories(records: list[logging.LogRecord]) -> list[str]:
     return [classify_warning(record.getMessage()) for record in records]
+
+
+def _vectors_digest(vectors: list[dict[str, Any]]) -> str:
+    """Return a stable digest over the vector set, never over ``reviewed``."""
+    normalized = json.dumps(
+        vectors,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(normalized).hexdigest()}"
 
 
 def _id_part(value: str | None) -> str:
@@ -160,13 +179,19 @@ def build_conformance_document() -> dict[str, Any]:
         for strict in (False, True)
     ]
     vectors.sort(key=lambda vector: vector["id"])
+    reviewed = _vectors_digest(vectors) == REVIEWED_VECTORS_DIGEST
 
     return {
         "schema_version": 1,
         "generated_from": "src/llm_compat/providers.py",
         "generated_by": "scripts/export_conformance.py",
-        "reviewed": False,
-        "reviewed_note": "生成后待人工按覆盖轴审定；审定前不得作为跨语言契约使用。",
+        "reviewed": reviewed,
+        "reviewed_note": (
+            "当前向量集合指纹与已审定集合一致，已按覆盖轴人工审定，可作为跨语言契约使用。"
+            if reviewed
+            else "指纹与已审定集合不符，请重新按覆盖轴审定后更新 REVIEWED_VECTORS_DIGEST；"
+            "审定前不得作为跨语言契约使用。"
+        ),
         "semantics": {
             "translation": (
                 "只增不删：set 是要合并进请求体的字段，实现必须精确产出这些字段，不多不少。"
