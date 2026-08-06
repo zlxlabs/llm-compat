@@ -115,6 +115,36 @@ def test_unknown_family_keeps_unknown_caps_defaults() -> None:
     assert providers.get_provider_caps("nonexistent")["json_mode"] == "json_schema"
 
 
+def test_none_family_caps_are_returned_as_a_copy() -> None:
+    # Task-Id llm-compat-20260806-06: keep the return-copy invariant so a
+    # downstream in-place assignment cannot silently pollute _DEFAULT_CAPS.
+    caps = providers.get_provider_caps(None)
+    caps["json_mode"] = "json_object"
+
+    assert providers.get_provider_caps(None)["json_mode"] == "json_schema"
+
+
+def test_unknown_family_caps_are_returned_as_a_copy() -> None:
+    # Task-Id llm-compat-20260806-06: keep the return-copy invariant so a
+    # downstream in-place assignment cannot silently pollute _DEFAULT_CAPS.
+    caps = providers.get_provider_caps("nonexistent")
+    caps["json_mode"] = "json_object"
+
+    assert providers.get_provider_caps("nonexistent")["json_mode"] == "json_schema"
+
+
+def test_known_family_caps_are_returned_as_a_copy() -> None:
+    # Task-Id llm-compat-20260806-06: keep the merged caps result independent
+    # from _FAMILY_CAPABILITIES, whose mutation would affect later decisions.
+    family = "deepseek"
+    original_caps = dict(providers._FAMILY_CAPABILITIES[family])
+    caps = providers.get_provider_caps(family)
+    caps["supports_vision"] = True
+
+    assert providers.get_provider_caps(family)["supports_vision"] is False
+    assert providers._FAMILY_CAPABILITIES[family] == original_caps
+
+
 def test_explicit_custom_caps_override_partial_defaults() -> None:
     family = "bcme"
     pattern_state = providers._custom_patterns
