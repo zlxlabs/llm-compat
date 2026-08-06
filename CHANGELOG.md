@@ -10,10 +10,13 @@
 
 ### Added
 
-- 新增跨语言共享产物 `caps.json`（provider 能力知识）和 `conformance.json`（336 条参数翻译
-  行为向量）；Bun/JS、Go 等下游可按[跨语言能力与契约指南](docs/guides/cross-language-caps.md)
+- 新增跨语言共享产物 `caps.json`（provider 能力知识）和 `conformance.json`（其中 `vectors` 当前为 360 条，
+  数量随产物更新；以 JSON 的 `vectors` 数组为准）的参数翻译行为向量；Bun/JS、Go 等下游
+  可按[跨语言能力与契约指南](docs/guides/cross-language-caps.md)
   读取 family 能力、实现参数翻译并运行向量自证。`conformance.json` 只有在 `reviewed=true`
-  时才可作为人工审定过的契约使用。
+  时才可作为人工审定过的契约使用。family、pattern 和 warning 类别的清单与数量分别以
+  `caps.json` 的 `families`、`patterns` 和 `conformance.json` 的 `warning_categories` 字段为准，
+  随产物更新。
 - 新增 `strict_unknown_models` client 构造参数，默认值为 `False`，不改变任何现有行为。
   开启后，未匹配任何已知 provider family 的模型会丢弃全部 reasoning 参数、将 JSON 模式降级为
   `json_object`，并从 vision fallback 链中移除。
@@ -27,11 +30,16 @@
 - **Breaking**：`register_provider(..., caps=...)` 现在会在注册时按完整 caps schema 校验能力记录。
   以前只给 `efforts` 的调用会从运行时崩溃改为立即抛出 `ValueError`，例如
   `register_provider("acme-*", "acme", caps={"efforts": frozenset({"low"})})` 会因缺少
-  `disable_mode`、`supports_vision` 和 `json_mode` 报错。正确写法是提供四个必需键：
+  `disable_mode`、`supports_vision` 和 `json_mode` 报错。正确写法是提供 `caps.json` 的
+  `schema.required` 中列出的必需键：
   `register_provider("acme-*", "acme", caps={"disable_mode": "na", "efforts": frozenset({"low"}),
   "supports_vision": True, "json_mode": "json_object"})`。`disable_mode` 与 `json_mode` 的合法
-  枚举值、四个必需键、字段类型以及 `efforts` 的允许值，请查阅 `caps.json` 的 `enums` 与
+  枚举值、`schema.required` 中的必需键、字段类型以及 `efforts` 的允许值，请查阅 `caps.json` 的 `enums` 与
   `schema` 节（`efforts` 的允许值是 `effort_rank` 的键）。
+- `register_provider(..., caps=...)` 现在保存调用方 caps dict 的浅拷贝。注册后再修改原 dict
+  以热更新能力表的旧写法不再生效，且不会报错；请构造新的 caps dict，再次调用
+  `register_provider()`。这是浅拷贝，因此嵌套值（例如 `efforts` 的 `frozenset`）仍共享引用；
+  但 `frozenset` 不可变，实践上无影响。
 - **BREAKING**：`detect_provider()` 的返回值从 `str` 改为 `ProviderDetection`。迁移时请逐项检查：
   - `detect_provider(m) == "deepseek"` → `detect_provider(m).family == "deepseek"`。
   - `detect_provider(m) in {"deepseek", "openai"}` 或把结果作为 dict key → 先取
