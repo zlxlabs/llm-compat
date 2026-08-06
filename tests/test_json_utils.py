@@ -4,7 +4,11 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from llm_compat.json_utils import parse_json, parse_json_model, pydantic_to_json_schema
+from llm_compat.json_utils import (
+    parse_json,
+    parse_json_model,
+    pydantic_to_json_schema,
+)
 
 
 class TagResult(BaseModel):
