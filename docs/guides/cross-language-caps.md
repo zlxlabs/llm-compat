@@ -4,6 +4,29 @@
 或 Go 中实现参数翻译的工程师。两份文件都是 JSON；跨语言实现只需要复现下面的匹配、翻译
 和向量比对规则。
 
+## 怎么获取这两份文件
+
+`caps.json` 和 `conformance.json` **不随 Python wheel 分发**。Python 侧从不回读这两份
+文件，`src/llm_compat/providers.py` 中的模块级能力常量才是运行时真相源；这两个 JSON
+是从源码导出的产物，不是 Python 运行时资源。真正需要它们的是不安装 Python wheel 的
+Bun/JS、Go 等跨语言消费者，因此把 JSON 打进 wheel 只是无用负担，还可能误导使用者以为
+Python 会读取它们、修改 JSON 就能改变 Python 行为。
+
+当前请直接从 GitHub 仓库获取，并将 URL 中的 ref 固定为具体 release tag 或完整 commit
+SHA，不要使用会漂移的 `main`。例如：
+
+```text
+https://raw.githubusercontent.com/zlxlabs/llm-compat/<tag-or-full-commit-sha>/caps.json
+https://raw.githubusercontent.com/zlxlabs/llm-compat/<tag-or-full-commit-sha>/conformance.json
+```
+
+正式的版本化分发（Release asset + 版本化 URL）属于后续增量，届时会更新本节。在此之前，
+跨语言消费者应自行 vendoring 两份文件，并记录来源 commit，确保实现与契约版本对应。
+
+修改 JSON **不会改变 Python 侧行为**。Python 消费者要调整运行时能力表，应在进程内使用
+`register_provider()` 注册新的能力记录，或提 PR 修改 `src/llm_compat/providers.py`；
+不要把直接改 JSON 当作 Python 配置入口。
+
 ## 两份文件分别是什么
 
 - `caps.json` 是 L1 知识：模型名如何匹配到 provider family，以及每个 family 支持哪些
