@@ -332,6 +332,7 @@ class TestCredentialsAndRequests:
 
     def test_missing_environment_key_exits_without_sending_request(
         self,
+        httpx_mock: HTTPXMock,
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
@@ -343,6 +344,7 @@ class TestCredentialsAndRequests:
 
         assert exit_code == 2
         assert "LLM_API_KEY" in capsys.readouterr().err
+        assert not httpx_mock.get_requests()
 
     def test_inline_api_key_is_rejected_without_echoing_value(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

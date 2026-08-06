@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from llm_compat import providers
-from scripts.export_conformance import build_conformance_document, classify_warning
+from scripts.export_conformance import (
+    REVIEWED_VECTORS_DIGEST,
+    _vectors_digest,
+    build_conformance_document,
+    classify_warning,
+)
 
 
 CONFORMANCE_PATH = ROOT / "conformance.json"
@@ -79,3 +85,22 @@ def test_every_warning_category_is_covered() -> None:
     }
 
     assert set(categories) <= covered
+
+
+def test_reviewed_vectors_digest_matches_checked_in_document() -> None:
+    assert _vectors_digest(VECTORS) == REVIEWED_VECTORS_DIGEST
+    assert CONFORMANCE_DOCUMENT["reviewed"] is True
+
+
+def test_changing_one_vector_invalidates_reviewed_digest() -> None:
+    changed_vectors = deepcopy(VECTORS)
+    changed_vectors[0]["id"] += "-changed"
+
+    assert _vectors_digest(changed_vectors) != REVIEWED_VECTORS_DIGEST
+
+
+def test_vectors_digest_is_insensitive_to_dict_key_order() -> None:
+    first = [{"outer": {"b": 2, "a": 1}, "value": "same"}]
+    second = [{"value": "same", "outer": {"a": 1, "b": 2}}]
+
+    assert _vectors_digest(first) == _vectors_digest(second)

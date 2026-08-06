@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_from": "src/llm_compat/providers.py",
   "generated_by": "scripts/export_conformance.py",
-  "reviewed": false,
-  "reviewed_note": "生成后待人工按覆盖轴审定；审定前不得作为跨语言契约使用。",
+  "reviewed": true,
+  "reviewed_note": "当前向量集合指纹与已审定集合一致，已按覆盖轴人工审定，可作为跨语言契约使用。",
   "semantics": {
     "translation": "只增不删：set 是要合并进请求体的字段，实现必须精确产出这些字段，不多不少。",
     "comparison": "exact"
