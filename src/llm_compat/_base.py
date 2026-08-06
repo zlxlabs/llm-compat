@@ -403,7 +403,8 @@ class BaseClient:
         remaining_timeout: float | None = None,
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
-        provider = detect_provider(model)
+        detection = detect_provider(model)
+        provider = detection.family
         payload = self._build_payload(model, messages, reasoning_effort, **extra)
         self._log_single_chat(payload, request_id, messages)
 
@@ -435,7 +436,8 @@ class BaseClient:
         remaining_timeout: float | None = None,
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
-        provider = detect_provider(model)
+        detection = detect_provider(model)
+        provider = detection.family
         working_messages = list(messages)
         attempts = 0
         fallback_to_json_object = False
@@ -592,7 +594,7 @@ class BaseClient:
             if remaining <= 0 and attempted:
                 break
 
-            current_provider = detect_provider(current_model)
+            current_provider = detect_provider(current_model).family
 
             if attempted:
                 trace.add_route_decision(
@@ -878,9 +880,10 @@ class BaseClient:
         force_json_object: bool = False,
         **extra: Any,
     ) -> tuple[dict[str, Any], str, list[dict[str, Any]]]:
-        family = detect_provider(model)
+        detection = detect_provider(model)
+        family = detection.family
         caps = get_provider_caps(family)
-        json_mode = caps.get("json_mode", "json_object")
+        json_mode = caps["json_mode"]
 
         use_json_schema = not force_json_object and json_mode == "json_schema"
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .providers import (
     detect_provider,
+    detect_provider_for_pattern,
     get_provider_caps,
     normalize_reasoning_effort,
     resolve_effort_clamp,
@@ -16,7 +17,8 @@ def validate_config(model: str, effort: str | None) -> list[str]:
         return []
 
     warnings: list[str] = []
-    family = detect_provider(model)
+    detection = detect_provider(model)
+    family = detection.family
     caps = get_provider_caps(family)
 
     if effort == "disabled":
@@ -53,15 +55,15 @@ def validate_fallback_config(
 
     warnings: list[str] = []
     for pattern, chain in config.items():
-        primary_family = detect_provider(pattern.replace("*", "x").replace("?", "x"))
-        primary_caps = get_provider_caps(primary_family)
-        primary_has_vision = primary_caps.get("supports_vision", True)
+        primary_detection = detect_provider_for_pattern(pattern)
+        primary_caps = get_provider_caps(primary_detection.family if primary_detection else None)
+        primary_has_vision = primary_caps["supports_vision"]
         any_vision_fb = False
 
         for fb_model in chain:
-            fb_family = detect_provider(fb_model)
-            fb_caps = get_provider_caps(fb_family)
-            if fb_caps.get("supports_vision", True):
+            fb_detection = detect_provider(fb_model)
+            fb_caps = get_provider_caps(fb_detection.family)
+            if fb_caps["supports_vision"]:
                 any_vision_fb = True
 
         if primary_has_vision and not any_vision_fb and chain:
