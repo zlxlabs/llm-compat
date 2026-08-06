@@ -10,8 +10,22 @@
 
 ### Changed
 
-- **BREAKING**：`detect_provider()` 的返回值从 `str` 改为 `ProviderDetection`；下游需要读取
-  `.family` 获取原来的 provider 字符串。
+- **BREAKING**：`detect_provider()` 的返回值从 `str` 改为 `ProviderDetection`。迁移时请逐项检查：
+  - `detect_provider(m) == "deepseek"` → `detect_provider(m).family == "deepseek"`。
+  - `detect_provider(m) in {"deepseek", "openai"}` 或把结果作为 dict key → 先取
+    `detect_provider(m).family`。
+  - `json.dumps(detect_provider(m))` → 会抛 `TypeError`；改为
+    `json.dumps(detect_provider(m).family)`。
+  - f-string、`str()` 或日志格式化 → 现在会输出
+    `ProviderDetection(family=..., matched=...)` 而不是族名；改为格式化
+    `detect_provider(m).family`。
+  - `sorted()` 或直接比较排序 → `ProviderDetection` 未定义序关系；改为使用
+    `.family`，或显式提供 `key=lambda detection: detection.family`。
+  - pickle 或跨进程传递 → 返回类型已变化；需要保持字符串协议时，先取并传递
+    `.family`。
+  - `get_provider_caps(...)` 返回的是副本，就地覆盖其键值会静默失效；需要修改自定义能力时，
+    改用 `register_provider(..., caps=...)`。
+  - 新增能力：`.matched` 可区分真正匹配到已知 family 与未知模型兜底到 `openai` family。
 
 ## [0.8.0] - 2026-08-05
 
