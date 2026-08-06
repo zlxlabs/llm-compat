@@ -29,7 +29,6 @@ from .fallback import filter_by_modality, resolve_fallback_chain
 from .json_utils import (
     parse_json,
     parse_json_model,
-    parse_json_schema,
     pydantic_to_json_schema,
 )
 from .providers import (
@@ -383,31 +382,6 @@ class BaseClient:
             )
         return [{"role": "user", "content": content}]
 
-    def _parse_json_result(
-        self,
-        result: ChatResult,
-        model: str,
-        schema: type[T] | None = None,
-        json_schema: dict[str, Any] | None = None,
-    ) -> ChatResult:
-        raw = result.content
-        try:
-            if schema is not None:
-                parsed = parse_json_model(raw, schema)
-            elif json_schema is not None:
-                parsed = parse_json_schema(raw, json_schema)
-            else:
-                parsed = parse_json(raw)
-        except (ValueError, Exception) as e:
-            raise JSONParseError(
-                str(e),
-                raw_content=raw,
-                model=model,
-                request_id=result.request_id,
-            ) from e
-        result.parsed = parsed
-        return result
-
     def _simple_attempt(
         self,
         model: str,
@@ -497,8 +471,6 @@ class BaseClient:
             try:
                 if schema is not None:
                     parsed = parse_json_model(result.content, schema)
-                elif json_schema is not None:
-                    parsed = parse_json_schema(result.content, json_schema)
                 else:
                     parsed = parse_json(result.content)
                 result.parsed = parsed
@@ -963,6 +935,13 @@ class BaseClient:
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
         from functools import partial
+
+        if json_schema is not None and schema is None:
+            logger.warning(
+                "chat_json received json_schema without schema; response values will not be "
+                "structurally validated. Use schema=<PydanticModel> to enable response validation."
+            )
+
         attempt_fn = partial(
             self._json_attempt,
             schema=schema, json_schema=json_schema,

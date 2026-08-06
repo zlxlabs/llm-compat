@@ -75,6 +75,10 @@ print(result.parsed)  # dict, 如 {"name": "Python"}
 
 同时传 `schema` + `json_schema` 时，`json_schema` 优先用于 API 的 `response_format`，`schema` 用于反序列化。
 
+只传 `json_schema` 时，`json_schema` 仅用于 API 请求侧的 `response_format`，返回的 `parsed` 字典不会在本地做结构校验。
+如果需要校验返回值，请传入 `schema=<PydanticModel>`；库会用该模型反序列化并校验结果。只传 `json_schema` 时，库会打一条
+warning 明确提示这一限制。
+
 #### 不传 Schema
 
 只保证返回合法 JSON，不约束结构：

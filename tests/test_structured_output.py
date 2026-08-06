@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -21,22 +22,6 @@ class TagResult(BaseModel):
 class ScoreResult(BaseModel):
     name: str
     score: float
-
-
-CUSTOM_SCHEMA = {
-    "type": "object",
-    "required": ["name", "score"],
-    "properties": {
-        "name": {"type": "string"},
-        "score": {"type": "number"},
-    },
-}
-
-ENUM_SCHEMA = {
-    "type": "object",
-    "required": ["status"],
-    "properties": {"status": {"type": "string", "enum": ["ready", "failed"]}},
-}
 
 
 def _chat_response(content: str, *, model: str = "gpt-4o") -> dict:
@@ -90,22 +75,70 @@ class TestResponseFormatInjection:
         body = json.loads(request.content)
         assert body["response_format"] == {"type": "json_object"}
 
+    async def test_json_schema_without_pydantic_schema_warns_once(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response("not valid json"))
+        httpx_mock.add_response(json=_chat_response('{"unvalidated": true}'))
+        with caplog.at_level(logging.WARNING, logger="llm_compat._base"):
+            async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+                result = await client.chat_json(
+                    "gpt-5-mini",
+                    [{"role": "user", "content": "json"}],
+                    json_schema={"type": "object", "required": ["name"]},
+                    self_correction=True,
+                    max_retries=1,
+                )
+
+        assert result.parsed == {"unvalidated": True}
+        warnings = [
+            record.getMessage()
+            for record in caplog.records
+            if "json_schema without schema" in record.getMessage()
+        ]
+        assert len(warnings) == 1
+        assert "will not be structurally validated" in warnings[0]
+        assert "schema=<PydanticModel>" in warnings[0]
+
     async def test_explicit_json_schema_overrides_pydantic(self, httpx_mock: HTTPXMock) -> None:
         """json_schema dict takes precedence over Pydantic schema (on capable providers)."""
         custom_schema = {"type": "object", "properties": {"x": {"type": "integer"}}}
         httpx_mock.add_response(json=_chat_response('{"tags": ["a"]}'))
         async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            await client.chat_json(
+            result = await client.chat_json(
                 "gpt-5-mini",
                 [{"role": "user", "content": "test"}],
                 schema=TagResult,
                 json_schema=custom_schema,
             )
+        assert isinstance(result.parsed, TagResult)
         request = httpx_mock.get_request()
         body = json.loads(request.content)
         rf = body["response_format"]
         assert rf["type"] == "json_schema"
         assert rf["json_schema"]["schema"] == custom_schema
+
+    async def test_json_schema_request_and_pydantic_response_contracts_are_separate(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        request_schema = {
+            "type": "object",
+            "required": ["request_field"],
+            "properties": {"request_field": {"type": "string"}},
+        }
+        httpx_mock.add_response(json=_chat_response('{"tags":["a"]}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            result = await client.chat_json(
+                "gpt-5-mini",
+                [{"role": "user", "content": "test"}],
+                schema=TagResult,
+                json_schema=request_schema,
+            )
+
+        assert isinstance(result.parsed, TagResult)
+        request = httpx_mock.get_request()
+        body = json.loads(request.content)
+        assert body["response_format"]["json_schema"]["schema"] == request_schema
 
     async def test_json_schema_dict_respects_provider_caps(self, httpx_mock: HTTPXMock) -> None:
         """json_schema dict falls back to json_object when provider doesn't support json_schema."""
@@ -122,72 +155,6 @@ class TestResponseFormatInjection:
         assert body["response_format"] == {"type": "json_object"}
         last_user_msg = [m for m in body["messages"] if m["role"] == "user"][-1]
         assert '"x"' in last_user_msg["content"]
-
-    async def test_json_schema_dict_validates_required_field(self, httpx_mock: HTTPXMock) -> None:
-        httpx_mock.add_response(json=_chat_response('{"score": 1}'))
-        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            with pytest.raises(JSONParseError, match="name.*required.*missing"):
-                await client.chat_json(
-                    "gpt-5-mini",
-                    [{"role": "user", "content": "test"}],
-                    json_schema=CUSTOM_SCHEMA,
-                )
-
-    async def test_json_schema_dict_validates_property_type(self, httpx_mock: HTTPXMock) -> None:
-        httpx_mock.add_response(json=_chat_response('{"name":"Ada","score":"1"}'))
-        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            with pytest.raises(JSONParseError, match="score.*number.*string"):
-                await client.chat_json(
-                    "gpt-5-mini",
-                    [{"role": "user", "content": "test"}],
-                    json_schema=CUSTOM_SCHEMA,
-                )
-
-    async def test_json_schema_dict_validates_enum(self, httpx_mock: HTTPXMock) -> None:
-        httpx_mock.add_response(json=_chat_response('{"status":"unknown"}'))
-        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            with pytest.raises(JSONParseError, match="status.*enum.*unknown"):
-                await client.chat_json(
-                    "gpt-5-mini",
-                    [{"role": "user", "content": "test"}],
-                    json_schema=ENUM_SCHEMA,
-                )
-
-    async def test_json_schema_dict_self_correction_in_json_schema_mode(
-        self, httpx_mock: HTTPXMock
-    ) -> None:
-        httpx_mock.add_response(json=_chat_response('{"score": 1}'))
-        httpx_mock.add_response(json=_chat_response('{"name":"Ada","score":1}'))
-        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            result = await client.chat_json(
-                "gpt-5-mini",
-                [{"role": "user", "content": "test"}],
-                json_schema=CUSTOM_SCHEMA,
-                self_correction=True,
-                max_retries=1,
-            )
-
-        assert result.parsed == {"name": "Ada", "score": 1}
-        assert client.stats.json_parse_failures == 1
-        assert client.stats.json_self_correction_success == 1
-
-    async def test_json_schema_dict_self_correction_in_json_object_mode(
-        self, httpx_mock: HTTPXMock
-    ) -> None:
-        httpx_mock.add_response(json=_chat_response('{"score": 1}'))
-        httpx_mock.add_response(json=_chat_response('{"name":"Ada","score":1}'))
-        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
-            result = await client.chat_json(
-                "deepseek-v4",
-                [{"role": "user", "content": "test"}],
-                json_schema=CUSTOM_SCHEMA,
-                self_correction=True,
-                max_retries=1,
-            )
-
-        assert result.parsed == {"name": "Ada", "score": 1}
-        assert client.stats.json_parse_failures == 1
-        assert client.stats.json_self_correction_success == 1
 
     async def test_json_stats_tracked(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response('{"tags": ["a"]}'))

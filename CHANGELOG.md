@@ -25,13 +25,11 @@
   `providers.build_request_payload`、`_compat.validate_config`、
   `_compat.validate_fallback_config`、`fallback.filter_by_modality`。
 
-### Fixed
-
-- 修复 `chat_json(json_schema={...})` 对字典 JSON Schema 只解析 JSON、不校验返回结构的问题；现在会校验
-  `type`、`required`、`properties`、`enum` 及嵌套对象，并在失败时触发既有的 self-correction 流程。
-
 ### Changed
 
+- 明确 `chat_json()` 中 `json_schema` 与 `schema` 的职责分工：`json_schema` 用于 API 请求侧的
+  `response_format`，`schema` 用于返回值反序列化与校验。只传 `json_schema` 时不会做返回值结构校验，
+  库会打一条 warning；需要校验请传入 `schema=<PydanticModel>`。
 - **Breaking**：`register_provider(..., caps=...)` 现在会在注册时按完整 caps schema 校验能力记录。
   以前只给 `efforts` 的调用会从运行时崩溃改为立即抛出 `ValueError`，例如
   `register_provider("acme-*", "acme", caps={"efforts": frozenset({"low"})})` 会因缺少
