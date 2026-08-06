@@ -936,6 +936,19 @@ class BaseClient:
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
         from functools import partial
 
+        # 职责分工（见 docs/guides/integration-guide.md）：
+        #   json_schema -> 请求侧，进 API 的 response_format
+        #   schema      -> 响应侧，负责反序列化与结构校验
+        #
+        # 只传 json_schema 时本库不做本地结构校验，这是有意的取舍而非遗漏。
+        # 曾尝试在此手写一个 JSON Schema 子集校验器，两轮门禁主审各抓出 2 条 major，
+        # finding 全部落在同一边界——子集覆盖范围（enum 的跨类型相等、integer 对
+        # 无小数部分 float 的接纳、array 的 items、type 的数组形式、anyOf/$ref 下
+        # 部分应用约束导致误拒）。根因在接口契约层：「校验 JSON Schema」这个承诺的
+        # 边界无法在零重依赖约束（本库核心只依赖 httpx）下被正确划定。
+        #
+        # 因此改为「不校验，但不静默」：打一条 warning 让调用方明确知道这一限制。
+        # 本仓 P1 红线是「结果错但不报错」，warning 消除的正是其中的「不报错」。
         if json_schema is not None and schema is None:
             logger.warning(
                 "chat_json received json_schema without schema; response values will not be "
