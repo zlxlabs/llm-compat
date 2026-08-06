@@ -72,7 +72,8 @@ function fnmatchCurrent(text: string, pattern: string): boolean {
     .split("*")
     .map(escapeRegex)
     .join(".*");
-  return new RegExp(`^${regexSource}$`).test(text);
+  // Python fnmatch 的 * 也匹配换行；s flag 让正则中的 . 保持同样语义。
+  return new RegExp(`^${regexSource}$`, "s").test(text);
 }
 
 function detectProvider(model: string, caps: CapsDocument): Detection {
@@ -105,6 +106,12 @@ matcher，并用新的 conformance 向量验证。
 `reasoning_effort` 未设置（JSON `null`）时也返回 `{}`。`none`、`off`、`false` 是旧别名，
 应先归一化为 `disabled`；`conformance.json` 的 warning 向量会覆盖这些别名。
 
+不在 `caps.effort_rank` 中的 effort 值也不应原样发送或抛错；它们按 `high` 的 rank
+（当前为 3）参与下面的比较，并按同样的规则产生 clamp warning。比如请求未列举的
+`"ultra"` 时，`deepseek` 会得到 `{"reasoning_effort":"high"}` 并记录向下 clamp
+warning；如果 family 的 `efforts` 为空（如 `openai_gpt4`），则丢弃字段并记录
+`effort_dropped_unsupported` warning。
+
 其他 effort 值按 `caps.effort_rank` 的数值比较：
 
 1. family 已支持该值时原样发送。
@@ -117,11 +124,27 @@ matcher，并用新的 conformance 向量验证。
 最近的更高支持档是 `high`，所以应发送 `{"reasoning_effort":"high"}`；请求 `xhigh`
 则原样发送。
 
+### `set` 的深合并与保留键
+
+向量中的 `expect.set` 是要递归合并进既有请求体的字段，不是替换整个请求体。两边同名
+key 且值都是 object 时，逐键合并；其他冲突则由 `set` 的值胜出。例如：
+
+```text
+base = {"provider": {"region": "cn", "timeout": 30}}
+set  = {"provider": {"timeout": 60, "retry": 2}}
+结果 = {"provider": {"region": "cn", "timeout": 60, "retry": 2}}
+```
+
+Python 侧 `thinking` 与 `stream` 是保留键，调用方不能通过 `extra` 传入，因此当前实现中
+`translation` 产出的 `thinking` 与既有同名嵌套 dict 冲突的递归分支不可达。跨语言实现若
+允许调用方传入这些字段，必须仍实现上述深合并，才能与 Python 的请求合并语义等价；更
+推荐直接照搬保留键设计，行为更简单、也更可预测。
+
 未知模型的 `matched=false` 也要保留：lenient（默认）模式按 `openai` 族翻译，strict
 模式则丢弃 reasoning 字段并记录 warning。下游可以在落日志或配置检查时用
 `matched=false` 找出未知模型，而不能只看 `family`。
 
-## 4. 用 336 条向量自证实现
+## 4. 用 360 条向量自证实现
 
 只有 `conformance.json.reviewed` 为 `true` 时，才把这批向量当作人工审定过的契约。读取
 每条向量的 `input`，运行自己的 normalize、detect 和 translate，然后至少精确比较：
@@ -166,17 +189,28 @@ Go 实现使用 `encoding/json` 读取同样的结构，比较 map 时也必须�
 
 ## 6. 版本、来源与网关边界
 
-当前 checked-in 两份文件对应 commit
-`d69bf307140644e6402d5d0bf32e0d1967095c98`（短 SHA：`d69bf30`）中的
-`src/llm_compat/providers.py`，由 `scripts/export_caps.py` 与
-`scripts/export_conformance.py` 导出，JSON 的 `schema_version` 为 1。升级 provider 规则
-或导出器后，应随同代码提交重新生成的两份文件，并在消费方 pin 到同一个 commit/版本。
+当前 checked-in 两份文件的来源以各自 JSON 中的 `generated_from` 与 `generated_by` 字段
+为准：它们分别指向 provider 源文件和对应的导出脚本；两份 JSON 应与本仓同一次提交中的
+源代码同步，`schema_version` 当前为 1。升级 provider 规则或导出器后，应随同代码提交
+重新生成的两份文件。消费方应 pin 到 release tag 或具体 commit，而不是抄本文档里某个
+会腐烂的 SHA。
 
 `caps.json.gateway.kind` 为 `new-api` 很重要：其中的能力值是通过 New API 代理实际观测到
 的 wire 行为，不是模型的固有属性。同一个模型换到另一个网关后，字段可能被转换、忽略或
 拒绝，必须重新探测、审定并生成新的 caps/conformance 产物。
 
-## 7. CI 防漂移闸
+## 7. 不在本契约内的东西
+
+下面三项是 Python 侧进程内的运行时 API，不属于跨语言契约，跨语言消费者不需要复刻：
+
+- `custom_patterns` 参数：它是 Python 调用时临时覆盖匹配顺序的运行时扩展，不写入
+  `caps.json` 或 `conformance.json`。
+- `register_provider` 注册的自定义 family：它修改当前 Python 进程的内存状态；跨语言
+  消费者应直接修改自己持有的 caps 数据，并重新生成或维护对应向量。
+- `describe_from_payload` 的输出：这是 Python 侧诊断/描述结果，不参与请求翻译，也没有
+  契约字段表示。
+
+## 8. CI 防漂移闸
 
 仓库已有两条 pytest 闸：`tests/test_export_caps.py` 的
 `test_checked_in_caps_matches_export` 和 `tests/test_conformance.py` 的
