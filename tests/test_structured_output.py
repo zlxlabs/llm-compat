@@ -23,6 +23,22 @@ class ScoreResult(BaseModel):
     score: float
 
 
+CUSTOM_SCHEMA = {
+    "type": "object",
+    "required": ["name", "score"],
+    "properties": {
+        "name": {"type": "string"},
+        "score": {"type": "number"},
+    },
+}
+
+ENUM_SCHEMA = {
+    "type": "object",
+    "required": ["status"],
+    "properties": {"status": {"type": "string", "enum": ["ready", "failed"]}},
+}
+
+
 def _chat_response(content: str, *, model: str = "gpt-4o") -> dict:
     return {
         "id": "chatcmpl-123",
@@ -106,6 +122,72 @@ class TestResponseFormatInjection:
         assert body["response_format"] == {"type": "json_object"}
         last_user_msg = [m for m in body["messages"] if m["role"] == "user"][-1]
         assert '"x"' in last_user_msg["content"]
+
+    async def test_json_schema_dict_validates_required_field(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(json=_chat_response('{"score": 1}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            with pytest.raises(JSONParseError, match="name.*required.*missing"):
+                await client.chat_json(
+                    "gpt-5-mini",
+                    [{"role": "user", "content": "test"}],
+                    json_schema=CUSTOM_SCHEMA,
+                )
+
+    async def test_json_schema_dict_validates_property_type(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(json=_chat_response('{"name":"Ada","score":"1"}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            with pytest.raises(JSONParseError, match="score.*number.*string"):
+                await client.chat_json(
+                    "gpt-5-mini",
+                    [{"role": "user", "content": "test"}],
+                    json_schema=CUSTOM_SCHEMA,
+                )
+
+    async def test_json_schema_dict_validates_enum(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_response(json=_chat_response('{"status":"unknown"}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            with pytest.raises(JSONParseError, match="status.*enum.*unknown"):
+                await client.chat_json(
+                    "gpt-5-mini",
+                    [{"role": "user", "content": "test"}],
+                    json_schema=ENUM_SCHEMA,
+                )
+
+    async def test_json_schema_dict_self_correction_in_json_schema_mode(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response('{"score": 1}'))
+        httpx_mock.add_response(json=_chat_response('{"name":"Ada","score":1}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            result = await client.chat_json(
+                "gpt-5-mini",
+                [{"role": "user", "content": "test"}],
+                json_schema=CUSTOM_SCHEMA,
+                self_correction=True,
+                max_retries=1,
+            )
+
+        assert result.parsed == {"name": "Ada", "score": 1}
+        assert client.stats.json_parse_failures == 1
+        assert client.stats.json_self_correction_success == 1
+
+    async def test_json_schema_dict_self_correction_in_json_object_mode(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response('{"score": 1}'))
+        httpx_mock.add_response(json=_chat_response('{"name":"Ada","score":1}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            result = await client.chat_json(
+                "deepseek-v4",
+                [{"role": "user", "content": "test"}],
+                json_schema=CUSTOM_SCHEMA,
+                self_correction=True,
+                max_retries=1,
+            )
+
+        assert result.parsed == {"name": "Ada", "score": 1}
+        assert client.stats.json_parse_failures == 1
+        assert client.stats.json_self_correction_success == 1
 
     async def test_json_stats_tracked(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response('{"tags": ["a"]}'))

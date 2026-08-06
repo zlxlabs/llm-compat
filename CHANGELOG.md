@@ -25,6 +25,11 @@
   `providers.build_request_payload`、`_compat.validate_config`、
   `_compat.validate_fallback_config`、`fallback.filter_by_modality`。
 
+### Fixed
+
+- 修复 `chat_json(json_schema={...})` 对字典 JSON Schema 只解析 JSON、不校验返回结构的问题；现在会校验
+  `type`、`required`、`properties`、`enum` 及嵌套对象，并在失败时触发既有的 self-correction 流程。
+
 ### Changed
 
 - **Breaking**：`register_provider(..., caps=...)` 现在会在注册时按完整 caps schema 校验能力记录。

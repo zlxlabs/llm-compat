@@ -4,7 +4,12 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from llm_compat.json_utils import parse_json, parse_json_model, pydantic_to_json_schema
+from llm_compat.json_utils import (
+    parse_json,
+    parse_json_model,
+    parse_json_schema,
+    pydantic_to_json_schema,
+)
 
 
 class TagResult(BaseModel):
@@ -53,6 +58,76 @@ class TestParseJson:
     def test_multiple_code_fences_takes_first(self) -> None:
         raw = '```json\n{"a": 1}\n```\n```json\n{"b": 2}\n```'
         assert parse_json(raw) == {"a": 1}
+
+
+class TestParseJsonSchema:
+    schema = {
+        "type": "object",
+        "required": ["name", "score", "status", "profile"],
+        "properties": {
+            "name": {"type": "string"},
+            "score": {"type": "number"},
+            "status": {"type": "string", "enum": ["ready", "failed"]},
+            "profile": {
+                "type": "object",
+                "required": ["city"],
+                "properties": {"city": {"type": "string"}},
+            },
+        },
+    }
+
+    def test_valid_nested_object(self) -> None:
+        raw = '{"name":"Ada","score":9.5,"status":"ready","profile":{"city":"Paris"}}'
+
+        assert parse_json_schema(raw, self.schema) == {
+            "name": "Ada",
+            "score": 9.5,
+            "status": "ready",
+            "profile": {"city": "Paris"},
+        }
+
+    def test_missing_required_field_names_field(self) -> None:
+        with pytest.raises(ValueError, match="name.*required.*missing"):
+            parse_json_schema(
+                '{"score":9.5,"status":"ready","profile":{"city":"Paris"}}',
+                self.schema,
+            )
+
+    def test_wrong_type_names_field_expected_and_actual(self) -> None:
+        with pytest.raises(ValueError, match="score.*number.*string"):
+            parse_json_schema(
+                '{"name":"Ada","score":"9.5","status":"ready",'
+                '"profile":{"city":"Paris"}}',
+                self.schema,
+            )
+
+    def test_missing_nested_required_field_names_nested_path(self) -> None:
+        with pytest.raises(ValueError, match="profile.city.*required.*missing"):
+            parse_json_schema(
+                '{"name":"Ada","score":9.5,"status":"ready","profile":{}}',
+                self.schema,
+            )
+
+    def test_invalid_enum_names_field_expected_and_actual(self) -> None:
+        with pytest.raises(ValueError, match="status.*enum.*unknown"):
+            parse_json_schema(
+                '{"name":"Ada","score":9.5,"status":"unknown",'
+                '"profile":{"city":"Paris"}}',
+                self.schema,
+            )
+
+    def test_unknown_keywords_are_ignored(self) -> None:
+        schema = {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string", "minLength": 3}},
+            "additionalProperties": False,
+        }
+
+        assert parse_json_schema('{"name":"A","extra":true}', schema) == {
+            "name": "A",
+            "extra": True,
+        }
 
 
 class TestParseJsonModel:

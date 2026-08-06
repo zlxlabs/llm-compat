@@ -26,7 +26,12 @@ from .errors import (
     describe_error,
 )
 from .fallback import filter_by_modality, resolve_fallback_chain
-from .json_utils import parse_json, parse_json_model, pydantic_to_json_schema
+from .json_utils import (
+    parse_json,
+    parse_json_model,
+    parse_json_schema,
+    pydantic_to_json_schema,
+)
 from .providers import (
     build_request_payload,
     describe_from_payload,
@@ -383,11 +388,14 @@ class BaseClient:
         result: ChatResult,
         model: str,
         schema: type[T] | None = None,
+        json_schema: dict[str, Any] | None = None,
     ) -> ChatResult:
         raw = result.content
         try:
             if schema is not None:
                 parsed = parse_json_model(raw, schema)
+            elif json_schema is not None:
+                parsed = parse_json_schema(raw, json_schema)
             else:
                 parsed = parse_json(raw)
         except (ValueError, Exception) as e:
@@ -489,6 +497,8 @@ class BaseClient:
             try:
                 if schema is not None:
                     parsed = parse_json_model(result.content, schema)
+                elif json_schema is not None:
+                    parsed = parse_json_schema(result.content, json_schema)
                 else:
                     parsed = parse_json(result.content)
                 result.parsed = parsed
