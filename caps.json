@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "generated_from": "src/llm_compat/providers.py",
+  "generated_by": "scripts/export_caps.py",
+  "gateway": {
+    "kind": "new-api",
+    "note": "这些能力值记录的是通过 New API 代理观测到的网关行为，不是模型固有属性。换网关需重新验证。"
+  },
+  "matching": {
+    "algorithm": "fnmatch",
+    "case_sensitive": false,
+    "order": "first-match-wins",
+    "note": "模型名与 pattern 均先 lowercase，再按 patterns 数组顺序做 fnmatch，首个命中即返回。未命中时 family=openai 且 matched=false。"
+  },
+  "effort_rank": {
+    "minimal": 0,
+    "low": 1,
+    "medium": 2,
+    "high": 3,
+    "max": 4,
+    "xhigh": 5
+  },
+  "enums": {
+    "disable_mode": [
+      "native",
+      "effort_none",
+      "minimal_fallback",
+      "unsupported",
+      "na"
+    ],
+    "json_mode": [
+      "json_object",
+      "json_schema"
+    ]
+  },
+  "disable_mode_semantics": {
+    "native": "发 {\"thinking\": {\"type\": \"disabled\"}}",
+    "effort_none": "发 {\"reasoning_effort\": \"none\"}",
+    "minimal_fallback": "发 {\"reasoning_effort\": \"minimal\"}",
+    "unsupported": "关不掉，丢弃意图并告警",
+    "na": "该族本来就不推理，什么都不发"
+  },
+  "schema": {
+    "required_keys": [
+      "disable_mode",
+      "efforts",
+      "json_mode",
+      "supports_vision"
+    ],
+    "field_types": {
+      "disable_mode": "string",
+      "efforts": "array<string>",
+      "supports_vision": "boolean",
+      "json_mode": "string"
+    },
+    "efforts_allowed_values": "effort_rank keys",
+    "patterns": "有序数组；按源码顺序，首个 fnmatch 命中即返回"
+  },
+  "default_caps": {
+    "disable_mode": "na",
+    "efforts": [],
+    "supports_vision": true,
+    "json_mode": "json_schema",
+    "note": "未知 family 的兜底能力；用于完全未知的 provider family。"
+  },
+  "partial_caps_defaults": {
+    "disable_mode": "na",
+    "efforts": [],
+    "supports_vision": true,
+    "json_mode": "json_object",
+    "note": "不完整自定义 caps 的字段兜底；用于 register_provider 传入部分能力时的兼容路径。"
+  },
+  "patterns": [
+    {
+      "pattern": "deepseek-chat",
+      "family": "deepseek"
+    },
+    {
+      "pattern": "deepseek-reasoner",
+      "family": "deepseek"
+    },
+    {
+      "pattern": "deepseek-*",
+      "family": "deepseek"
+    },
+    {
+      "pattern": "gemini-2.5-*",
+      "family": "gemini_25"
+    },
+    {
+      "pattern": "gemini-3-*",
+      "family": "gemini_3"
+    },
+    {
+      "pattern": "gemini-3.*-*",
+      "family": "gemini_3"
+    },
+    {
+      "pattern": "gemini-*",
+      "family": "gemini"
+    },
+    {
+      "pattern": "gpt-5",
+      "family": "openai_gpt5"
+    },
+    {
+      "pattern": "gpt-5-*",
+      "family": "openai_gpt5"
+    },
+    {
+      "pattern": "gpt-5.*",
+      "family": "openai_gpt5"
+    },
+    {
+      "pattern": "gpt-4*",
+      "family": "openai_gpt4"
+    },
+    {
+      "pattern": "gpt-*",
+      "family": "openai"
+    },
+    {
+      "pattern": "doubao-seed-*",
+      "family": "doubao_seed"
+    },
+    {
+      "pattern": "doubao-*",
+      "family": "doubao"
+    },
+    {
+      "pattern": "o1*",
+      "family": "openai_o"
+    },
+    {
+      "pattern": "o3*",
+      "family": "openai_o"
+    },
+    {
+      "pattern": "o4*",
+      "family": "openai_o"
+    },
+    {
+      "pattern": "o5*",
+      "family": "openai_o"
+    }
+  ],
+  "families": {
+    "deepseek": {
+      "disable_mode": "native",
+      "efforts": [
+        "low",
+        "high",
+        "max",
+        "xhigh"
+      ],
+      "supports_vision": false,
+      "json_mode": "json_object"
+    },
+    "doubao": {
+      "disable_mode": "na",
+      "efforts": [],
+      "supports_vision": false,
+      "json_mode": "json_schema"
+    },
+    "doubao_seed": {
+      "disable_mode": "minimal_fallback",
+      "efforts": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "supports_vision": false,
+      "json_mode": "json_schema"
+    },
+    "gemini": {
+      "disable_mode": "effort_none",
+      "efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "supports_vision": true,
+      "json_mode": "json_object"
+    },
+    "gemini_25": {
+      "disable_mode": "effort_none",
+      "efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "supports_vision": true,
+      "json_mode": "json_schema"
+    },
+    "gemini_3": {
+      "disable_mode": "minimal_fallback",
+      "efforts": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "supports_vision": true,
+      "json_mode": "json_schema"
+    },
+    "openai": {
+      "disable_mode": "na",
+      "efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "supports_vision": true,
+      "json_mode": "json_schema"
+    },
+    "openai_gpt4": {
+      "disable_mode": "na",
+      "efforts": [],
+      "supports_vision": true,
+      "json_mode": "json_object"
+    },
+    "openai_gpt5": {
+      "disable_mode": "minimal_fallback",
+      "efforts": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ],
+      "supports_vision": true,
+      "json_mode": "json_schema"
+    },
+    "openai_o": {
+      "disable_mode": "unsupported",
+      "efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "supports_vision": false,
+      "json_mode": "json_schema"
+    }
+  }
+}
