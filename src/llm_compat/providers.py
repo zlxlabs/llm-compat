@@ -5,6 +5,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, cast
 
+from .caps_schema import REQUIRED_CAPS_KEYS, validate_family_caps
+
 logger = logging.getLogger(__name__)
 
 
@@ -162,22 +164,16 @@ def get_provider_caps(family: str | ProviderDetection | None) -> dict[str, Any]:
     caps = _FAMILY_CAPABILITIES.get(family_name)
     if caps is None:
         return dict(_DEFAULT_CAPS)
-    return {**_PARTIAL_CAPS_DEFAULTS, **caps}
-
-
-def _validate_ranked_efforts(family: str, caps: dict[str, Any]) -> None:
-    efforts = caps.get("efforts", ())
-    invalid_efforts = [
-        effort
-        for effort in efforts
-        if not isinstance(effort, str) or effort not in _EFFORT_RANK
-    ]
-    if invalid_efforts:
-        invalid_values = ", ".join(sorted(repr(value) for value in invalid_efforts))
-        raise ValueError(
-            f"Provider family {family!r} has unranked effort values: {invalid_values}. "
-            "Custom caps['efforts'] must contain only ranked effort values."
+    missing = REQUIRED_CAPS_KEYS.difference(caps)
+    if missing:
+        logger.warning(
+            "Provider family %r has incomplete caps; missing keys: %s. "
+            "This indicates someone bypassed register_provider and modified "
+            "_FAMILY_CAPABILITIES directly.",
+            family_name,
+            ", ".join(sorted(missing)),
         )
+    return {**_PARTIAL_CAPS_DEFAULTS, **caps}
 
 
 _custom_patterns: tuple[tuple[str, str], ...] | None = None
@@ -191,7 +187,7 @@ def register_provider(
 ) -> None:
     global _custom_patterns
     if caps is not None:
-        _validate_ranked_efforts(family, caps)
+        validate_family_caps(family, caps)
 
     entry = (pattern, family)
     if _custom_patterns:
@@ -199,7 +195,14 @@ def register_provider(
     else:
         _custom_patterns = (entry,)
     if caps is not None:
-        _FAMILY_CAPABILITIES[family] = caps
+        # Caps values must be immutable scalars or explicitly normalized immutable
+        # containers; add any new fields here when the schema grows.
+        _FAMILY_CAPABILITIES[family] = {
+            "disable_mode": caps["disable_mode"],
+            "efforts": frozenset(caps["efforts"]),
+            "supports_vision": caps["supports_vision"],
+            "json_mode": caps["json_mode"],
+        }
 
 
 def set_custom_patterns(patterns: Any) -> None:
@@ -305,8 +308,29 @@ def resolve_effort_clamp(family: str, effort: str) -> str | None:
 #     ├─ nearest supported rank >= requested ───────────────────> reasoning_effort=clamped
 #     ├─ no higher rank ─────────────────────────────────────────> highest supported rank
 #     └─ no supported efforts ──────────────────────────────────> warn + {}
-def _translate(family: str, effort: str | None) -> dict[str, Any]:
+def _translate(
+    provider: str | ProviderDetection,
+    effort: str | None,
+    *,
+    strict: bool = False,
+    model: str | None = None,
+) -> dict[str, Any]:
+    detection = (
+        provider
+        if isinstance(provider, ProviderDetection)
+        else ProviderDetection(family=provider, matched=True)
+    )
+    family = detection.family
     if effort is None:
+        return {}
+
+    if strict and not detection.matched:
+        logger.warning(
+            "strict_unknown_models: model %r did not match any known provider family; "
+            "dropping reasoning_effort %r instead of guessing openai semantics.",
+            model if model is not None else family,
+            effort,
+        )
         return {}
 
     caps = _FAMILY_CAPABILITIES.get(family, _FAMILY_CAPABILITIES["openai"])
@@ -367,11 +391,12 @@ def build_request_payload(
     reasoning_effort: str | None,
     base_payload: dict[str, Any],
     custom_patterns: tuple[tuple[str, str], ...] | None = None,
+    *,
+    strict: bool = False,
 ) -> dict[str, Any]:
     reasoning_effort = normalize_reasoning_effort(reasoning_effort)
     detection = detect_provider(model, custom_patterns)
-    family = detection.family
-    translation = _translate(family, reasoning_effort)
+    translation = _translate(detection, reasoning_effort, strict=strict, model=model)
     return deep_merge_payload(base_payload, translation)
 
 

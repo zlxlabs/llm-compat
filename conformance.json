@@ -1,0 +1,5922 @@
+{
+  "schema_version": 1,
+  "generated_from": "src/llm_compat/providers.py",
+  "generated_by": "scripts/export_conformance.py",
+  "reviewed": true,
+  "reviewed_note": "当前向量集合指纹与已审定集合一致，已按覆盖轴人工审定，可作为跨语言契约使用。",
+  "semantics": {
+    "translation": "只增不删：set 是要合并进请求体的字段，实现必须精确产出这些字段，不多不少。",
+    "comparison": "exact"
+  },
+  "warning_categories": {
+    "deprecated_effort_alias": "reasoning_effort 使用已废弃别名（none/off/false），已归一化为 disabled",
+    "disable_unsupported": "provider family 不支持关闭思考，disabled 意图被丢弃",
+    "effort_clamp_down": "reasoning_effort 被夹到更低的最近支持档",
+    "effort_clamp_up": "reasoning_effort 被夹到更高的最近支持档",
+    "effort_dropped_unsupported": "provider family 不支持任何 reasoning effort，参数被丢弃",
+    "strict_drop_effort": "strict 模式下模型未匹配任何已知 family，丢弃 reasoning 参数",
+    "unknown_model": "模型未匹配任何已知 provider pattern，使用 openai 兜底"
+  },
+  "vectors": [
+    {
+      "id": "DeepSeek-Chat__HIGH__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__HIGH__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__blank__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__blank__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__disabled__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__disabled__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__empty__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__empty__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__false__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__false__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__high__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__high__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__low__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__low__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__max__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "max"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__max__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "max"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__medium__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__medium__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__minimal__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__minimal__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__none__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__none__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__off__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__off__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__ultra__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__ultra__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__unset__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__unset__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__xhigh__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "xhigh"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__xhigh__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "xhigh"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__HIGH__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__HIGH__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__blank__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__blank__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__disabled__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__disabled__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__empty__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__empty__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__false__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__false__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__high__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__high__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__low__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__low__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__max__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "max"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__max__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "max"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__medium__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__medium__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__minimal__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__minimal__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__none__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__none__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__off__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__off__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "thinking": {
+            "type": "disabled"
+          }
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__ultra__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__ultra__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "deepseek-chat__unset__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__unset__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__xhigh__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "xhigh"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__xhigh__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "xhigh"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__HIGH__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__HIGH__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__blank__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__blank__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__disabled__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__disabled__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__empty__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__empty__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__false__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__false__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__high__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__high__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__low__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__low__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__max__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__max__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__medium__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__medium__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__minimal__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__minimal__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__none__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__none__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__off__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__off__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__ultra__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__ultra__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__unset__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__unset__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__xhigh__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-pro__xhigh__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__HIGH__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__HIGH__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__blank__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__blank__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__disabled__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__disabled__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__empty__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__empty__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__false__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__false__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__high__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__high__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__low__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__low__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__max__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__max__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__medium__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__medium__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__minimal__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__minimal__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__none__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__none__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__off__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__off__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__ultra__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__ultra__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__unset__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__unset__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__xhigh__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__xhigh__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__HIGH__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__HIGH__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__blank__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__blank__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__disabled__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__disabled__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__empty__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__empty__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__false__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__false__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__high__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__high__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__low__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__low__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__max__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__max__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__medium__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__medium__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__minimal__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__minimal__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__none__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__none__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__off__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__off__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__ultra__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__ultra__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__unset__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__unset__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__xhigh__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__xhigh__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__HIGH__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__HIGH__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__blank__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__blank__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__disabled__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__disabled__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__empty__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__empty__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__false__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__false__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__high__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__high__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__low__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__low__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__max__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__max__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__medium__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__medium__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__minimal__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__minimal__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__none__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__none__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__off__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__off__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "none"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__ultra__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__ultra__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__unset__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__unset__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__xhigh__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__xhigh__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__HIGH__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__HIGH__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__blank__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__blank__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__disabled__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__disabled__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__empty__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__empty__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__false__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__false__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__high__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__high__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__low__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__low__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__max__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__max__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__medium__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__medium__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__minimal__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__minimal__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__none__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__none__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__off__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__off__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__ultra__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__ultra__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__unset__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__unset__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__xhigh__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__xhigh__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__HIGH__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__HIGH__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__blank__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__blank__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__disabled__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__disabled__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__empty__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__empty__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__false__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__false__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__high__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__high__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__low__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__low__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__max__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__max__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__medium__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__medium__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__minimal__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__minimal__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__none__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__none__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__off__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__off__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__ultra__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__ultra__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__unset__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__unset__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__xhigh__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__xhigh__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__HIGH__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__HIGH__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__blank__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__blank__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__disabled__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__disabled__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__empty__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__empty__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__false__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__false__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__high__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__high__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__low__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__low__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__max__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__max__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__medium__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__medium__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__minimal__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__minimal__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__none__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__none__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__off__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__off__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__ultra__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__ultra__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__unset__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__unset__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__xhigh__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-4o__xhigh__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "effort_dropped_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__HIGH__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__HIGH__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__blank__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__blank__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__disabled__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__disabled__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__empty__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__empty__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__false__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__false__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__high__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__high__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__low__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__low__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__max__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__max__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__medium__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__medium__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__minimal__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__minimal__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__none__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__none__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__off__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__off__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "minimal"
+        },
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__ultra__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__ultra__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__unset__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__unset__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__xhigh__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "gpt-5__xhigh__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__HIGH__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__HIGH__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__blank__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__blank__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__disabled__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "disable_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__disabled__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "disable_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__empty__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__empty__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__false__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "disable_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__false__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "disable_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__high__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__high__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__low__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__low__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__max__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__max__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__medium__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__medium__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__minimal__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__minimal__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__none__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "disable_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__none__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "disable_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__off__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "disable_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__off__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "disable_unsupported"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__ultra__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__ultra__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__unset__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__unset__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__xhigh__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "o3-mini__xhigh__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__HIGH__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__HIGH__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__blank__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__blank__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__disabled__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__disabled__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__empty__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__empty__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__false__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__false__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__high__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__high__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__low__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__low__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__max__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "unknown_model",
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__max__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__medium__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__medium__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__minimal__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "unknown_model",
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__minimal__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__none__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__none__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__off__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__off__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias",
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__ultra__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "unknown_model",
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__ultra__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__unset__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__unset__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__xhigh__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "unknown_model",
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__xhigh__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model",
+          "strict_drop_effort"
+        ]
+      }
+    }
+  ]
+}
