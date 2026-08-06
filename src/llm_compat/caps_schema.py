@@ -56,6 +56,4 @@ def validate_family_caps(family: str, caps: dict[str, Any]) -> None:
         not isinstance(value, str) or value not in _EFFORT_RANK
     )})
     if invalid:
-        raise ValueError(
-            f"Provider family {family!r} has unranked effort values: {', '.join(invalid)}"
-        )
+        raise ValueError(f"Family {family!r} has unranked efforts: {', '.join(invalid)}")
