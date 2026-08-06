@@ -20,6 +20,14 @@
 
 ### Changed
 
+- **Breaking**：`register_provider(..., caps=...)` 现在会在注册时按完整 caps schema 校验能力记录。
+  以前只给 `efforts` 的调用会从运行时崩溃改为立即抛出 `ValueError`，例如
+  `register_provider("acme-*", "acme", caps={"efforts": frozenset({"low"})})` 会因缺少
+  `disable_mode`、`supports_vision` 和 `json_mode` 报错。正确写法是提供四个必需键：
+  `register_provider("acme-*", "acme", caps={"disable_mode": "na", "efforts": frozenset({"low"}),
+  "supports_vision": True, "json_mode": "json_object"})`。`disable_mode` 与 `json_mode` 的合法
+  枚举值、四个必需键、字段类型以及 `efforts` 的允许值，请查阅 `caps.json` 的 `enums` 与
+  `schema` 节（`efforts` 的允许值是 `effort_rank` 的键）。
 - **BREAKING**：`detect_provider()` 的返回值从 `str` 改为 `ProviderDetection`。迁移时请逐项检查：
   - `detect_provider(m) == "deepseek"` → `detect_provider(m).family == "deepseek"`。
   - `detect_provider(m) in {"deepseek", "openai"}` 或把结果作为 dict key → 先取

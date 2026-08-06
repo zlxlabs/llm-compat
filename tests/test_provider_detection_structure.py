@@ -66,7 +66,9 @@ class TestProviderPatternDetection:
         assert result is None
 
 
-def test_partial_registered_caps_are_completed_at_caps_boundary() -> None:
+def test_partial_direct_caps_are_completed_with_warning_at_caps_boundary(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     family = "acme"
     pattern_state = providers._custom_patterns
     missing = object()
@@ -74,19 +76,20 @@ def test_partial_registered_caps_are_completed_at_caps_boundary() -> None:
     custom_efforts = frozenset()
 
     try:
-        providers.register_provider(
-            "acme-*",
-            family,
-            caps={"efforts": custom_efforts},
-        )
+        providers._custom_patterns = (("acme-*", family),)
+        providers._FAMILY_CAPABILITIES[family] = {"efforts": custom_efforts}
 
-        caps = providers.get_provider_caps(family)
+        with caplog.at_level(logging.WARNING):
+            caps = providers.get_provider_caps(family)
         assert {"disable_mode", "efforts", "supports_vision", "json_mode"} <= caps.keys()
         assert caps["disable_mode"] == "na"
         assert caps["efforts"] is custom_efforts
         assert caps["efforts"] is not providers._DEFAULT_CAPS["efforts"]
         assert caps["supports_vision"] is True
         assert caps["json_mode"] == "json_object"
+        assert f"Provider family {family!r} has incomplete caps" in caplog.text
+        assert "missing keys: disable_mode, json_mode, supports_vision" in caplog.text
+        assert "bypassed register_provider" in caplog.text
 
         payload = providers.build_request_payload(
             "acme-v1",
@@ -156,7 +159,7 @@ def test_explicit_custom_caps_override_partial_defaults() -> None:
             "bcme-*",
             family,
             caps={
-                "json_mode": "",
+                "json_mode": "json_schema",
                 "supports_vision": False,
                 "efforts": frozenset(),
                 "disable_mode": "na",
@@ -164,7 +167,7 @@ def test_explicit_custom_caps_override_partial_defaults() -> None:
         )
 
         caps = providers.get_provider_caps(family)
-        assert caps["json_mode"] == ""
+        assert caps["json_mode"] == "json_schema"
         assert caps["supports_vision"] is False
         assert caps["efforts"] == frozenset()
         assert caps["disable_mode"] == "na"
