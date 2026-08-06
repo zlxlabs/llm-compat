@@ -83,6 +83,8 @@ def test_declared_schema_uses_validator_constants() -> None:
     document = build_caps_document()
 
     assert document["schema"]["required_keys"] == sorted(REQUIRED_CAPS_KEYS)
+    assert document["schema"]["efforts_allowed_values"] == list(document["effort_rank"])
+    assert "patterns" not in document["schema"]
     assert document["enums"]["disable_mode"] == list(VALID_DISABLE_MODES)
     assert document["enums"]["json_mode"] == list(VALID_JSON_MODES)
 

@@ -53,8 +53,7 @@ def build_caps_document() -> dict[str, Any]:
             "supports_vision": "boolean",
             "json_mode": "string",
         },
-        "efforts_allowed_values": "effort_rank keys",
-        "patterns": "有序数组；按源码顺序，首个 fnmatch 命中即返回",
+        "efforts_allowed_values": list(effort_rank),
     }
     return {
         "schema_version": 1,
