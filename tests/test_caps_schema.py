@@ -49,6 +49,20 @@ def test_non_bool_vision_is_rejected(valid_caps: dict[str, Any]) -> None:
         validate_family_caps("example", valid_caps)
 
 
+@pytest.mark.parametrize(
+    "invalid_efforts",
+    ["low", b"low", {"low": 1}, object()],
+    ids=["str", "bytes", "mapping", "non_iterable"],
+)
+def test_non_iterable_efforts_are_rejected(
+    valid_caps: dict[str, Any], invalid_efforts: object
+) -> None:
+    valid_caps["efforts"] = invalid_efforts
+
+    with pytest.raises(ValueError, match="efforts must be an iterable of strings"):
+        validate_family_caps("example", valid_caps)
+
+
 def test_unranked_effort_is_rejected(valid_caps: dict[str, Any]) -> None:
     valid_caps["efforts"] = {"low", "ultra"}
 
