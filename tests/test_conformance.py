@@ -119,3 +119,83 @@ def test_vectors_digest_is_insensitive_to_dict_key_order() -> None:
     second = [{"value": "same", "outer": {"a": 1, "b": 2}}]
 
     assert _vectors_digest(first) == _vectors_digest(second)
+
+
+# The first seven messages mirror the current providers.logger.warning calls.
+# The final boundary samples deliberately contain "strict" while belonging
+# to another known category. A broad strict matcher must not steal them.
+_WARNING_CLASSIFICATION_CASES = (
+    (
+        "reasoning_effort alias 'none' is deprecated, use 'disabled' instead. "
+        "Auto-converting to 'disabled'.",
+        "deprecated_effort_alias",
+    ),
+    (
+        "strict_unknown_models: model 'qwen-max' did not match any known provider "
+        "family; dropping reasoning_effort 'high' instead of guessing openai semantics.",
+        "strict_drop_effort",
+    ),
+    (
+        "detect_provider: unknown model 'qwen-max', defaulting to 'openai'",
+        "unknown_model",
+    ),
+    (
+        "Provider family 'gemini_25' effort clamp: requested='minimal' -> "
+        "actual='low'; direction=upward.",
+        "effort_clamp_up",
+    ),
+    (
+        "Provider family 'deepseek' effort clamp: requested='ultra' -> "
+        "actual='high'; direction=downward.",
+        "effort_clamp_down",
+    ),
+    (
+        "Provider 'openai_gpt4' effort unsupported: request='high' -> "
+        "actual=dropped; direction=drop.",
+        "effort_dropped_unsupported",
+    ),
+    (
+        "Provider family 'openai_o' cannot disable thinking; dropping 'disabled' intent.",
+        "disable_unsupported",
+    ),
+    (
+        "detect_provider: unknown model 'qwen-max', defaulting to 'openai' "
+        "during strict mode audit",
+        "unknown_model",
+    ),
+    (
+        "Provider family 'deepseek' effort clamp: requested='ultra' -> "
+        "actual='high'; direction=downward. strict mode audit",
+        "effort_clamp_down",
+    ),
+    (
+        "Provider family 'openai_o' cannot disable thinking; dropping 'disabled' intent. "
+        "strict mode audit",
+        "disable_unsupported",
+    ),
+)
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    _WARNING_CLASSIFICATION_CASES,
+    ids=[expected for _, expected in _WARNING_CLASSIFICATION_CASES],
+)
+def test_classify_warning_uses_discriminating_messages(
+    message: str,
+    expected: str,
+) -> None:
+    assert classify_warning(message) == expected
+
+
+@pytest.mark.parametrize(
+    "message",
+    (
+        "strict_unknown_models: model 'qwen-max' did not match any known provider "
+        "family; retaining reasoning_effort 'high'.",
+        "new provider warning: strict validation changed the fallback behavior",
+    ),
+)
+def test_classify_warning_rejects_unclassified_messages(message: str) -> None:
+    with pytest.raises(ValueError, match="^Unclassified provider warning:"):
+        classify_warning(message)
