@@ -92,6 +92,21 @@
 
   判据是「残余失败率 > 2% 才重评 M3」，**0% 远低于阈值 → M3 降 backlog**。
 
+  > ⚠️ **该数字待重新验证（2026-08-06 追记）**：AdComments PR #40 的 gate 主审抓到
+  > 两条 major——① `schema_mismatch` 未计入总失败率（本次数据上无影响，因它本身是 0）；
+  > ② **schema 检查只验字段存在性与三个 enum，漏验纯 string 字段的类型**，
+  > 所以 `schema_mismatch = 0` 可能是假阴性。
+  >
+  > **判据本身仍成立**（判据是「`extractJson` 返回 `null` 的比例」，而 `schema_mismatch`
+  > 只观测不改控制流，不影响返回值；`no_json_match` 与 `json_parse_error` 都是 0 是硬事实）。
+  > 但「JSON 提取总失败率 0%」这个表述过强——准确说法是**JSON 解析失败率 0%，
+  > 结构符合度只做了部分检查**。
+  >
+  > 差别恰好落在 M3 价值的关键处：「能解析、字段都在、但某个 string 字段返回了数字」
+  > 这一类，当前 AdComments 会静默接受，而 llm-compat 的 `chat_json`（传 Pydantic schema）
+  > 会检测到并触发 self-correction。**该场景未被测到，概率未知。**
+  > 修复卡已派，重跑后按新数字确认或修正本节结论。
+
 - **结论**：`json_schema` + `strict:true` 在当前网关+模型组合下工作良好，
   `extractJson` 的正则只是防御层，300 条里一次都没触发。
   **「手搓 JSON 提取是真痛点」这个判断被彻底证伪。**
