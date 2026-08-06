@@ -74,6 +74,27 @@ except LLMCallError as error:
     print(error.trace.to_dict() if error.trace else None)
 ```
 
+## Provider caps 探针
+
+`scripts/probe_caps.py` 会对指定模型发送不带字段的对照请求，以及每种
+`reasoning_effort` / `thinking` 变体各 2 次采样，输出 Markdown 矩阵和人工审阅用的 caps
+片段。它只读取环境变量中的 `LLM_API_KEY`，不会接受命令行 key，也不会修改
+`src/llm_compat/providers.py`。
+
+```bash
+export LLM_API_KEY='从环境变量或 .env 安全注入的 key'
+uv run python scripts/probe_caps.py \
+  --base-url 'https://your-newapi.com/v1' \
+  --model deepseek-v4-flash \
+  --model gemini-3-flash-preview \
+  > probe-report.md
+```
+
+报告中的每个格子都是 `supported`、`unsupported` 或 `inconclusive`。只有 HTTP 结果、重复
+采样和 `reasoning_tokens` 对照证据都充分时才会给出 caps 片段；`inconclusive` 会使对应
+模型不生成片段并令进程以非 0 退出，方便修复网络或重跑。默认并发上限为 2，启动请求间隔
+为 0.5 秒，429/5xx/超时/网络错误最多额外重试 2 次；可用 `--delay 0` 加速本地 mock 测试。
+
 `requested_model` 是调用方请求的模型；被预检跳过的模型只出现在
 `route_decisions`；真正发出请求的模型才出现在 `model_attempts`；`final_model`
 是成功模型或最后失败模型；`final_outcome` 是整个逻辑调用的结果。一次 attempt 的
