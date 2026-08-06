@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
 import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+CAPS_PATH = ROOT / "caps.json"
+EXPORT_SCRIPT = ROOT / "scripts" / "export_caps.py"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from llm_compat import providers
 from llm_compat.caps_schema import (
@@ -14,10 +21,7 @@ from llm_compat.caps_schema import (
     VALID_JSON_MODES,
     validate_family_caps,
 )
-
-ROOT = Path(__file__).resolve().parents[1]
-CAPS_PATH = ROOT / "caps.json"
-EXPORT_SCRIPT = ROOT / "scripts" / "export_caps.py"
+from scripts.export_caps import build_caps_document
 
 
 def _load_caps() -> dict[str, Any]:
@@ -46,7 +50,7 @@ def test_export_contains_exactly_all_provider_families() -> None:
 
 
 def test_patterns_preserve_source_order() -> None:
-    document = _load_caps()
+    document = build_caps_document()
     expected = [
         {"pattern": pattern, "family": family}
         for pattern, family in providers._DEFAULT_PROVIDER_PATTERNS
@@ -65,7 +69,7 @@ def test_every_family_efforts_are_rank_sorted() -> None:
 
 
 def test_defaults_keep_distinct_json_modes_and_explain_why() -> None:
-    document = _load_caps()
+    document = build_caps_document()
     default_caps = document["default_caps"]
     partial_caps_defaults = document["partial_caps_defaults"]
 
@@ -76,7 +80,7 @@ def test_defaults_keep_distinct_json_modes_and_explain_why() -> None:
 
 
 def test_declared_schema_uses_validator_constants() -> None:
-    document = _load_caps()
+    document = build_caps_document()
 
     assert document["schema"]["required_keys"] == sorted(REQUIRED_CAPS_KEYS)
     assert document["enums"]["disable_mode"] == list(VALID_DISABLE_MODES)
@@ -84,7 +88,13 @@ def test_declared_schema_uses_validator_constants() -> None:
 
 
 def test_exported_family_caps_pass_schema_validation() -> None:
-    document = _load_caps()
+    document = build_caps_document()
 
     for family, caps in document["families"].items():
         validate_family_caps(family, caps)
+
+
+def test_checked_in_caps_matches_export() -> None:
+    expected = json.dumps(build_caps_document(), ensure_ascii=False, indent=2) + "\n"
+
+    assert CAPS_PATH.read_text(encoding="utf-8") == expected
