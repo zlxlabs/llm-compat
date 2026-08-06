@@ -87,6 +87,21 @@ def test_every_warning_category_is_covered() -> None:
     assert set(categories) <= covered
 
 
+def test_every_provider_family_has_checked_in_conformance_coverage() -> None:
+    provider_families = set(providers._FAMILY_CAPABILITIES)
+    covered_families = {
+        vector["expect"]["family"]
+        for vector in VECTORS
+    }
+    missing_families = sorted(provider_families - covered_families)
+
+    assert not missing_families, (
+        "Missing checked-in conformance vector coverage for provider family: "
+        f"{', '.join(missing_families)}. "
+        "往 scripts/export_conformance.py 的 MODEL_CASES 加一个该 family 的代表模型。"
+    )
+
+
 def test_reviewed_vectors_digest_matches_checked_in_document() -> None:
     assert _vectors_digest(VECTORS) == REVIEWED_VECTORS_DIGEST
     assert CONFORMANCE_DOCUMENT["reviewed"] is True
