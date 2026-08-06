@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from collections import Counter
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -74,6 +75,20 @@ def test_checked_in_conformance_matches_export() -> None:
     ) + "\n"
 
     assert CONFORMANCE_PATH.read_text(encoding="utf-8") == expected
+
+
+def test_conformance_vector_ids_are_unique() -> None:
+    counts = Counter(vector["id"] for vector in VECTORS)
+    duplicates = {
+        vector_id: [vector["input"] for vector in VECTORS if vector["id"] == vector_id]
+        for vector_id, count in counts.items()
+        if count > 1
+    }
+
+    assert not duplicates, (
+        "Duplicate conformance vector IDs and their inputs:\n"
+        + json.dumps(duplicates, ensure_ascii=False, indent=2, sort_keys=True)
+    )
 
 
 def test_every_warning_category_is_covered() -> None:

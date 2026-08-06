@@ -354,20 +354,6 @@
       "id": "DeepSeek-Chat__none__lenient",
       "input": {
         "model": "DeepSeek-Chat",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "deepseek",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "DeepSeek-Chat__none__lenient",
-      "input": {
-        "model": "DeepSeek-Chat",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -382,20 +368,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "DeepSeek-Chat__none__strict",
-      "input": {
-        "model": "DeepSeek-Chat",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "deepseek",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -492,6 +464,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__unset__lenient",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "DeepSeek-Chat__unset__strict",
+      "input": {
+        "model": "DeepSeek-Chat",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -862,20 +862,6 @@
       "id": "deepseek-chat__none__lenient",
       "input": {
         "model": "deepseek-chat",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "deepseek",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "deepseek-chat__none__lenient",
-      "input": {
-        "model": "deepseek-chat",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -890,20 +876,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "deepseek-chat__none__strict",
-      "input": {
-        "model": "deepseek-chat",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "deepseek",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -1000,6 +972,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "deepseek-chat__unset__lenient",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "deepseek-chat__unset__strict",
+      "input": {
+        "model": "deepseek-chat",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "deepseek",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -1346,20 +1346,6 @@
       "id": "doubao-pro__none__lenient",
       "input": {
         "model": "doubao-pro",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "doubao",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "doubao-pro__none__lenient",
-      "input": {
-        "model": "doubao-pro",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -1370,20 +1356,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "doubao-pro__none__strict",
-      "input": {
-        "model": "doubao-pro",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "doubao",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -1464,6 +1436,34 @@
         "warnings": [
           "effort_dropped_unsupported"
         ]
+      }
+    },
+    {
+      "id": "doubao-pro__unset__lenient",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-pro__unset__strict",
+      "input": {
+        "model": "doubao-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -1822,20 +1822,6 @@
       "id": "doubao-seed-1.6__none__lenient",
       "input": {
         "model": "doubao-seed-1.6",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "doubao_seed",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "doubao-seed-1.6__none__lenient",
-      "input": {
-        "model": "doubao-seed-1.6",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -1848,20 +1834,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "doubao-seed-1.6__none__strict",
-      "input": {
-        "model": "doubao-seed-1.6",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "doubao_seed",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -1952,6 +1924,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__unset__lenient",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "doubao-seed-1.6__unset__strict",
+      "input": {
+        "model": "doubao-seed-1.6",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "doubao_seed",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -2318,20 +2318,6 @@
       "id": "gemini-1.5-pro__none__lenient",
       "input": {
         "model": "gemini-1.5-pro",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "gemini",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "gemini-1.5-pro__none__lenient",
-      "input": {
-        "model": "gemini-1.5-pro",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -2344,20 +2330,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "gemini-1.5-pro__none__strict",
-      "input": {
-        "model": "gemini-1.5-pro",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "gemini",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -2448,6 +2420,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__unset__lenient",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-1.5-pro__unset__strict",
+      "input": {
+        "model": "gemini-1.5-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -2814,20 +2814,6 @@
       "id": "gemini-2.5-pro__none__lenient",
       "input": {
         "model": "gemini-2.5-pro",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "gemini_25",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "gemini-2.5-pro__none__lenient",
-      "input": {
-        "model": "gemini-2.5-pro",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -2840,20 +2826,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "gemini-2.5-pro__none__strict",
-      "input": {
-        "model": "gemini-2.5-pro",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "gemini_25",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -2944,6 +2916,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__unset__lenient",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-2.5-pro__unset__strict",
+      "input": {
+        "model": "gemini-2.5-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_25",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -3306,20 +3306,6 @@
       "id": "gemini-3-pro__none__lenient",
       "input": {
         "model": "gemini-3-pro",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "gemini_3",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "gemini-3-pro__none__lenient",
-      "input": {
-        "model": "gemini-3-pro",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -3332,20 +3318,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "gemini-3-pro__none__strict",
-      "input": {
-        "model": "gemini-3-pro",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "gemini_3",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -3436,6 +3408,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "gemini-3-pro__unset__lenient",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gemini-3-pro__unset__strict",
+      "input": {
+        "model": "gemini-3-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "gemini_3",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -3794,20 +3794,6 @@
       "id": "gpt-3.5-turbo__none__lenient",
       "input": {
         "model": "gpt-3.5-turbo",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "openai",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "gpt-3.5-turbo__none__lenient",
-      "input": {
-        "model": "gpt-3.5-turbo",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -3818,20 +3804,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "gpt-3.5-turbo__none__strict",
-      "input": {
-        "model": "gpt-3.5-turbo",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "openai",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -3916,6 +3888,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__unset__lenient",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-3.5-turbo__unset__strict",
+      "input": {
+        "model": "gpt-3.5-turbo",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -4266,20 +4266,6 @@
       "id": "gpt-4o__none__lenient",
       "input": {
         "model": "gpt-4o",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "openai_gpt4",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "gpt-4o__none__lenient",
-      "input": {
-        "model": "gpt-4o",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -4290,20 +4276,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "gpt-4o__none__strict",
-      "input": {
-        "model": "gpt-4o",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "openai_gpt4",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -4384,6 +4356,34 @@
         "warnings": [
           "effort_dropped_unsupported"
         ]
+      }
+    },
+    {
+      "id": "gpt-4o__unset__lenient",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-4o__unset__strict",
+      "input": {
+        "model": "gpt-4o",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt4",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -4742,20 +4742,6 @@
       "id": "gpt-5__none__lenient",
       "input": {
         "model": "gpt-5",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "openai_gpt5",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "gpt-5__none__lenient",
-      "input": {
-        "model": "gpt-5",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -4768,20 +4754,6 @@
         "warnings": [
           "deprecated_effort_alias"
         ]
-      }
-    },
-    {
-      "id": "gpt-5__none__strict",
-      "input": {
-        "model": "gpt-5",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "openai_gpt5",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -4872,6 +4844,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "gpt-5__unset__lenient",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "gpt-5__unset__strict",
+      "input": {
+        "model": "gpt-5",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_gpt5",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -5236,20 +5236,6 @@
       "id": "o3-mini__none__lenient",
       "input": {
         "model": "o3-mini",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "openai_o",
-        "matched": true,
-        "set": {},
-        "warnings": []
-      }
-    },
-    {
-      "id": "o3-mini__none__lenient",
-      "input": {
-        "model": "o3-mini",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -5261,20 +5247,6 @@
           "deprecated_effort_alias",
           "disable_unsupported"
         ]
-      }
-    },
-    {
-      "id": "o3-mini__none__strict",
-      "input": {
-        "model": "o3-mini",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "openai_o",
-        "matched": true,
-        "set": {},
-        "warnings": []
       }
     },
     {
@@ -5362,6 +5334,34 @@
         "warnings": [
           "effort_clamp_down"
         ]
+      }
+    },
+    {
+      "id": "o3-mini__unset__lenient",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "o3-mini__unset__strict",
+      "input": {
+        "model": "o3-mini",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai_o",
+        "matched": true,
+        "set": {},
+        "warnings": []
       }
     },
     {
@@ -5748,22 +5748,6 @@
       "id": "qwen-max__none__lenient",
       "input": {
         "model": "qwen-max",
-        "reasoning_effort": null,
-        "strict": false
-      },
-      "expect": {
-        "family": "openai",
-        "matched": false,
-        "set": {},
-        "warnings": [
-          "unknown_model"
-        ]
-      }
-    },
-    {
-      "id": "qwen-max__none__lenient",
-      "input": {
-        "model": "qwen-max",
         "reasoning_effort": "none",
         "strict": false
       },
@@ -5773,22 +5757,6 @@
         "set": {},
         "warnings": [
           "deprecated_effort_alias",
-          "unknown_model"
-        ]
-      }
-    },
-    {
-      "id": "qwen-max__none__strict",
-      "input": {
-        "model": "qwen-max",
-        "reasoning_effort": null,
-        "strict": true
-      },
-      "expect": {
-        "family": "openai",
-        "matched": false,
-        "set": {},
-        "warnings": [
           "unknown_model"
         ]
       }
@@ -5879,6 +5847,38 @@
         "warnings": [
           "unknown_model",
           "strict_drop_effort"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__unset__lenient",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
+        ]
+      }
+    },
+    {
+      "id": "qwen-max__unset__strict",
+      "input": {
+        "model": "qwen-max",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "openai",
+        "matched": false,
+        "set": {},
+        "warnings": [
+          "unknown_model"
         ]
       }
     },
