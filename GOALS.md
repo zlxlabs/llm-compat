@@ -92,7 +92,15 @@
 
   判据是「残余失败率 > 2% 才重评 M3」，**0% 远低于阈值 → M3 降 backlog**。
 
-  > ⚠️ **该数字待重新验证（2026-08-06 追记）**：AdComments PR #40 的 gate 主审抓到
+  > ✅ **已重新验证，结论确认（2026-08-06 二次追记）**：按下方 caveat 修正测量口径后
+  > **重跑 300 样本，`schema_mismatch` 仍为 0**，`parsing_failure_rate` 与
+  > `total_failure_rate` 均为 0，调用层失败仍全 0。补上字段类型校验
+  > （`comment_zhcn` 等验 string、三个 `if_*` 验 boolean）后数字未变，
+  > 说明原先的 0 不是假阴性。**M3 降 backlog 的结论成立，且证据强于首次测量。**
+  >
+  > <details><summary>首次测量的局限（保留存档）</summary>
+  >
+  > ⚠️ AdComments PR #40 的 gate 主审抓到
   > 两条 major——① `schema_mismatch` 未计入总失败率（本次数据上无影响，因它本身是 0）；
   > ② **schema 检查只验字段存在性与三个 enum，漏验纯 string 字段的类型**，
   > 所以 `schema_mismatch = 0` 可能是假阴性。
@@ -106,6 +114,8 @@
   > 这一类，当前 AdComments 会静默接受，而 llm-compat 的 `chat_json`（传 Pydantic schema）
   > 会检测到并触发 self-correction。**该场景未被测到，概率未知。**
   > 修复卡已派，重跑后按新数字确认或修正本节结论。
+  >
+  > </details>
 
 - **结论**：`json_schema` + `strict:true` 在当前网关+模型组合下工作良好，
   `extractJson` 的正则只是防御层，300 条里一次都没触发。
