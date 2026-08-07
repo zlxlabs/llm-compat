@@ -6,6 +6,7 @@
 uv add git+https://github.com/zlxlabs/llm-compat.git
 ```
 
+v0.9.0 将 provider 检测结果结构化，并新增可选的未知模型严格模式；默认仍宽松兼容。
 ```python
 from llm_compat import LLMClient
 
@@ -440,6 +441,28 @@ warnings = validate_fallback_config({"gpt-4.1-*": ["deepseek-chat"]})
 
 支持 10 个 provider 族：`deepseek` / `gemini_25` / `gemini_3` / `gemini` / `openai_gpt5` / `openai_gpt4` / `openai_o` / `doubao_seed` / `doubao` / `openai`
 
+### v0.9.0 检测结果与严格模式
+`detect_provider(model)` 返回 `ProviderDetection`，不是字符串；旧的字符串比较改用 `.family`，
+还需用 `.matched` 判断是否命中 pattern：
+
+```python
+from llm_compat import detect_provider
+
+detection = detect_provider("gpt-5-mini")
+print(detection.family, detection.matched)  # openai_gpt5 True
+```
+
+未知模型返回 `family="openai", matched=False` 并记录 warning。
+
+`LLMClient(..., strict_unknown_models=True)` 是构造参数，默认 `False`：
+
+- 宽松：未知模型按 openai 族翻译 reasoning，JSON 使用 `json_schema`，文本 fallback 保留未知候选。
+- 严格：未知模型丢弃 reasoning、JSON 降为 `json_object`；仅 vision fallback 移除未知候选，文本仍保留。
+- 已知但不支持 vision 的模型始终从 vision fallback 链移除；这不替调用方决定主模型。
+
+上游拒绝 `json_schema` 时该次请求降为 `json_object` 并告警；`json_object` 会注入 schema
+prompt，Pydantic `schema=` 做本地校验，而只传 `json_schema=` 不做本地结构校验。
+
 ### `extra_body` 请求体契约
 
 `extra_body` 是普通的 wire 字段，会原样保留在请求 body 顶层的 `extra_body` 对象中，不会被
@@ -500,7 +523,16 @@ from llm_compat import register_provider, set_custom_patterns
 
 register_provider("my-proxy-ds-*", "deepseek")
 set_custom_patterns({"my-ds-*": "deepseek", "my-gpt-*": "openai_gpt4"})
+
+# 新 family 必须给出完整 caps；字段和值域见 caps.json schema/enums。
+register_provider(
+    "yi-*", "yi",
+    caps={"disable_mode": "effort_none", "efforts": {"low", "medium", "high"},
+          "supports_vision": False, "json_mode": "json_object"},
+)
 ```
+
+不传 `caps` 只表示复用已登记 family 的能力，不会创建新的能力记录。
 
 ---
 
@@ -668,6 +700,7 @@ class LLMClient:
 | `on_success` | `(str, int) → None` | `None` | 成功回调 (model, latency_ms) |
 | `on_error` | `(str, Exception) → None` | `None` | 错误回调 (model, error) |
 | `pre_request` | `(str) → bool` | `None` | 请求前置检查，返回 False 跳过 |
+| `strict_unknown_models` | `bool` | `False` | 未知模型丢弃 reasoning、JSON mode 降为 `json_object`；vision fallback 移除未知候选 |
 
 ### ChatResult
 

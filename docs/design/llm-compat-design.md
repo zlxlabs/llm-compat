@@ -42,14 +42,15 @@ llm-compat/
 name = "llm-compat"
 requires-python = ">=3.11"
 dependencies = [
-    "httpx>=0.27",
+    "httpx[socks]>=0.27",
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]
-pydantic = ["pydantic>=2.0"]  # chat_json 的 schema 校验，可选
+sensitive = ["pyahocorasick>=2.0"]  # 可选的敏感词检测加速
 ```
 
-**零重依赖**：核心只依赖 httpx。Pydantic 作为可选依赖，不用 chat_json 就不需要装。
+运行时依赖是 `httpx[socks]` 与 `pydantic`；敏感词检测的 `pyahocorasick` 为可选依赖。
 
 ## 核心 API 设计
 
@@ -70,7 +71,7 @@ answer = await client.chat(
     messages=[{"role": "user", "content": "hello"}],
     reasoning_effort="high",       # 可选，透传或翻译
 )
-# 返回: str
+# 返回: ChatResult（`str(result)` 可取 content）
 
 # --- 结构化 JSON ---
 from pydantic import BaseModel
@@ -84,7 +85,7 @@ result = await client.chat_json(
     schema=TagResult,
     reasoning_effort="disabled",   # 关闭思考，省 token
 )
-# 返回: TagResult 实例
+# 返回: ChatResult，`result.parsed` 为 TagResult 实例
 
 # --- 流式 ---
 async for chunk in client.chat_stream(
@@ -115,107 +116,26 @@ await client.close()
 **设计要点**：
 - `model` 是每次调用的参数，不是客户端级别的 — 同一个 client 可以调不同模型
 - `reasoning_effort` 在调用时传入，client 根据 model 名自动做 provider 翻译
-- 返回值简洁：`chat` 返回 `str`，`chat_json` 返回 Pydantic 实例
+- `chat` 与 `chat_json` 都返回 `ChatResult`；用 `str(result)` 取文本，`chat_json` 的
+  解析对象从 `result.parsed` 读取
 
 ### 2. Provider 翻译（providers.py）
 
 ```python
-# --- Provider 检测 ---
-from llm_compat.providers import detect_provider, build_thinking_params
+from llm_compat.providers import build_request_payload, detect_provider
 
-detect_provider("deepseek-v4-flash")    # → "deepseek"
-detect_provider("gpt-4o")              # → "openai"
-detect_provider("gemini-2.5-flash")    # → "gemini"
-detect_provider("qwen-plus")           # → "qwen"
-detect_provider("unknown-model")       # → "generic"（透传，不翻译）
-
-# --- Thinking 参数翻译 ---
-# 输入统一的 reasoning_effort 值，输出 provider 特定的 payload 字段
-build_thinking_params("deepseek", "disabled")
-# → {"thinking": {"type": "disabled"}}
-
-build_thinking_params("deepseek", "high")
-# → {"reasoning_effort": "high"}
-
-build_thinking_params("deepseek", "max")
-# → {"reasoning_effort": "max"}
-
-build_thinking_params("openai", "high")
-# → {"reasoning_effort": "high"}
-
-build_thinking_params("openai", "disabled")
-# → {"reasoning_effort": "none"}
-
-build_thinking_params("gemini", "disabled")
-# → {"reasoning_effort": "none"}
-
-build_thinking_params("generic", "high")
-# → {"reasoning_effort": "high"}  # 透传
-
-build_thinking_params("generic", "disabled")
-# → {}  # 未知 provider 不知道怎么关，安全丢弃 + warn
+detection = detect_provider("deepseek-chat")
+assert detection.family == "deepseek" and detection.matched
+# 按模型匹配的 family 翻译统一的 reasoning_effort：
+build_request_payload("deepseek-chat", "disabled", {"model": "deepseek-chat"})
+# → {"model": "deepseek-chat", "thinking": {"type": "disabled"}}
 ```
 
-**Provider 注册表**：
+运行时能力记录是 `dict[str, Any]`，当前 10 个 family/18 个有序 pattern 以 `caps.json`
+及其 schema/enums 为准；`ProviderDetection` 用 `.family` 和 `.matched` 区分兜底与命中。
 
-```python
-_PROVIDER_PATTERNS: list[tuple[str, str]] = [
-    # (fnmatch pattern, provider_family)
-    # 具体模式在前，通配在后
-    ("deepseek-*",         "deepseek"),
-    ("gpt-*",              "openai"),
-    ("o1-*",               "openai"),
-    ("o3-*",               "openai"),
-    ("o4-*",               "openai"),
-    ("gemini-*",           "gemini"),
-    ("claude-*",           "anthropic"),
-    ("qwen-*",             "qwen"),
-    ("doubao-*",           "doubao"),
-    ("glm-*",              "zhipu"),
-]
-
-_PROVIDER_CAPABILITIES: dict[str, ProviderCaps] = {
-    "deepseek": ProviderCaps(
-        supported_efforts={"low", "medium", "high", "max"},
-        disable_mode="thinking_object",    # thinking.type="disabled"
-        effort_mapping={"low": "high", "medium": "high", "xhigh": "max"},
-    ),
-    "openai": ProviderCaps(
-        supported_efforts={"none", "minimal", "low", "medium", "high"},
-        disable_mode="effort_none",        # reasoning_effort="none"
-        effort_mapping={},
-    ),
-    "gemini": ProviderCaps(
-        supported_efforts={"none", "minimal", "low", "medium", "high"},
-        disable_mode="effort_none",
-        effort_mapping={},
-    ),
-    # 可扩展...
-}
-```
-
-**用户可自定义**：
-
-```python
-from llm_compat.providers import register_provider, ProviderCaps
-
-# 注册自定义 provider（如代理服务重命名了模型）
-register_provider(
-    pattern="my-proxy-ds-*",
-    family="deepseek",
-)
-
-# 或注册全新 provider
-register_provider(
-    pattern="yi-*",
-    family="yi",
-    caps=ProviderCaps(
-        supported_efforts={"low", "medium", "high"},
-        disable_mode="effort_none",
-        effort_mapping={},
-    ),
-)
-```
+自定义 family 的完整 `register_provider(..., caps={...})` 用法见接入指南；字段必须符合
+`caps.json` 的 schema/enums。只传 `pattern` 与已有 family 时，是复用该 family 的能力记录。
 
 ### 3. JSON 响应清洗（json_utils.py）
 
@@ -261,15 +181,7 @@ result = parse_json_model(raw_content, TagResult)
 
 ## reasoning_effort 统一值域
 
-| 配置值 | 语义 | DeepSeek | OpenAI | Gemini | 未知 |
-|--------|------|----------|--------|--------|------|
-| `None` | 不设置，用 provider 默认 | 不发 | 不发 | 不发 | 不发 |
-| `"disabled"` | 显式关闭思考 | `thinking.type=disabled` | `effort=none` | `effort=none` | 丢弃+warn |
-| `"low"` | 低 | 映射→`high` | 透传 | 透传 | 透传 |
-| `"medium"` | 中 | 映射→`high` | 透传 | 透传 | 透传 |
-| `"high"` | 高 | 透传 | 透传 | 透传 | 透传 |
-| `"max"` | 最高（DeepSeek 独有） | 透传 | clamp→`high`+warn | clamp→`high`+warn | 透传 |
-| 其他字符串 | 未知值 | 透传 | 透传 | 透传 | 透传 |
+family 的 `disable_mode`、efforts、`json_mode`、`supports_vision` 以 `caps.json.families` 及 schema/enums 为准；不要再维护旧示例。
 
 `"none"` 作为 legacy 别名，自动归一到 `"disabled"` + deprecation warn。
 
@@ -320,10 +232,7 @@ class LLMClient:
 uv add git+https://github.com/zlxlabs/llm-compat.git
 
 # 或锁定版本
-uv add git+https://github.com/zlxlabs/llm-compat.git@v0.1.0
-
-# 带 Pydantic 支持
-uv add "llm-compat[pydantic] @ git+https://github.com/zlxlabs/llm-compat.git"
+uv add git+https://github.com/zlxlabs/llm-compat.git@v0.9.0
 ```
 
 ## 版本策略

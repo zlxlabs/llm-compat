@@ -104,8 +104,8 @@ uv run python scripts/probe_caps.py \
 
 - **[接入指南](docs/guides/integration-guide.md)** — 完整 API 文档 + 配置参考 + 迁移指南
 - **[跨语言能力与契约指南](docs/guides/cross-language-caps.md)** — Bun/JS 或 Go 如何读取
-  `caps.json`、消费 `conformance.json`，并复现模型匹配与参数翻译；两份 JSON 不随 Python
-  wheel 分发，请按指南从 GitHub 固定 tag 或 commit 获取并自行 vendoring。
+  `caps.json`、消费 `conformance.json`，并复现 provider 检测与 reasoning 翻译；这是文档参考契约，
+  不是 JS SDK/HTTP shim。两份 JSON 不随 Python wheel 分发，请按指南固定 tag 或 commit vendoring。
 - **[RFC: 功能扩展](docs/rfcs/structured-output-and-extensions.md)** — 设计决策与路线图
 
 ## 包结构
