@@ -4,6 +4,12 @@
 或 Go 中实现参数翻译的工程师。两份文件都是 JSON；跨语言实现只需要复现下面的匹配、翻译
 和向量比对规则。
 
+## v0.9.0 的边界
+
+本契约只覆盖 provider detection 与 `reasoning_effort` 翻译；vision/JSON 仅是元数据。
+它不包含 Python 的 HTTP、retry、JSON 清洗/self-correction、content fallback、CallTrace，
+也不提供 JS SDK/HTTP shim；Bun/TS 文件只是可运行的文档参考 runner。
+
 ## 怎么获取这两份文件
 
 `caps.json` 和 `conformance.json` **不随 Python wheel 分发**。Python 侧从不回读这两份
@@ -12,16 +18,24 @@
 Bun/JS、Go 等跨语言消费者，因此把 JSON 打进 wheel 只是无用负担，还可能误导使用者以为
 Python 会读取它们、修改 JSON 就能改变 Python 行为。
 
-当前请直接从 GitHub 仓库获取，并将 URL 中的 ref 固定为具体 release tag 或完整 commit
-SHA，不要使用会漂移的 `main`。例如：
+v0.9.0 请从固定的 release tag（`v0.9.0`）或完整 commit SHA 获取，禁止使用会漂移的
+`main`。两份文件不随 Python wheel 分发；在消费项目中显式 vendoring，并把 ref 写入构建
+记录。例如：
 
-```text
-https://raw.githubusercontent.com/zlxlabs/llm-compat/<tag-or-full-commit-sha>/caps.json
-https://raw.githubusercontent.com/zlxlabs/llm-compat/<tag-or-full-commit-sha>/conformance.json
+```bash
+REF=v0.9.0                         # 或完整 40 位 commit SHA
+VENDOR_DIR=vendor/llm-compat-caps/$REF
+mkdir -p "$VENDOR_DIR"
+for FILE in caps.json conformance.json; do
+  curl --fail --location --silent --show-error \
+    "https://raw.githubusercontent.com/zlxlabs/llm-compat/$REF/$FILE" -o "$VENDOR_DIR/$FILE"
+done
+sha256sum "$VENDOR_DIR/caps.json" "$VENDOR_DIR/conformance.json" \
+  > "$VENDOR_DIR/SHA256SUMS"
+git add "$VENDOR_DIR"
 ```
 
-正式的版本化分发（Release asset + 版本化 URL）属于后续增量，届时会更新本节。在此之前，
-跨语言消费者应自行 vendoring 两份文件，并记录来源 commit，确保实现与契约版本对应。
+更新版本时必须同步两份 JSON、SHA-256 记录和 runner 的路径。
 
 修改 JSON **不会改变 Python 侧行为**。Python 消费者要调整运行时能力表，应在进程内使用
 `register_provider()` 注册新的能力记录，或提 PR 修改 `src/llm_compat/providers.py`；
@@ -192,7 +206,7 @@ if (conformance.reviewed !== true) {
 }
 
 for (const vector of conformance.vectors as Vector[]) {
-  const actual = translateVector(vector.input);
+  const actual = translateVector(vector.input, caps);
   assert.equal(actual.family, vector.expect.family, vector.id);
   assert.equal(actual.matched, vector.expect.matched, vector.id);
   assert.deepEqual(actual.set, vector.expect.set, `${vector.id}: exact wire fields`);
@@ -201,6 +215,18 @@ for (const vector of conformance.vectors as Vector[]) {
 
 console.log(`passed ${conformance.vectors.length} conformance vectors`);
 ```
+
+本次新增的、基于 v0.9.0 契约的 Bun 参考位于 [`examples/cross-language-caps.ts`](examples/cross-language-caps.ts)；无参数
+验证当前 checkout 文件，传入刚下载的路径则验证 vendored 文件（Bun 1.3.11，无依赖）：
+
+```bash
+bun run docs/guides/examples/cross-language-caps.ts
+bun run docs/guides/examples/cross-language-caps.ts "$VENDOR_DIR/caps.json" "$VENDOR_DIR/conformance.json"
+# 两次均输出 passed 360 conformance vectors
+```
+
+它导出 `CapsDocument`、`Detection`、`normalizeReasoningEffort`、`detectProvider`、
+`translateVector`，仅供参考，不能作为 SDK 依赖。
 
 Go 实现使用 `encoding/json` 读取同样的结构，比较 map 时也必须检查键集合和对应值都
 相同（不能只做“期望键包含于实际 map”的断言）。
