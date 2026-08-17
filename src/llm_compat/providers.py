@@ -37,6 +37,7 @@ _DEFAULT_PROVIDER_PATTERNS: tuple[tuple[str, str], ...] = (
     # Doubao（doubao-seed 系列支持 thinking，普通 doubao 不支持）
     ("doubao-seed-*", "doubao_seed"),
     ("doubao-*", "doubao"),
+    ("mimo-*", "mimo"),
     # OpenAI o-series
     ("o1*", "openai_o"),
     ("o3*", "openai_o"),
@@ -128,6 +129,12 @@ _FAMILY_CAPABILITIES: dict[str, dict[str, Any]] = {
         "efforts": frozenset(),
         "supports_vision": False,
         "json_mode": "json_schema",
+    },
+    "mimo": {
+        "disable_mode": "na",
+        "efforts": frozenset({"low", "medium", "high"}),
+        "supports_vision": False,
+        "json_mode": "json_object",
     },
     "openai": {
         "disable_mode": "na",
