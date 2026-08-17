@@ -66,6 +66,45 @@ class TestResponseFormatInjection:
         body = json.loads(request.content)
         assert body["response_format"] == {"type": "json_object"}
 
+    async def test_json_object_mode_for_mimo_injects_pydantic_schema(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        httpx_mock.add_response(json=_chat_response('{"tags": ["ai"]}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            result = await client.chat_json(
+                "mimo-v2.5-pro",
+                [{"role": "user", "content": "tag this"}],
+                schema=TagResult,
+            )
+        assert result.parsed.tags == ["ai"]
+        body = json.loads(httpx_mock.get_request().content)
+        assert body["response_format"] == {"type": "json_object"}
+        assert body["messages"][-1]["role"] == "user"
+        assert '"tags"' in body["messages"][-1]["content"]
+
+    async def test_json_object_mode_for_mimo_injects_explicit_json_schema(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        custom_schema = {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+        }
+        httpx_mock.add_response(json=_chat_response('{"tags": ["ai"]}'))
+        async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:
+            result = await client.chat_json(
+                "mimo-v2.5",
+                [{"role": "user", "content": "tag this"}],
+                schema=TagResult,
+                json_schema=custom_schema,
+            )
+        assert result.parsed.tags == ["ai"]
+        body = json.loads(httpx_mock.get_request().content)
+        assert body["response_format"] == {"type": "json_object"}
+        assert body["messages"][-1]["role"] == "user"
+        assert '"name"' in body["messages"][-1]["content"]
+        assert "json_schema" not in body["response_format"]
+
     async def test_no_schema_uses_json_object(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response('{"key": "value"}'))
         async with LLMClient(base_url="http://test/v1", api_key="sk-test") as client:

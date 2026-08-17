@@ -74,6 +74,14 @@ _EFFORT_CLAMP_MATRIX: dict[str, dict[str, str | None]] = {
         "max": None,
         "xhigh": None,
     },
+    "mimo": {
+        "minimal": "low",
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "max": "high",
+        "xhigh": "high",
+    },
     "openai": {
         "minimal": "low",
         "low": "low",
@@ -374,6 +382,8 @@ class TestDetectProvider:
             ("o1-pro", "openai_o"),
             ("o3-mini", "openai_o"),
             ("o4-mini", "openai_o"),
+            ("mimo-v2.5", "mimo"),
+            ("mimo-v2.5-pro", "mimo"),
             ("qwen-turbo", "openai"),
             ("glm-4", "openai"),
         ],
@@ -384,6 +394,16 @@ class TestDetectProvider:
     def test_case_insensitive(self) -> None:
         assert providers.detect_provider("DeepSeek-V4-Flash").family == "deepseek"
         assert providers.detect_provider("Gemini-3-Flash").family == "gemini_3"
+        detection = providers.detect_provider("MIMO-V2.5-PRO")
+        assert detection.family == "mimo"
+        assert detection.matched
+
+    def test_mimo_models_are_known_without_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING):
+            detection = providers.detect_provider("mimo-v2.5-pro")
+        assert detection.family == "mimo"
+        assert detection.matched
+        assert "unknown model" not in caplog.text
 
     def test_empty_model_returns_openai_with_warn(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING):
@@ -692,6 +712,7 @@ class TestJsonMode:
             ("gpt-4.1-mini", "json_object"),
             ("gemini-pro", "json_object"),
             ("deepseek-v4-flash", "json_object"),
+            ("mimo-v2.5-pro", "json_object"),
         ],
     )
     def test_json_mode_per_provider(self, model: str, expected_mode: str) -> None:
@@ -753,6 +774,9 @@ class TestThinkingModeMatrix:
             ("o3-mini", "disabled", {}, "default(openai_o)"),
             ("gpt-4o", "disabled", {}, "n/a"),
             ("doubao-pro-256k", "disabled", {}, "n/a"),
+            ("mimo-v2.5-pro", "disabled", {}, "n/a"),
+            ("mimo-v2.5-pro", "high", {"reasoning_effort": "high"}, "high"),
+            ("mimo-v2.5-pro", "minimal", {"reasoning_effort": "low"}, "low"),
         ],
     )
     def test_thinking_mode_matches_wire_fields(

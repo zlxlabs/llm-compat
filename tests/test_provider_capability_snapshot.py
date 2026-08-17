@@ -71,6 +71,12 @@ _EXPECTED_FAMILY_CAPABILITIES = {
         "supports_vision": False,
         "json_mode": "json_schema",
     },
+    "mimo": {
+        "disable_mode": "na",
+        "efforts": frozenset({"low", "medium", "high"}),
+        "supports_vision": False,
+        "json_mode": "json_object",
+    },
     "openai": {
         "disable_mode": "na",
         "efforts": frozenset({"low", "medium", "high"}),
