@@ -134,6 +134,10 @@
       "family": "doubao"
     },
     {
+      "pattern": "mimo-*",
+      "family": "mimo"
+    },
+    {
       "pattern": "o1*",
       "family": "openai_o"
     },
@@ -209,6 +213,16 @@
       ],
       "supports_vision": true,
       "json_mode": "json_schema"
+    },
+    "mimo": {
+      "disable_mode": "na",
+      "efforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "supports_vision": false,
+      "json_mode": "json_object"
     },
     "openai": {
       "disable_mode": "na",

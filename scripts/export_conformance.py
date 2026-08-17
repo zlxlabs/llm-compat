@@ -31,6 +31,7 @@ MODEL_CASES: tuple[str, ...] = (
     "o3-mini",
     "doubao-seed-1.6",
     "doubao-pro",
+    "mimo-v2.5-pro",
     "gpt-3.5-turbo",
     "qwen-max",
     "DeepSeek-Chat",
@@ -70,7 +71,7 @@ WARNING_CATEGORIES: dict[str, str] = {
 # 主脑审定过的向量集合指纹。向量任何增删改都会让它失配，
 # reviewed 自动变回 false，提醒重新审定。
 REVIEWED_VECTORS_DIGEST = (
-    "sha256:e14805c5facd9ee43ffd06cf282e99f46d39e695c842ac879badeeabd7338d7f"
+    "sha256:baae6e9753c38a45bc35e83ec500353e6d94811682a8ca3f7a1b3bffffaa79c8"
 )
 
 
