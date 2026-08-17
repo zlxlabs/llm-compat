@@ -21,7 +21,7 @@ llm-compat 统一处理这些差异，业务代码只需改配置不改代码。
 | **结构化 JSON 输出** | 自动选择 json_schema 或 json_object 模式，Pydantic 校验，self-correction |
 | **内容审查降级** | 国内模型被拒时自动切换海外模型，`chat()` 和 `chat_json()` 均支持 |
 | **调用轨迹** | 成功和失败共享不可变 `CallTrace`，区分路由决策、真实模型尝试与终态 |
-| **Provider 翻译** | reasoning_effort 跨 10 个 provider 族自动翻译 |
+| **Provider 翻译** | reasoning_effort 跨 11 个 provider 族自动翻译 |
 | **智能重试** | 指数退避 + jitter，错误分类（可重试/致命/超时） |
 | **并发控制** | `max_concurrency` 参数，防止打爆 API |
 | **生命周期 Hook** | `on_success` / `on_error` / `pre_request`，可接入熔断器 |
@@ -115,7 +115,7 @@ src/llm_compat/
 ├── _base.py          — 分层 orchestrator（content fallback + JSON 编排）+ hooks
 ├── client.py         — async client
 ├── sync.py           — sync client
-├── providers.py      — 10 族检测 + thinking 翻译 + json_mode
+├── providers.py      — 11 族检测 + thinking 翻译 + json_mode
 ├── retry.py          — 智能重试 + 错误分类
 ├── refusal.py        — 3 层拒绝检测
 ├── fallback.py       — fallback 链解析 + 模态过滤

@@ -2,6 +2,24 @@
 
 记录设计过程中的关键决策及其推理过程。
 
+## 2026-08-17: 登记 MiMo family 并采用 json_object
+
+**问题**: `mimo-v2.5-pro` 和 `mimo-v2.5` 未登记时会回落到 `openai`/`json_schema`，网关对
+不支持的格式返回 HTTP 200 并吐出半截 JSON，生产方因此出现静默解析失败。
+
+**证据**:
+
+- [MiMo 结构化输出官方文档](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/text-generation/structured-output)
+  只允许 `response_format={"type":"json_object"}`。
+- issue #19 实测中，未登记路径 20/20 为 `JSONParseError`，`raw_content` 仅 23–48 字符；
+  运行时登记 `json_mode=json_object` 并使用 `max_completion_tokens=8192` 后 17/20 解析成功，
+  其余 3 篇是业务 schema 不匹配而非截断。
+
+**决定**: 用单一 `mimo-*` pattern 登记 `mimo` family，caps 固定为
+`disable_mode=na`、`efforts={low, medium, high}`、`supports_vision=False`、
+`json_mode=json_object`。不在本次翻译官方 `thinking.type`；family 级 vision 取 False，避免
+把不支持多模态的 `mimo-v2.5-pro` 当作 vision fallback 目标。
+
 ## 2026-05-07: 是否支持 DeepSeek `thinking` 参数
 
 **问题**: DeepSeek V4 新增了 `thinking: {type: "enabled"/"disabled"}` 对象，当前系统只支持 `reasoning_effort`。

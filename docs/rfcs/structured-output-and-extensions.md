@@ -49,6 +49,7 @@ result = await client.chat_json(
 | gemini (旧版) | json_object | |
 | doubao | json_schema | |
 | doubao_seed | json_schema | |
+| mimo | json_object | |
 
 ### 迁移影响
 

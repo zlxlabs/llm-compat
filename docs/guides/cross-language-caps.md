@@ -64,7 +64,7 @@ git add "$VENDOR_DIR"
 4. 全部不命中时返回 `family="openai"`、`matched=false`。
 
 数组顺序是契约的一部分，不能排序、去重或按 family 重组。内容以
-`caps.json.patterns` 为准；下表是当前 18 项的完整顺序，随产物更新：
+`caps.json.patterns` 为准；下表是当前 19 项的完整顺序，随产物更新：
 
 | 顺序 | pattern | family |
 | ---: | --- | --- |
@@ -82,10 +82,11 @@ git add "$VENDOR_DIR"
 | 12 | `gpt-*` | `openai` |
 | 13 | `doubao-seed-*` | `doubao_seed` |
 | 14 | `doubao-*` | `doubao` |
-| 15 | `o1*` | `openai_o` |
-| 16 | `o3*` | `openai_o` |
-| 17 | `o4*` | `openai_o` |
-| 18 | `o5*` | `openai_o` |
+| 15 | `mimo-*` | `mimo` |
+| 16 | `o1*` | `openai_o` |
+| 17 | `o3*` | `openai_o` |
+| 18 | `o4*` | `openai_o` |
+| 19 | `o5*` | `openai_o` |
 
 例如，`gpt-5` 必须先命中第 8 项而不是第 12 项；如果把通用的 `gpt-*` 排到
 `gpt-5` 前面，它会错误地落入 `openai` 族，随后得到错误的能力和请求字段。这种错误
