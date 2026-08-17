@@ -96,7 +96,7 @@ print(result.parsed)  # dict
 | Provider 族 | 模式 | 代表模型 | 说明 |
 |---|---|---|---|
 | `openai_gpt5` / `openai_o` / `gemini_25` / `gemini_3` / `doubao` / `doubao_seed` | json_schema | gpt-5-mini, o4-mini, gemini-2.5-flash | API 层面强制 Schema 约束，成功率最高 |
-| `openai_gpt4` / `deepseek` / `gemini` | json_object | gpt-4o, deepseek-v4-flash | API 保证合法 JSON，schema 通过 prompt 注入引导结构 |
+| `openai_gpt4` / `deepseek` / `gemini` / `mimo` | json_object | gpt-4o, deepseek-v4-flash, mimo-v2.5-pro | API 保证合法 JSON，schema 通过 prompt 注入引导结构 |
 
 - json_schema 模式被 API 拒绝（400）时自动降级到 json_object + warning 日志
 - json_object 模式下自动将 schema 注入到最后一条 user message 中引导输出格式
@@ -439,7 +439,7 @@ warnings = validate_fallback_config({"gpt-4.1-*": ["deepseek-chat"]})
 | `"high"` | 透传 | 透传 | 透传 | drop+warn |
 | `"max"` | 透传 | clamp→`high` | clamp→`high` | drop+warn |
 
-支持 10 个 provider 族：`deepseek` / `gemini_25` / `gemini_3` / `gemini` / `openai_gpt5` / `openai_gpt4` / `openai_o` / `doubao_seed` / `doubao` / `openai`
+支持 11 个 provider 族：`deepseek` / `gemini_25` / `gemini_3` / `gemini` / `openai_gpt5` / `openai_gpt4` / `openai_o` / `doubao_seed` / `doubao` / `mimo` / `openai`
 
 ### v0.9.0 检测结果与严格模式
 `detect_provider(model)` 返回 `ProviderDetection`，不是字符串；旧的字符串比较改用 `.family`，

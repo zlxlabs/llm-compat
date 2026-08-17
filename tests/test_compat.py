@@ -17,6 +17,7 @@ _VALIDATION_FAMILY_MODELS: dict[str, str] = {
     "openai_o": "o3-mini",
     "doubao_seed": "doubao-seed-2.0",
     "doubao": "doubao-pro-256k",
+    "mimo": "mimo-v2.5-pro",
     "openai_gpt4": "gpt-4o",
     "openai": "qwen-turbo",
     "unknown": "unknown-model",

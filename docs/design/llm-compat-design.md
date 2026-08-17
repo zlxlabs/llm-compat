@@ -131,7 +131,7 @@ build_request_payload("deepseek-chat", "disabled", {"model": "deepseek-chat"})
 # → {"model": "deepseek-chat", "thinking": {"type": "disabled"}}
 ```
 
-运行时能力记录是 `dict[str, Any]`，当前 10 个 family/18 个有序 pattern 以 `caps.json`
+运行时能力记录是 `dict[str, Any]`，当前 11 个 family/19 个有序 pattern 以 `caps.json`
 及其 schema/enums 为准；`ProviderDetection` 用 `.family` 和 `.matched` 区分兜底与命中。
 
 自定义 family 的完整 `register_provider(..., caps={...})` 用法见接入指南；字段必须符合

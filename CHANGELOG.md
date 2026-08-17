@@ -8,6 +8,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- 登记小米 MiMo `mimo-*` provider family。`chat_json()` 现在为 `mimo-v2.5-pro` 和
+  `mimo-v2.5` 使用 `json_object` 并将 Pydantic 或显式 JSON Schema 注入最后一条 user
+  message，避免未知模型回落到 `json_schema` 导致网关静默截断 JSON。该 family 保守取
+  `disable_mode=na`、`supports_vision=False`，reasoning effort 支持 `low`、`medium`、`high`。
+
 ## [0.9.0] - 2026-08-06
 
 ### Added

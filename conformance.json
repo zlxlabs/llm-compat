@@ -4911,6 +4911,486 @@
       }
     },
     {
+      "id": "mimo-v2.5-pro__HIGH__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "HIGH",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__HIGH__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "HIGH",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__blank__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "  ",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__blank__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "  ",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__disabled__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "disabled",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__disabled__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "disabled",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__empty__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__empty__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__false__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "false",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__false__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "false",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__high__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "high",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__high__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "high",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__low__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "low",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__low__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "low",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__max__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "max",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__max__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "max",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__medium__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "medium",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__medium__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "medium",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "medium"
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__minimal__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "minimal",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__minimal__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "minimal",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "low"
+        },
+        "warnings": [
+          "effort_clamp_up"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__none__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "none",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__none__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "none",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__off__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "off",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__off__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "off",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": [
+          "deprecated_effort_alias"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__ultra__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "ultra",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__ultra__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "ultra",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__unset__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": null,
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__unset__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": null,
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {},
+        "warnings": []
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__xhigh__lenient",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "xhigh",
+        "strict": false
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro__xhigh__strict",
+      "input": {
+        "model": "mimo-v2.5-pro",
+        "reasoning_effort": "xhigh",
+        "strict": true
+      },
+      "expect": {
+        "family": "mimo",
+        "matched": true,
+        "set": {
+          "reasoning_effort": "high"
+        },
+        "warnings": [
+          "effort_clamp_down"
+        ]
+      }
+    },
+    {
       "id": "o3-mini__HIGH__lenient",
       "input": {
         "model": "o3-mini",
