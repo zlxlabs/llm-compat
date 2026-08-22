@@ -48,10 +48,48 @@ def _content_filter_response(content: str = "provider partial output") -> dict:
     }
 
 
+def _message_refusal_response(refusal: str = "provider refusal") -> dict:
+    response = _chat_response("provider partial output")
+    response["choices"][0]["message"]["refusal"] = refusal
+    return response
+
+
 MESSAGES = [{"role": "user", "content": "hello"}]
 
 
+STRUCTURED_NO_FALLBACK_CASES = [
+    ("finish_reason=content_filter", _content_filter_response()),
+    (
+        "finish_reason=content_policy",
+        _chat_response("provider partial output", finish_reason="content_policy"),
+    ),
+    ("finish_reason=safety", _chat_response("provider partial output", finish_reason="safety")),
+    ("message.refusal", _message_refusal_response()),
+]
+
+
 class TestFallbackBasic:
+    @pytest.mark.parametrize(
+        ("signal", "response"),
+        STRUCTURED_NO_FALLBACK_CASES,
+        ids=[case[0] for case in STRUCTURED_NO_FALLBACK_CASES],
+    )
+    async def test_structured_refusal_without_fallback_raises(
+        self, httpx_mock: HTTPXMock, signal: str, response: dict
+    ):
+        httpx_mock.add_response(json=response)
+        async with LLMClient(
+            base_url="https://api.test.com/v1", api_key="sk-test"
+        ) as client:
+            with pytest.raises(ContentPolicyError) as exc_info:
+                await client.chat("gpt-4o", MESSAGES)
+
+        error = exc_info.value
+        assert error.evidence is not None
+        assert error.evidence.layer == "structured_signal"
+        assert error.evidence.signal == signal
+        assert error.attempt_layers == {"gpt-4o": "structured_signal"}
+
     async def test_refusal_warning_contains_evidence_fields(
         self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
     ):

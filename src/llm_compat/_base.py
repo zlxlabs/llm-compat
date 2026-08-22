@@ -739,7 +739,7 @@ class BaseClient:
                         ) from response.error
 
                     response_is_refusal = False
-                    if has_fallback and response.data and not response.error:
+                    if response.data and not response.error:
                         evidence = detect_refusal(
                             response.data,
                             self._refusal_detector,
@@ -752,7 +752,9 @@ class BaseClient:
                             model=current_model,
                             provider=current_provider,
                         )
-                        response_is_refusal = evidence.is_refusal
+                        response_is_refusal = evidence.is_refusal and (
+                            evidence.layer == "structured_signal" or has_fallback
+                        )
                         trace.add_model_attempt(
                             model=current_model,
                             provider=current_provider,
