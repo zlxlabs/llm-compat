@@ -79,6 +79,8 @@ DEFAULT_REFUSAL_PATTERNS_CN: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"(?:AI[ \u3000]*语言模型|AI|人工智能|语言模型)[，,、:\s]*)?"
             r"(?:很抱歉[，,、:\s]*)?(?:无法|不能|没办法|不便)"
             r"(?:提供|回答|协助|讨论|继续|完成|生成|帮助)"
+            # Keep this lookahead sentence-local; widening it would miss this true refusal:
+            # "我不能协助这个请求。不过你可以尝试其他问法。"
             r"(?![^。！？!?\n]{0,30}(?:但|不过|然而))"
         ),
     ),
@@ -101,6 +103,8 @@ DEFAULT_REFUSAL_PATTERNS_EN: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"artificial intelligence|language model)[,:\s]*)?"
             r"\bI\s+(?:cannot|can['’]?t|am unable to)\s+"
             r"(?:assist|help|provide|comply|answer|continue|complete|generate)\b"
+            # Keep this lookahead sentence-local; widening it would miss this true refusal:
+            # "我不能协助这个请求。不过你可以尝试其他问法。"
             r"(?![^.!?\n]{0,30}(?:but|however))",
             re.IGNORECASE,
         ),
