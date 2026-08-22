@@ -515,12 +515,11 @@ class TestFallbackStats:
             assert client.stats.error_count == 0
             assert client.stats.total_calls == 1
 
-    async def test_empty_chain_skips_refusal_error_accounting_gate_contract(
+    async def test_no_fallback_text_inference_returns_original_response(
         self, httpx_mock: HTTPXMock
     ):
-        """Gate finding correctness-json-rescue-double-error-accounting: with an empty
-        chain, refusal detection does not run, so _base.py:853 and _base.py:619
-        cannot both call record_error.
+        """Text inference is ignored without a fallback, while structured signals are
+        still enforced by the shared refusal detector.
         """
         refusal = "我无法回答这个问题。"
         httpx_mock.add_response(json=_refusal_response(refusal))
@@ -532,6 +531,7 @@ class TestFallbackStats:
             assert result.content == refusal
             assert result.refusal_suspected is False
             assert client.stats.error_count == 0
+            assert client.stats.fallback_count == 0
 
     async def test_no_fallback_no_stats(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json=_chat_response("ok"))
