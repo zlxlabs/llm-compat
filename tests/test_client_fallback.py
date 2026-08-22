@@ -115,6 +115,78 @@ class TestFallbackBasic:
         assert evidence.content_length == 8
         assert evidence.finish_reason == "stop"
 
+    async def test_text_refusal_without_fallback_does_not_log_warning(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ):
+        httpx_mock.add_response(json=_refusal_response())
+        with caplog.at_level("WARNING"):
+            async with LLMClient(
+                base_url="https://api.test.com/v1", api_key="sk-test"
+            ) as client:
+                result = await client.chat("gpt-4o", MESSAGES)
+
+        refusal_warnings = [
+            record
+            for record in caplog.records
+            if record.levelno == logging.WARNING and "Refusal detected" in record.message
+        ]
+        assert result.content == "我无法回答该问题"
+        assert result.refusal_suspected is False
+        assert refusal_warnings == []
+
+    async def test_text_refusal_with_fallback_logs_once_with_complete_evidence(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ):
+        httpx_mock.add_response(json=_refusal_response())
+        httpx_mock.add_response(json=_chat_response("actual answer"))
+        with caplog.at_level("WARNING"):
+            async with LLMClient(
+                base_url="https://api.test.com/v1",
+                api_key="sk-test",
+                content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+            ) as client:
+                result = await client.chat("deepseek-v4", MESSAGES)
+
+        refusal_warnings = [
+            record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING and "Refusal detected" in record.message
+        ]
+        assert result.content == "actual answer"
+        assert len(refusal_warnings) == 1
+        assert "model=deepseek-v4" in refusal_warnings[0]
+        assert "layer=text_pattern" in refusal_warnings[0]
+        assert "signal=pattern:cn_first_person_cannot" in refusal_warnings[0]
+        assert "matched_text='我无法回答'" in refusal_warnings[0]
+        assert "position=0" in refusal_warnings[0]
+        assert "content_length=8" in refusal_warnings[0]
+        assert "finish_reason=stop" in refusal_warnings[0]
+
+    async def test_structured_refusal_without_fallback_logs_once(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ):
+        httpx_mock.add_response(json=_content_filter_response())
+        with caplog.at_level("WARNING"):
+            async with LLMClient(
+                base_url="https://api.test.com/v1", api_key="sk-test"
+            ) as client:
+                with pytest.raises(ContentPolicyError):
+                    await client.chat("gpt-4o", MESSAGES)
+
+        refusal_warnings = [
+            record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING and "Refusal detected" in record.message
+        ]
+        assert len(refusal_warnings) == 1
+        assert "model=gpt-4o" in refusal_warnings[0]
+        assert "layer=structured_signal" in refusal_warnings[0]
+        assert "signal=finish_reason=content_filter" in refusal_warnings[0]
+        assert "matched_text=''" in refusal_warnings[0]
+        assert "position=-1" in refusal_warnings[0]
+        assert "content_length=23" in refusal_warnings[0]
+        assert "finish_reason=content_filter" in refusal_warnings[0]
+
     async def test_replace_mode_disables_builtin_text_patterns(
         self, httpx_mock: HTTPXMock
     ):
