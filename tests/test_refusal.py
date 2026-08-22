@@ -157,6 +157,24 @@ class TestTextEvidence:
         assert evidence.is_refusal is False
         assert evidence.layer == "none"
 
+    def test_extra_keyword_position_gate_within_length_limit(self) -> None:
+        keyword = "自定义拒绝"
+        late_content = "正常内容" * 35 + keyword
+        head_content = keyword + "正常内容" * 35
+        assert len(late_content) == len(head_content) == 145
+        assert len(late_content) <= 300
+        assert late_content.find(keyword) == 140
+        assert head_content.find(keyword) == 0
+
+        late_evidence = detect_refusal(
+            response(late_content), policy=RefusalPolicy(extra_keywords=(keyword,))
+        )
+        head_evidence = detect_refusal(
+            response(head_content), policy=RefusalPolicy(extra_keywords=(keyword,))
+        )
+        assert late_evidence.is_refusal is False
+        assert head_evidence.is_refusal is True
+
     @pytest.mark.parametrize(
         ("content_length", "expected"),
         [(300, True), (301, False)],
