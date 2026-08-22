@@ -208,6 +208,48 @@ class TestTextEvidence:
         assert evidence.layer == "none"
 
     @pytest.mark.parametrize(
+        "content",
+        [case[1] for case in REFUSAL_PATTERN_CASES],
+        ids=[case[0] for case in REFUSAL_PATTERN_CASES],
+    )
+    def test_zero_max_content_length_disables_builtin_text_layer(
+        self, content: str
+    ) -> None:
+        evidence = detect_refusal(
+            response(content), policy=RefusalPolicy(max_content_length=0)
+        )
+        assert evidence.is_refusal is False
+        assert evidence.layer == "none"
+
+    @pytest.mark.parametrize(
+        "data",
+        [
+            response("answer", finish_reason="content_filter"),
+            response("answer", refusal="provider refusal"),
+        ],
+        ids=["finish_reason_content_filter", "message_refusal"],
+    )
+    def test_zero_max_content_length_preserves_structured_signals(
+        self, data: dict
+    ) -> None:
+        evidence = detect_refusal(
+            data, policy=RefusalPolicy(max_content_length=0)
+        )
+        assert evidence.is_refusal is True
+        assert evidence.layer == "structured_signal"
+
+    def test_zero_max_content_length_disables_extra_keywords(self) -> None:
+        evidence = detect_refusal(
+            response("自定义拒绝"),
+            policy=RefusalPolicy(
+                max_content_length=0,
+                extra_keywords=("自定义拒绝",),
+            ),
+        )
+        assert evidence.is_refusal is False
+        assert evidence.layer == "none"
+
+    @pytest.mark.parametrize(
         ("signal", "content", "review"),
         REFUSAL_PATTERN_CASES,
         ids=[case[0] for case in REFUSAL_PATTERN_CASES],
