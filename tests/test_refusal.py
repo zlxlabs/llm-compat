@@ -24,6 +24,91 @@ def response(
     return {"choices": [{"finish_reason": finish_reason, "message": message}]}
 
 
+REFUSAL_PATTERN_CASES = [
+    ("pattern:cn_first_person_cannot", "我无法提供确切数字", "直接拒绝本次提供请求"),
+    ("pattern:cn_apology_meta", "抱歉，我不能协助这个请求", "道歉后由我明确拒绝"),
+    (
+        "pattern:cn_as_ai_cannot",
+        "作为一个AI语言模型，我无法回答这个问题",
+        "当前回答以 AI 身份明确拒绝",
+    ),
+    ("pattern:cn_unsuitable_topic", "这个问题不适合讨论", "当前问题被明确拒绝讨论"),
+    (
+        "pattern:en_apology_cannot",
+        "I'm sorry, but I cannot help with that request.",
+        "道歉后由我明确拒绝",
+    ),
+    (
+        "pattern:en_first_person_assistance",
+        "I cannot assist with that request.",
+        "当前回答由我明确拒绝协助",
+    ),
+    (
+        "pattern:en_as_ai_cannot",
+        "As an AI language model, I cannot comply with this request.",
+        "当前回答以 AI 身份明确拒绝",
+    ),
+    (
+        "pattern:en_policy_violation",
+        "This violates our content policy.",
+        "当前请求被明确归为违反政策",
+    ),
+    (
+        "pattern:en_against_guidelines",
+        "That is against my programming.",
+        "当前请求被明确归为违背约束",
+    ),
+]
+
+NON_REFUSAL_PATTERN_CASES = [
+    (
+        "pattern:cn_first_person_cannot",
+        "我无法提供确切数字，但可以给出区间：",
+        "先拒绝精确数字、随后继续回答，不是拒绝本次任务",
+    ),
+    (
+        "pattern:cn_apology_meta",
+        "抱歉，我需要先了解一下你的具体需求",
+        "道歉后的澄清请求没有拒绝 cue",
+    ),
+    (
+        "pattern:cn_as_ai_cannot",
+        "原文写道：作为一个AI语言模型，我无法回答这个问题，但给出了替代方案",
+        "转述他人且继续提供方案，不是本次回答的拒绝",
+    ),
+    (
+        "pattern:cn_unsuitable_topic",
+        "原文认为该做法不适合讨论细节",
+        "转述原文观点，且主语不是当前请求",
+    ),
+    (
+        "pattern:en_apology_cannot",
+        "I'm afraid I cannot give an exact number, but roughly 40%.",
+        "先拒绝精确数字、随后继续回答，不是拒绝本次任务",
+    ),
+    (
+        "pattern:en_first_person_assistance",
+        "I cannot provide an exact number, but I can estimate 40%.",
+        "限制一个细节后仍完成回答，不是拒绝本次任务",
+    ),
+    (
+        "pattern:en_as_ai_cannot",
+        "The article says: As an AI language model, I cannot answer that.",
+        "转述文章内容，不是本次回答的拒绝",
+    ),
+    (
+        "pattern:en_policy_violation",
+        "The audit found the vendor violates the company's policy.",
+        "审计转述第三方事实，不是拒绝当前请求",
+    ),
+    (
+        "pattern:en_against_guidelines",
+        "The documentation says that it is against my programming.",
+        "转述文档内容，不是拒绝当前请求",
+    ),
+]
+
+
 class TestRefusalContext:
     def test_fields(self) -> None:
         ctx = RefusalContext(
@@ -83,6 +168,37 @@ class TestStructuredEvidence:
 
 
 class TestTextEvidence:
+    @pytest.mark.parametrize(
+        ("signal", "content", "review"),
+        REFUSAL_PATTERN_CASES,
+        ids=[case[0] for case in REFUSAL_PATTERN_CASES],
+    )
+    def test_every_default_pattern_has_a_refusal_case(
+        self, signal: str, content: str, review: str
+    ) -> None:
+        assert review
+        evidence = detect_refusal(response(content, finish_reason="stop"))
+        assert evidence.is_refusal is True
+        assert evidence.layer == "text_pattern"
+        assert evidence.signal == signal
+        assert evidence.match_position < 120
+        assert len(content) <= 300
+
+    @pytest.mark.parametrize(
+        ("signal", "content", "review"),
+        NON_REFUSAL_PATTERN_CASES,
+        ids=[case[0] for case in NON_REFUSAL_PATTERN_CASES],
+    )
+    def test_every_default_pattern_rejects_its_false_positive(
+        self, signal: str, content: str, review: str
+    ) -> None:
+        assert review
+        evidence = detect_refusal(response(content, finish_reason="stop"))
+        assert evidence.is_refusal is False, signal
+        assert evidence.layer == "none"
+        assert len(content) <= 300
+        assert any(char not in "\n" for char in content[:120])
+
     @pytest.mark.parametrize(
         "content",
         [
