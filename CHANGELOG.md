@@ -8,6 +8,36 @@
 
 ## [Unreleased]
 
+- 收紧拒绝句式表对中英混排空白和“不确定后继续作答”的处理，减少文本层假阳性并覆盖常见
+  `作为 AI` 表达。
+- 在集成指南中明确文本层是偏向漏判的启发式，记录 `refusal_max_content_length=0`、
+  `refusal_keywords_mode="replace"` 和 `refusal_detector` 返回 `False` 三条现有逃生门，以及后续
+  个案走配置或 backlog 的处置约定。
+
+## [0.10.0] - 2026-08-22
+
+### Changed
+
+- **Breaking**：拒绝检测默认词表从普通题材词改为严格的拒绝言语行为正则；文本判定同时要求
+  句式命中位于正文前 120 字且全文不超过 300 字，降低正常长文被误判的风险。
+- 拒绝句式统一为“第一人称 + 情态否定 + 任务动词”的主规则；拒绝动词后约 30 字内、同一句中的
+  “但/不过/然而”（英文为 “but/however”）会排除文本层拒绝匹配，英文政策归因保留独立精确规则。
+  该排除不跨句：跨句转折既可能引出任务答案，也可能引出仍属拒绝的替代建议，无法靠位置区分；库保守判为拒绝，
+  误判代价由 `on_all_refused="return_best"` 兜住。普通澄清、补充回答和转述他人观点不会仅因出现否定词而触发。
+- 拒绝判定现在返回可序列化的 `RefusalEvidence`，区分 provider 声明层、畸形响应、文本推断层
+  和调用方 detector；结构化声明优先，`refusal_detector` 返回 `False` 可否决文本层判定。
+- **Breaking**：链耗尽时 `on_all_refused` 默认改为 `"return_best"`。救援只从推断层候选中挑选正文最长者；
+  声明层候选自身一律不救。链上同时存在声明层与推断层候选时，仍会救援推断层候选；若没有非空的推断层候选，
+  抛出 `ContentPolicyError`。被救援的候选设置 `ChatResult.refusal_suspected=True`。
+
+### Migration
+
+- 需要保留旧的“所有候选拒绝即抛错”行为时显式设置 `on_all_refused="raise"`。
+- 需要接管文本词表时设置 `refusal_keywords_mode="replace"`；`refusal_keywords` 和
+  `refusal_keywords_url` 仍按子串匹配，但继续受长度/位置门槛约束。
+- 处理可能被文本推断层救援的结果时检查 `result.refusal_suspected` 和
+  `result.refusal_evidence`，并对 `chat_json()` 继续使用 `parsed` 做结构校验。
+
 ## [0.9.1] - 2026-08-17
 
 ### Added

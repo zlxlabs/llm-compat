@@ -19,7 +19,7 @@ llm-compat 统一处理这些差异，业务代码只需改配置不改代码。
 |------|------|
 | **统一对话 API** | `chat()` / `chat_json()` / `chat_stream()` / `chat_image()` + 同步版本 |
 | **结构化 JSON 输出** | 自动选择 json_schema 或 json_object 模式，Pydantic 校验，self-correction |
-| **内容审查降级** | 国内模型被拒时自动切换海外模型，`chat()` 和 `chat_json()` 均支持 |
+| **内容审查降级** | 结构化信号优先、严格句式推断并支持 fallback；链耗尽可返回带 evidence 的最佳候选；[边界与调优](docs/guides/integration-guide.md#拒绝检测的边界与调优) |
 | **调用轨迹** | 成功和失败共享不可变 `CallTrace`，区分路由决策、真实模型尝试与终态 |
 | **Provider 翻译** | reasoning_effort 跨 11 个 provider 族自动翻译 |
 | **智能重试** | 指数退避 + jitter，错误分类（可重试/致命/超时） |
@@ -59,6 +59,8 @@ async with LLMClient(
     result = await client.chat_json("deepseek-v4-pro", messages, schema=TagResult)
     print(result.parsed)       # TagResult(tags=[...])
     print(result.fallback_from) # 降级时显示原始模型，否则 None
+    print(result.refusal_suspected) # 推断层救援的结果为 True
+    print(result.refusal_evidence)  # 可序列化的拒绝证据
     print(result.trace.to_dict()) # 安全、可序列化的模型级调用事实
 ```
 

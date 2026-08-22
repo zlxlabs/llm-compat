@@ -58,6 +58,7 @@ class CollectorClient:
         finish_reason: str | None = None,
         fallback_model: str | None = None,
         fallback_chain: list[str] | None = None,
+        evidence: dict[str, Any] | None = None,
     ) -> None:
         body: dict[str, Any] = {
             "model": model,
@@ -73,6 +74,7 @@ class CollectorClient:
             "finish_reason": finish_reason,
             "fallback_model": fallback_model,
             "fallback_chain": fallback_chain,
+            "evidence": evidence,
         }
         try:
             http = self._get_http()

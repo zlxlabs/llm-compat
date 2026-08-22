@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from llm_compat._collector import CollectorClient
+from llm_compat.refusal import RefusalEvidence
 
 
 @pytest.fixture
@@ -36,6 +37,9 @@ class TestReportRefusal:
             http_status=500,
             input_text="这是测试内容，前200字会被截取",
             response_preview="sensitive_words_detected",
+            evidence=RefusalEvidence(
+                True, "structured_signal", signal="finish_reason=content_filter"
+            ).to_dict(),
         )
         mock_http.post.assert_called_once()
         call_kwargs = mock_http.post.call_args
@@ -44,6 +48,7 @@ class TestReportRefusal:
         assert body["source_project"] == "test-project"
         assert body["detection_layer"] == "http_error"
         assert body["http_status"] == 500
+        assert body["evidence"]["layer"] == "structured_signal"
 
     @pytest.mark.asyncio
     async def test_report_falls_back_to_cache(self, mock_http: AsyncMock, tmp_cache: Path):

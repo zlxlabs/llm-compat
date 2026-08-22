@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 from llm_compat._types import ChatResult, LLMStats, TokenUsage
+from llm_compat.refusal import RefusalEvidence
 
 
 class TestTokenUsage:
@@ -42,6 +43,17 @@ class TestChatResult:
     def test_parsed_field(self):
         r = ChatResult(content='{"key": "val"}', parsed={"key": "val"})
         assert r.parsed == {"key": "val"}
+
+    def test_refusal_metadata_defaults_and_round_trips(self):
+        r = ChatResult(content="answer")
+        assert r.refusal_suspected is False
+        assert r.refusal_evidence is None
+        evidence = RefusalEvidence(True, "text_pattern", signal="pattern:test")
+        r = ChatResult(
+            content="answer", refusal_suspected=True, refusal_evidence=evidence
+        )
+        assert r.refusal_suspected is True
+        assert r.refusal_evidence == evidence
 
 
 class TestLLMStats:

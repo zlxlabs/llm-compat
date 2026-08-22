@@ -196,11 +196,16 @@ async with LLMClient(
 
 fallback 切换模型时，`chat_json()` 自动为新模型重新选择 json_mode。例如 DeepSeek（json_object）被拒后 fallback 到 GPT-5（json_schema），会自动使用更高级的 json_schema 模式。
 
-### 拒绝检测（三层，自动）
+### 拒绝检测（证据分级，自动）
 
-1. **结构化信号**（最可靠）：`finish_reason=content_filter`、空 `choices`、`refusal` 字段
-2. **HTTP 错误码**：400/403/451/500 + body 包含审查关键词
-3. **响应文本关键词**（兜底）：内置中英文拒绝关键词列表
+1. **声明层**（最可靠）：provider 的 `finish_reason=content_filter`/`content_policy`/`safety` 或非空
+   `message.refusal`。这类拒绝不可被文本 detector 否决，也不会在链耗尽时被救援。
+2. **推断层**：默认中英文拒绝言语行为正则，且必须同时满足全文不超过 300 字、命中在前 120
+   字；普通题材词（例如“违反”“无法提供”“violates”）不会单独触发。
+3. **HTTP 错误**：400/403/451/500 且响应体被分类为内容审查错误；它不提供可救援的正文。
+
+每次拒绝判定都产生 `RefusalEvidence`，包含 `layer`、`signal`、命中片段、位置、正文长度和
+`finish_reason`，同时写入 WARNING 日志和 Collector（如果已配置）。
 
 ### 模态感知
 
@@ -263,16 +268,91 @@ client = LLMClient(
 ```python
 from llm_compat import RefusalContext
 
-def my_detector(ctx: RefusalContext) -> bool:
+def my_detector(ctx: RefusalContext) -> bool | None:
     return "自定义拒绝标识" in ctx.content
 
 client = LLMClient(
     ...,
     content_fallbacks={...},
     refusal_detector=my_detector,
-    refusal_keywords=["额外关键词"],      # 追加到内置列表
+    refusal_keywords=["额外关键词"],      # 默认追加到内置句式
 )
 ```
+
+detector 是三态函数：返回 `True` 表示拒绝，返回 `False` 表示确认非拒绝并短路内置文本判定，
+返回 `None` 交给默认逻辑。detector 抛异常时记录 WARNING 并继续默认逻辑。声明层信号始终优先。
+
+需要完全接管文本词表时使用 `refusal_keywords_mode="replace"`；不传关键词时文本层不判拒绝，
+但 provider 声明层仍然有效。手动词和 URL 词按子串匹配，仍受相同的长度/位置门槛约束。
+
+### 拒绝检测的边界与调优
+
+内置文本层是启发式，不是语义判定器。模型先道歉或限定，再继续作答时，内置句式表始终会有
+残余的假阳性和漏判风险：词法形态可以不断变化，但正则无法可靠判断语用意图。库的取舍是偏向
+漏判，因为漏判只会把一句拒绝语交给下游，调用方仍可恢复；误判则可能丢弃正确结果，无法恢复。
+
+已知的文本层残余假阳性包括：
+
+- **因果补充**：拒绝动词后的因果补充（例如“因为……”或英文 “as …”）不是转折排除信号，
+  后文若继续作答，仍可能被整段判为拒绝。
+- **跨句转折后继续作答**：转折排除只在拒绝动词后约 30 字、且不跨句末标点时生效，
+  因此“我无法提供精确数字。不过，根据现有数据估计约为 40%。”和英文对应句式仍可能被判为拒绝。
+  跨句的“不过”或 “However” 既可能引出任务答案，也可能引出替代建议（后者仍是拒绝），
+  无法靠位置区分；库选择保守判为拒绝，误判代价由 `on_all_refused="return_best"` 兜住。
+
+文本层误判的代价有上限。`on_all_refused` 默认是 `"return_best"`，因此文本层把正常回答误判为
+拒绝时不会直接让调用方拿到失败：最坏情况是多试几次 fallback，最后仍返回正文，并设置
+`refusal_suspected=True`。调用方应检查这个字段和 `refusal_evidence`，再决定是否需要业务降级。
+provider 的声明层信号仍然优先，`finish_reason=content_filter` 或非空 `message.refusal` 不会被
+文本层配置关闭。
+
+需要关闭或接管文本层时，使用现有的三个逃生门。下面的示例都保留声明层判定：
+
+1. 完全关闭文本层，只保留 provider 声明层：
+
+   ```python
+   from llm_compat import LLMClient
+
+   client = LLMClient(
+       base_url="https://api.example.com/v1",
+       api_key="sk-example",
+       refusal_max_content_length=0,
+   )
+   ```
+
+2. 完全接管文本词表，内置句式不再参与文本判定：
+
+   ```python
+   from llm_compat import LLMClient
+
+   client = LLMClient(
+       base_url="https://api.example.com/v1",
+       api_key="sk-example",
+       refusal_keywords_mode="replace",
+       refusal_keywords=["供应商明确拒绝"],
+   )
+   ```
+
+3. 对单次响应由调用方确认不是拒绝，短路内置文本判定：
+
+   ```python
+   from llm_compat import LLMClient, RefusalContext
+
+   def detector(ctx: RefusalContext) -> bool | None:
+       if ctx.content == "抱歉，我无法提供相关信息":
+           return False
+       return None
+
+   client = LLMClient(
+       base_url="https://api.example.com/v1",
+       api_key="sk-example",
+       refusal_detector=detector,
+   )
+   ```
+
+后续新发现的假阳性或漏判个案，优先通过上述配置由调用方处理，或提 issue 记入 backlog；默认
+正则表不再按个案逐条修改。句首冒号、Markdown 列表或加粗等已知漏判属于“偏向漏判”的取舍，
+不应为覆盖单个样本而放宽默认句式边界。
 
 ### 动态关键词加载
 
@@ -296,16 +376,27 @@ client = LLMClient(
 
 ### 所有模型都拒绝时
 
+默认 `on_all_refused="return_best"`。救援只从推断层候选中挑选正文最长者；声明层候选自身一律不救。
+链上同时存在声明层与推断层候选时，仍会救援推断层候选；若没有非空的推断层候选，抛
+`ContentPolicyError`。被救援的候选设置 `refusal_suspected=True` 与 `refusal_evidence`；
+`chat_json()` 会重新执行 JSON 清洗和 schema 校验，校验失败仍抛 `ContentPolicyError`。
+
 ```python
 from llm_compat import ContentPolicyError
 
 try:
     result = await client.chat("deepseek-v4-pro", messages)
+    if result.refusal_suspected:
+        logger.warning("best candidate was inferred as a refusal: %s", result.refusal_evidence)
 except ContentPolicyError as e:
     print(e.attempted_models)  # ['deepseek-v4-pro', 'gemini-3-flash-preview', ...]
     print(e.raw_content)       # 最后一个模型的拒绝内容
     print(e.original_model)    # 'deepseek-v4-pro'
+    print(e.attempt_layers)    # {model: layer}
 ```
+
+如果业务必须在推断层也失败，可显式传 `on_all_refused="raise"`。原始返回结果仍在
+`ContentPolicyError.raw_content` 中，判定详情在 `e.evidence`。
 
 ### 已知限制
 
@@ -691,6 +782,10 @@ class LLMClient:
 | `refusal_detector` | `RefusalDetector` | `None` | 自定义拒绝检测函数 |
 | `refusal_keywords` | `list[str]` | `None` | 追加拒绝关键词 |
 | `refusal_keywords_url` | `str \| list[str]` | `None` | 从 URL 动态加载关键词 |
+| `refusal_keywords_mode` | `Literal["extend", "replace"]` | `"extend"` | 内置句式与调用方词条合并方式 |
+| `refusal_max_content_length` | `int` | `300` | 文本层判定的全文字符上限 |
+| `refusal_head_window` | `int` | `120` | 文本层命中必须位于正文前 N 字 |
+| `on_all_refused` | `Literal["raise", "return_best"]` | `"return_best"` | 链耗尽时救援推断层最佳候选或抛错 |
 | `sensitive_detector` | `SensitiveDetector` | `None` | 前置敏感词检测器（手动词库） |
 | `sensitive_words_url` | `str \| list[str]` | `None` | 从 URL 加载敏感词（纯文本格式） |
 | `collector_url` | `str` | `""` | Collector 服务地址 |
@@ -716,6 +811,8 @@ class LLMClient:
 | `fallback_from` | `str \| None` | 降级时为原始模型，未降级时为 None |
 | `fallback_chain` | `list[str]` | 降级时尝试过的模型链 |
 | `trace` | `CallTrace \| None` | v0.6.0 模型级调用轨迹；旧代码不传时保持 `None` |
+| `refusal_suspected` | `bool` | 链耗尽救援推断层候选时为 `True` |
+| `refusal_evidence` | `RefusalEvidence \| None` | 触发拒绝或救援的结构化证据 |
 
 ### CallTrace：成功与失败的统一事实
 
@@ -762,7 +859,7 @@ payload、响应正文、headers、API key 或原始异常。公共对象是 fro
 | `TruncationError` | `RetryableError` | 输出被截断 | 否 |
 | `FatalError` | `LLMCallError` | 不可恢复错误（400/401/403/404） | 否 |
 | `JSONParseError` | `LLMCallError` | JSON 解析失败（兼容保留 raw_content, model, request_id） | 否 |
-| `ContentPolicyError` | `LLMCallError` | 所有模型拒绝（兼容保留 attempted_models 等字段） | 否 |
+| `ContentPolicyError` | `LLMCallError` | 所有模型拒绝（含 `evidence` / `attempt_layers`） | 否 |
 | `SkipRequestError` | `LLMError` | pre_request hook 返回 False | 否 |
 
 稳定 `error_kind` 包括 `invalid_request`、`authentication`、`permission_denied`、

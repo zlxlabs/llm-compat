@@ -30,7 +30,13 @@ from llm_compat.providers import (
     register_provider,
     set_custom_patterns,
 )
-from llm_compat.refusal import RefusalContext, RefusalDetector
+from llm_compat.refusal import (
+    RefusalContext,
+    RefusalDetector,
+    RefusalEvidence,
+    RefusalPolicy,
+    detect_refusal,
+)
 from llm_compat.sync import SyncLLMClient
 
 __all__ = [
@@ -53,6 +59,9 @@ __all__ = [
     "ModelAttempt",
     "RefusalContext",
     "RefusalDetector",
+    "RefusalEvidence",
+    "RefusalPolicy",
+    "detect_refusal",
     "validate_fallback_config",
     "detect_provider",
     "build_request_payload",

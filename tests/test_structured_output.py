@@ -520,6 +520,47 @@ class TestContentFallbackWithJson:
         assert result.parsed.tags == ["safe"]
         assert result.fallback_from == "deepseek-v4"
 
+    async def test_json_all_inferred_refusals_rescue_valid_best_candidate(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        httpx_mock.add_response(
+            json=_chat_response('{"tags": ["I cannot assist"]}')
+        )
+        httpx_mock.add_response(
+            json=_chat_response('{"tags": ["I cannot assist with this request"]}')
+        )
+        async with LLMClient(
+            base_url="http://test/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-v4": ["gpt-5-mini"]},
+        ) as client:
+            result = await client.chat_json(
+                "deepseek-v4",
+                [{"role": "user", "content": "test"}],
+                schema=TagResult,
+            )
+        assert result.parsed.tags == ["I cannot assist with this request"]
+        assert result.refusal_suspected is True
+        assert result.refusal_evidence is not None
+        assert result.refusal_evidence.layer == "text_pattern"
+
+    async def test_json_rescue_parse_failure_is_content_policy_error(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        httpx_mock.add_response(json=self._refusal_response())
+        httpx_mock.add_response(json=self._refusal_response("I cannot assist"))
+        async with LLMClient(
+            base_url="http://test/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-v4": ["gpt-5-mini"]},
+        ) as client:
+            with pytest.raises(ContentPolicyError, match="best candidate rescue failed"):
+                await client.chat_json(
+                    "deepseek-v4",
+                    [{"role": "user", "content": "test"}],
+                    schema=TagResult,
+                )
+
     async def test_json_no_fallback_without_chain(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response('{"tags": ["normal"]}'))
         async with LLMClient(
