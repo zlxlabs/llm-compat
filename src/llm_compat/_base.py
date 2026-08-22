@@ -37,7 +37,13 @@ from .providers import (
     detect_provider,
     get_provider_caps,
 )
-from .refusal import RefusalDetector, RefusalEvidence, RefusalPolicy, detect_refusal
+from .refusal import (
+    RefusalDetector,
+    RefusalEvidence,
+    RefusalPolicy,
+    _log_refusal,
+    detect_refusal,
+)
 from .sensitive import SensitiveDetector
 
 logger = logging.getLogger(__name__)
@@ -703,12 +709,14 @@ class BaseClient:
                             latency_ms=attempt_latency_ms,
                         )
 
-                    if (
-                        response.error
-                        and isinstance(response.error, ContentPolicyError)
-                        and has_fallback
-                    ):
-                        attempt_layers[current_model] = "http_error"
+                    if response.error and isinstance(response.error, ContentPolicyError):
+                        http_evidence = RefusalEvidence(
+                            is_refusal=True,
+                            layer="http_error",
+                            signal="http_error",
+                        )
+                        _log_refusal(http_evidence, model=current_model)
+                        attempt_layers[current_model] = http_evidence.layer
                         inner.close()
                         self._pending_refusal_report = {
                             "model": current_model,
@@ -718,20 +726,16 @@ class BaseClient:
                             "message_count": len(messages),
                             "has_images": self._has_vision_content(messages),
                             "detection_layer": "http_error",
-                            "evidence": (
-                                response.error.evidence.to_dict()
-                                if response.error.evidence is not None
-                                else None
-                            ),
+                            "evidence": http_evidence.to_dict(),
                             "http_status": http_status,
                             "finish_reason": None,
                             "response_preview": str(response.error)[:200],
                         }
                         raise ContentPolicyError(
-                            str(response.error),
+                            f"Model {current_model} refused the request ({http_evidence.layer})",
                             http_status=http_status,
-                            evidence=response.error.evidence,
-                            attempt_layers={current_model: "http_error"},
+                            evidence=http_evidence,
+                            attempt_layers={current_model: http_evidence.layer},
                         ) from response.error
 
                     response_is_refusal = False

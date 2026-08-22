@@ -300,6 +300,74 @@ class TestFallbackBasic:
             assert result.content == "fallback answer"
             assert result.fallback_from == "deepseek-v4"
 
+    async def test_http_content_policy_fallback_logs_and_reports_layer(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ):
+        httpx_mock.add_response(
+            status_code=400,
+            json={"error": {"message": "content_policy_violation"}},
+        )
+        httpx_mock.add_response(
+            status_code=400,
+            json={"error": {"message": "content_policy_violation"}},
+        )
+        with caplog.at_level("WARNING"):
+            async with LLMClient(
+                base_url="https://api.test.com/v1",
+                api_key="sk-test",
+                content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+                max_retries=0,
+                on_all_refused="raise",
+            ) as client:
+                with pytest.raises(ContentPolicyError) as exc_info:
+                    await client.chat("deepseek-v4", MESSAGES)
+
+        refusal_warnings = [
+            record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING and "Refusal detected" in record.message
+        ]
+        assert len(refusal_warnings) == 2
+        assert all("layer=http_error" in message for message in refusal_warnings)
+        assert all("position=-1" in message for message in refusal_warnings)
+        assert all("content_length=0" in message for message in refusal_warnings)
+        assert all("finish_reason=None" in message for message in refusal_warnings)
+        assert exc_info.value.attempt_layers == {
+            "deepseek-v4": "http_error",
+            "gpt-4.1-mini": "http_error",
+        }
+
+    async def test_http_content_policy_without_fallback_logs_and_reports_layer(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ):
+        httpx_mock.add_response(
+            status_code=400,
+            json={"error": {"message": "content_policy_violation"}},
+        )
+        with caplog.at_level("WARNING"):
+            async with LLMClient(
+                base_url="https://api.test.com/v1",
+                api_key="sk-test",
+                max_retries=0,
+            ) as client:
+                with pytest.raises(ContentPolicyError) as exc_info:
+                    await client.chat("gpt-4o", MESSAGES)
+
+        refusal_warnings = [
+            record.message
+            for record in caplog.records
+            if record.levelno == logging.WARNING and "Refusal detected" in record.message
+        ]
+        assert len(refusal_warnings) == 1
+        assert "model=gpt-4o" in refusal_warnings[0]
+        assert "layer=http_error" in refusal_warnings[0]
+        assert "matched_text=''" in refusal_warnings[0]
+        assert "position=-1" in refusal_warnings[0]
+        assert "content_length=0" in refusal_warnings[0]
+        assert "finish_reason=None" in refusal_warnings[0]
+        assert exc_info.value.attempt_layers == {"gpt-4o": "http_error"}
+        assert "gpt-4o=http_error" in str(exc_info.value)
+
     async def test_model_not_in_fallback_config_no_fallback(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json=_refusal_response())
         async with LLMClient(

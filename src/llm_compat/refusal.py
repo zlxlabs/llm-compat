@@ -15,6 +15,7 @@ RefusalLayer = Literal[
     "text_pattern",
     "custom_detector",
     "custom_override",
+    "http_error",
     "none",
 ]
 
