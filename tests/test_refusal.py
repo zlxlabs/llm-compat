@@ -1,15 +1,31 @@
 from __future__ import annotations
 
+import pytest
+
 from llm_compat.refusal import (
     RefusalContext,
+    RefusalEvidence,
+    RefusalPolicy,
     check_response_keywords,
     check_structured_signals,
     detect_refusal,
 )
 
 
+def response(
+    content: str | None = "hello",
+    *,
+    finish_reason: str = "stop",
+    refusal: str | None = None,
+) -> dict:
+    message: dict[str, object] = {"content": content}
+    if refusal is not None:
+        message["refusal"] = refusal
+    return {"choices": [{"finish_reason": finish_reason, "message": message}]}
+
+
 class TestRefusalContext:
-    def test_fields(self):
+    def test_fields(self) -> None:
         ctx = RefusalContext(
             content="hello",
             status_code=200,
@@ -22,101 +38,170 @@ class TestRefusalContext:
         assert ctx.finish_reason == "stop"
 
 
-class TestCheckStructuredSignals:
-    def test_finish_reason_content_filter(self):
-        data = {"choices": [{"finish_reason": "content_filter", "message": {"content": "..."}}]}
+class TestStructuredEvidence:
+    @pytest.mark.parametrize(
+        ("data", "layer"),
+        [
+            (response("answer", finish_reason="content_filter"), "structured_signal"),
+            (response("answer", finish_reason="safety"), "structured_signal"),
+            (response("answer", refusal="provider refusal"), "structured_signal"),
+            (response(None), "malformed"),
+            ({"choices": []}, "malformed"),
+            ({}, "malformed"),
+        ],
+    )
+    def test_structured_and_malformed_layers(self, data: dict, layer: str) -> None:
+        evidence = detect_refusal(data)
+        assert evidence.is_refusal is True
+        assert evidence.layer == layer
         assert check_structured_signals(data) is True
 
-    def test_empty_choices(self):
-        data = {"choices": []}
-        assert check_structured_signals(data) is True
-
-    def test_no_choices_key(self):
-        data = {}
-        assert check_structured_signals(data) is True
-
-    def test_normal_response(self):
-        data = {"choices": [{"finish_reason": "stop", "message": {"content": "hello"}}]}
-        assert check_structured_signals(data) is False
-
-    def test_finish_reason_length(self):
-        data = {"choices": [{"finish_reason": "length", "message": {"content": "truncated"}}]}
-        assert check_structured_signals(data) is False
-
-    def test_refusal_field(self):
-        data = {
-            "choices": [
-                {
-                    "message": {"refusal": "I can't help with that"},
-                    "finish_reason": "stop",
-                }
-            ]
-        }
-        assert check_structured_signals(data) is True
-
-    def test_none_content_with_stop(self):
-        data = {"choices": [{"finish_reason": "stop", "message": {"content": None}}]}
-        assert check_structured_signals(data) is True
+    @pytest.mark.parametrize(
+        "finish_reason",
+        ["length", "stop"],
+    )
+    def test_non_refusal_finish_reasons(self, finish_reason: str) -> None:
+        data = response("normal response", finish_reason=finish_reason)
+        evidence = detect_refusal(data)
+        assert evidence.is_refusal is False
+        assert evidence.layer == "none"
 
 
-class TestCheckResponseKeywords:
-    def test_chinese_refusal(self):
-        assert check_response_keywords("我无法回答该问题") is True
+class TestTextEvidence:
+    @pytest.mark.parametrize(
+        "content",
+        [
+            "我无法回答该问题",
+            "我很抱歉，无法提供这项协助。",
+            "抱歉，我作为一个 AI 不能继续。",
+            "作为一个AI语言模型，我无法回答。",
+            "这个问题不适合讨论。",
+            "I cannot assist with that request.",
+            "I'm sorry, but I am unable to help.",
+            "As an AI language model, I cannot comply.",
+            "This violates our content policy.",
+            "That is against my programming.",
+        ],
+    )
+    def test_strict_refusal_patterns(self, content: str) -> None:
+        evidence = detect_refusal(response(content))
+        assert evidence.is_refusal is True
+        assert evidence.layer == "text_pattern"
+        assert evidence.signal.startswith("pattern:")
+        assert evidence.match_position < 120
 
-    def test_chinese_refusal_sensitive(self):
-        assert check_response_keywords("该内容涉及敏感话题") is True
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ("该内容涉及敏感话题", False),
+            ("This violates", False),
+            ("content policy", False),
+            ("Python 是一种通用编程语言", False),
+            ("Here is the code you requested", False),
+            ("", False),
+        ],
+    )
+    def test_old_topic_substrings_are_not_refusal_patterns(
+        self, content: str, expected: bool
+    ) -> None:
+        assert check_response_keywords(content) is expected
 
-    def test_english_refusal(self):
-        assert check_response_keywords("I cannot assist with that request") is True
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ("我无法回答该问题", True),
+            ("前置说明" * 40 + "我无法回答该问题", False),
+            ("正常内容" + "x" * 5000 + "自定义拒绝", False),
+        ],
+    )
+    def test_position_and_length_are_conjunctive_gates(
+        self, content: str, expected: bool
+    ) -> None:
+        evidence = detect_refusal(
+            response(content),
+            policy=RefusalPolicy(extra_keywords=("自定义拒绝",)),
+        )
+        assert evidence.is_refusal is expected
 
-    def test_english_refusal_policy(self):
-        assert check_response_keywords("This violates our content policy") is True
+    def test_issue_22_long_normal_response_is_not_refused(self) -> None:
+        content = "合规分析正文。" * 2000
+        content = content[:8000] + "违反" + content[8000:]
+        content = content[:9000] + "无法提供" + content[9000:]
+        content += "违反" * 3
+        assert len(content) >= 13000
+        evidence = detect_refusal(response(content))
+        assert evidence.is_refusal is False
+        assert evidence.layer == "none"
 
-    def test_normal_chinese(self):
-        assert check_response_keywords("Python 是一种通用编程语言") is False
-
-    def test_normal_english(self):
-        assert check_response_keywords("Here is the code you requested") is False
-
-    def test_empty_content(self):
-        assert check_response_keywords("") is False
-
-    def test_custom_keywords(self):
-        assert check_response_keywords("自定义拒绝", extra_keywords=["自定义拒绝"]) is True
-
-    def test_custom_keywords_no_match(self):
-        assert check_response_keywords("正常内容", extra_keywords=["自定义拒绝"]) is False
+    def test_evidence_is_serializable_and_inferred(self) -> None:
+        evidence = detect_refusal(response("我无法回答该问题"))
+        assert isinstance(evidence, RefusalEvidence)
+        assert evidence.is_inferred is True
+        assert evidence.to_dict()["signal"] == "pattern:cn_first_person_cannot"
 
 
-class TestDetectRefusal:
-    def test_structured_signal_takes_priority(self):
-        data = {"choices": [{"finish_reason": "content_filter", "message": {"content": "hello"}}]}
-        assert detect_refusal(data) is True
-
-    def test_keyword_detection_on_normal_finish(self):
-        data = {"choices": [{"finish_reason": "stop", "message": {"content": "我无法回答该问题"}}]}
-        assert detect_refusal(data) is True
-
-    def test_normal_response(self):
-        data = {"choices": [{"finish_reason": "stop", "message": {"content": "Python is great"}}]}
-        assert detect_refusal(data) is False
-
-    def test_custom_detector_overrides(self):
-        data = {"choices": [{"finish_reason": "stop", "message": {"content": "short"}}]}
-
+class TestDetectorStates:
+    def test_true_is_a_custom_detector_refusal(self) -> None:
         def custom(ctx: RefusalContext) -> bool:
             return len(ctx.content) < 10
 
-        assert detect_refusal(data, custom_detector=custom, model="test", provider="test") is True
+        evidence = detect_refusal(response("short"), custom_detector=custom)
+        assert evidence.is_refusal is True
+        assert evidence.layer == "custom_detector"
 
-    def test_custom_detector_exception_is_caught(self):
-        data = {"choices": [{"finish_reason": "stop", "message": {"content": "hello world"}}]}
+    def test_false_short_circuits_builtin_text_detection(self) -> None:
+        def custom(ctx: RefusalContext) -> bool:
+            return False
 
+        evidence = detect_refusal(
+            response("我无法回答该问题"), custom_detector=custom
+        )
+        assert evidence.is_refusal is False
+        assert evidence.layer == "custom_override"
+
+    @pytest.mark.parametrize("detector", [None, lambda ctx: None])
+    def test_none_uses_builtin_text_detection(self, detector) -> None:
+        evidence = detect_refusal(
+            response("我无法回答该问题"), custom_detector=detector
+        )
+        assert evidence.is_refusal is True
+        assert evidence.layer == "text_pattern"
+
+    def test_detector_exception_continues_builtin_logic(self) -> None:
         def broken(ctx: RefusalContext) -> bool:
             raise ValueError("boom")
 
-        assert detect_refusal(data, custom_detector=broken, model="test", provider="test") is False
+        evidence = detect_refusal(response("正常内容"), custom_detector=broken)
+        assert evidence.is_refusal is False
+        assert evidence.layer == "none"
 
-    def test_extra_keywords(self):
-        data = {"choices": [{"finish_reason": "stop", "message": {"content": "自定义拒绝词"}}]}
-        assert detect_refusal(data, extra_keywords=["自定义拒绝词"]) is True
+    def test_structured_signal_cannot_be_overridden(self) -> None:
+        evidence = detect_refusal(
+            response("answer", finish_reason="content_filter"),
+            custom_detector=lambda ctx: False,
+        )
+        assert evidence.is_refusal is True
+        assert evidence.layer == "structured_signal"
+
+
+class TestKeywordModes:
+    @pytest.mark.parametrize(
+        ("mode", "keywords", "expected"),
+        [
+            ("extend", ("manual",), True),
+            ("replace", ("manual",), True),
+            ("replace", (), False),
+        ],
+    )
+    def test_keywords_mode(self, mode: str, keywords: tuple[str, ...], expected: bool) -> None:
+        evidence = detect_refusal(
+            response("manual refusal"),
+            policy=RefusalPolicy(keywords_mode=mode, extra_keywords=keywords),  # type: ignore[arg-type]
+        )
+        assert evidence.is_refusal is expected
+
+    def test_custom_keywords_are_substrings_with_same_gates(self) -> None:
+        policy = RefusalPolicy(extra_keywords=("拒绝标记",))
+        assert detect_refusal(response("这里是拒绝标记"), policy=policy).is_refusal is True
+        long_content = "x" * 5000 + "拒绝标记"
+        assert detect_refusal(response(long_content), policy=policy).is_refusal is False
