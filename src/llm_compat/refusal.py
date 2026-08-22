@@ -308,7 +308,6 @@ def detect_refusal(
 
     structured = _structured_evidence(data)
     if structured is not None:
-        _log_refusal(structured, model=model)
         return structured
 
     _, _, content, finish_reason = _content_and_finish_reason(data)
@@ -334,7 +333,6 @@ def detect_refusal(
                     content_length=len(content),
                     finish_reason=finish_reason,
                 )
-                _log_refusal(evidence, model=model)
                 return evidence
             if custom_result is False:
                 return RefusalEvidence(
@@ -346,6 +344,4 @@ def detect_refusal(
                 )
 
     evidence = _text_evidence(content, finish_reason, effective_policy)
-    if evidence.is_refusal:
-        _log_refusal(evidence, model=model)
     return evidence

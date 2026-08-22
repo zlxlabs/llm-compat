@@ -755,6 +755,8 @@ class BaseClient:
                         response_is_refusal = evidence.is_refusal and (
                             evidence.layer == "structured_signal" or has_fallback
                         )
+                        if response_is_refusal:
+                            _log_refusal(evidence, model=current_model)
                         trace.add_model_attempt(
                             model=current_model,
                             provider=current_provider,
