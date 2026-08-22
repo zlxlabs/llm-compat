@@ -93,31 +93,15 @@ DEFAULT_REFUSAL_PATTERNS_CN: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 DEFAULT_REFUSAL_PATTERNS_EN: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
-        "pattern:en_apology_cannot",
-        re.compile(
-            r"(?:^|(?<=[.!?{}\[\]\"\n]))\s*\bI(?:\s+am\s+sorry|['’]m\s+(?:sorry|afraid))"
-            r"[^.!?\n]{0,80}\b(?:cannot|can['’]?t|unable\s+to)\b"
-            r"(?![^.!?\n]{0,60}\b(?:but|however|roughly|approximately|"
-            r"instead|can|could|will|here)\b)",
-            re.IGNORECASE,
-        ),
-    ),
-    (
         "pattern:en_first_person_assistance",
         re.compile(
-            r"(?:^|(?<=[.!?{}\[\]\"\n]))\s*\bI\s+can(?:not|['’]t)\s+"
-            r"(?:assist|help|provide|comply)\b"
-            r"(?![^.!?\n]{0,60}\b(?:but|however|instead|also|can|could|will|here)\b)",
-            re.IGNORECASE,
-        ),
-    ),
-    (
-        "pattern:en_as_ai_cannot",
-        re.compile(
-            r"(?:^|(?<=[.!?{}\[\]\"\n]))\s*\bAs\s+an?\s+"
-            r"(?:AI|artificial intelligence|language model)\b"
-            r"[^.!?\n]{0,80}\bI\s+(?:cannot|can['’]?t|unable\s+to)\b"
-            r"(?![^.!?\n]{0,60}\b(?:but|however|instead|also|can|could|will|here)\b)",
+            r"(?:^|(?<=[.!?{}\[\]\"\n]))\s*"
+            r"(?:(?:I['’]m|I am)\s+(?:sorry|afraid)[,:\s]*(?:but\s+)?)?"
+            r"(?:As\s+an?\s+(?:AI(?:\s+language\s+model)?|"
+            r"artificial intelligence|language model)[,:\s]*)?"
+            r"\bI\s+(?:cannot|can['’]?t|am unable to)\s+"
+            r"(?:assist|help|provide|comply|answer|continue|complete|generate)\b"
+            r"(?:[^,.!?\n]*[.!?]|[^,.!?\n]*[\"'”’)}\]]*\s*$)",
             re.IGNORECASE,
         ),
     ),

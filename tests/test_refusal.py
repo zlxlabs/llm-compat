@@ -34,7 +34,7 @@ REFUSAL_PATTERN_CASES = [
     ),
     ("pattern:cn_unsuitable_topic", "这个问题不适合讨论", "当前问题被明确拒绝讨论"),
     (
-        "pattern:en_apology_cannot",
+        "pattern:en_first_person_assistance",
         "I'm sorry, but I cannot help with that request.",
         "道歉后由我明确拒绝",
     ),
@@ -44,7 +44,7 @@ REFUSAL_PATTERN_CASES = [
         "当前回答由我明确拒绝协助",
     ),
     (
-        "pattern:en_as_ai_cannot",
+        "pattern:en_first_person_assistance",
         "As an AI language model, I cannot comply with this request.",
         "当前回答以 AI 身份明确拒绝",
     ),
@@ -82,7 +82,7 @@ NON_REFUSAL_PATTERN_CASES = [
         "转述原文观点，且主语不是当前请求",
     ),
     (
-        "pattern:en_apology_cannot",
+        "pattern:en_first_person_assistance",
         "I'm afraid I cannot give an exact number, but roughly 40%.",
         "先拒绝精确数字、随后继续回答，不是拒绝本次任务",
     ),
@@ -92,7 +92,7 @@ NON_REFUSAL_PATTERN_CASES = [
         "限制一个细节后仍完成回答，不是拒绝本次任务",
     ),
     (
-        "pattern:en_as_ai_cannot",
+        "pattern:en_first_person_assistance",
         "The article says: As an AI language model, I cannot answer that.",
         "转述文章内容，不是本次回答的拒绝",
     ),
