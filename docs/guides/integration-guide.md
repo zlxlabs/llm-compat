@@ -285,6 +285,66 @@ detector 是三态函数：返回 `True` 表示拒绝，返回 `False` 表示确
 需要完全接管文本词表时使用 `refusal_keywords_mode="replace"`；不传关键词时文本层不判拒绝，
 但 provider 声明层仍然有效。手动词和 URL 词按子串匹配，仍受相同的长度/位置门槛约束。
 
+### 拒绝检测的边界与调优
+
+内置文本层是启发式，不是语义判定器。模型先道歉或限定，再继续作答时，内置句式表始终会有
+残余的假阳性和漏判风险：词法形态可以不断变化，但正则无法可靠判断语用意图。库的取舍是偏向
+漏判，因为漏判只会把一句拒绝语交给下游，调用方仍可恢复；误判则可能丢弃正确结果，无法恢复。
+
+文本层误判的代价有上限。`on_all_refused` 默认是 `"return_best"`，因此文本层把正常回答误判为
+拒绝时不会直接让调用方拿到失败：最坏情况是多试几次 fallback，最后仍返回正文，并设置
+`refusal_suspected=True`。调用方应检查这个字段和 `refusal_evidence`，再决定是否需要业务降级。
+provider 的声明层信号仍然优先，`finish_reason=content_filter` 或非空 `message.refusal` 不会被
+文本层配置关闭。
+
+需要关闭或接管文本层时，使用现有的三个逃生门。下面的示例都保留声明层判定：
+
+1. 完全关闭文本层，只保留 provider 声明层：
+
+   ```python
+   from llm_compat import LLMClient
+
+   client = LLMClient(
+       base_url="https://api.example.com/v1",
+       api_key="sk-example",
+       refusal_max_content_length=0,
+   )
+   ```
+
+2. 完全接管文本词表，内置句式不再参与文本判定：
+
+   ```python
+   from llm_compat import LLMClient
+
+   client = LLMClient(
+       base_url="https://api.example.com/v1",
+       api_key="sk-example",
+       refusal_keywords_mode="replace",
+       refusal_keywords=["供应商明确拒绝"],
+   )
+   ```
+
+3. 对单次响应由调用方确认不是拒绝，短路内置文本判定：
+
+   ```python
+   from llm_compat import LLMClient, RefusalContext
+
+   def detector(ctx: RefusalContext) -> bool | None:
+       if ctx.content == "抱歉，我无法提供相关信息":
+           return False
+       return None
+
+   client = LLMClient(
+       base_url="https://api.example.com/v1",
+       api_key="sk-example",
+       refusal_detector=detector,
+   )
+   ```
+
+后续新发现的假阳性或漏判个案，优先通过上述配置由调用方处理，或提 issue 记入 backlog；默认
+正则表不再按个案逐条修改。句首冒号、Markdown 列表或加粗等已知漏判属于“偏向漏判”的取舍，
+不应为覆盖单个样本而放宽默认句式边界。
+
 ### 动态关键词加载
 
 从 URL 动态加载拒绝关键词，扩大检测覆盖面：

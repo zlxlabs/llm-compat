@@ -8,6 +8,12 @@
 
 ## [Unreleased]
 
+- 收紧拒绝句式表对中英混排空白和“不确定后继续作答”的处理，减少文本层假阳性并覆盖常见
+  `作为 AI` 表达。
+- 在集成指南中明确文本层是偏向漏判的启发式，记录 `refusal_max_content_length=0`、
+  `refusal_keywords_mode="replace"` 和 `refusal_detector` 返回 `False` 三条现有逃生门，以及后续
+  个案走配置或 backlog 的处置约定。
+
 ## [0.10.0] - 2026-08-22
 
 ### Changed

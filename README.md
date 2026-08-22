@@ -19,7 +19,7 @@ llm-compat 统一处理这些差异，业务代码只需改配置不改代码。
 |------|------|
 | **统一对话 API** | `chat()` / `chat_json()` / `chat_stream()` / `chat_image()` + 同步版本 |
 | **结构化 JSON 输出** | 自动选择 json_schema 或 json_object 模式，Pydantic 校验，self-correction |
-| **内容审查降级** | 结构化信号优先、严格句式推断并支持 fallback；链耗尽可返回带 evidence 的最佳候选 |
+| **内容审查降级** | 结构化信号优先、严格句式推断并支持 fallback；链耗尽可返回带 evidence 的最佳候选；[边界与调优](docs/guides/integration-guide.md#拒绝检测的边界与调优) |
 | **调用轨迹** | 成功和失败共享不可变 `CallTrace`，区分路由决策、真实模型尝试与终态 |
 | **Provider 翻译** | reasoning_effort 跨 11 个 provider 族自动翻译 |
 | **智能重试** | 指数退避 + jitter，错误分类（可重试/致命/超时） |
