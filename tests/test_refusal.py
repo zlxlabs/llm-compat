@@ -159,13 +159,23 @@ class TestDetectorStates:
         assert evidence.is_refusal is False
         assert evidence.layer == "custom_override"
 
-    @pytest.mark.parametrize("detector", [None, lambda ctx: None])
-    def test_none_uses_builtin_text_detection(self, detector) -> None:
+    @pytest.mark.parametrize(
+        ("detector", "content", "expected"),
+        [
+            (None, "我无法回答该问题", True),
+            (lambda ctx: None, "我无法回答该问题", True),
+            (None, "正常内容", False),
+            (lambda ctx: None, "正常内容", False),
+        ],
+    )
+    def test_none_uses_builtin_text_detection(
+        self, detector, content: str, expected: bool
+    ) -> None:
         evidence = detect_refusal(
-            response("我无法回答该问题"), custom_detector=detector
+            response(content), custom_detector=detector
         )
-        assert evidence.is_refusal is True
-        assert evidence.layer == "text_pattern"
+        assert evidence.is_refusal is expected
+        assert evidence.layer == ("text_pattern" if expected else "none")
 
     def test_detector_exception_continues_builtin_logic(self) -> None:
         def broken(ctx: RefusalContext) -> bool:
@@ -174,6 +184,14 @@ class TestDetectorStates:
         evidence = detect_refusal(response("正常内容"), custom_detector=broken)
         assert evidence.is_refusal is False
         assert evidence.layer == "none"
+
+    def test_detector_exception_does_not_suppress_builtin_refusal(self) -> None:
+        def broken(ctx: RefusalContext) -> bool:
+            raise ValueError("boom")
+
+        evidence = detect_refusal(response("我无法回答该问题"), custom_detector=broken)
+        assert evidence.is_refusal is True
+        assert evidence.layer == "text_pattern"
 
     def test_structured_signal_cannot_be_overridden(self) -> None:
         evidence = detect_refusal(
