@@ -163,6 +163,49 @@ ACCEPTANCE_CASES = [
     (True, '{"answer": "抱歉，我无法提供相关信息"}'),
 ]
 
+TRANSITION_EXCLUSION_CASES = [
+    (
+        "我无法提供精确数字。不过，根据现有数据估计约为 40%。",
+        True,
+        "已知接受的误判（跨句转折+答案）",
+    ),
+    (
+        "I cannot provide an exact number. However, I can estimate about 40%.",
+        True,
+        "已知接受的误判（跨句转折+答案）",
+    ),
+    (
+        "我无法提供确切数字，但可以给出区间：40%-50%",
+        False,
+        "正确（同句转折）",
+    ),
+    (
+        "我不能协助这个请求。不过你可以尝试其他问法。",
+        True,
+        "正确（跨句转折+替代建议，仍是拒绝）",
+    ),
+    (
+        "抱歉，我无法回答。不过建议你咨询专业人士。",
+        True,
+        "正确（跨句转折+替代建议，仍是拒绝）",
+    ),
+    (
+        "I cannot help with that. However, you may want to rephrase.",
+        True,
+        "正确（跨句转折+替代建议，仍是拒绝）",
+    ),
+    (
+        "我无法提供相关信息。请谅解。",
+        True,
+        "正确（跨句非转折）",
+    ),
+    (
+        "很抱歉，我无法回答这个问题，因为它涉及敏感内容。",
+        True,
+        "正确（同句因果）",
+    ),
+]
+
 UNCERTAINTY_AFTER_CUE_CASES = [
     "抱歉，我不能确定这个数字",
     "抱歉，我不能保证这个结论",
@@ -237,6 +280,25 @@ class TestTextEvidence:
         ids=[case[1] for case in ACCEPTANCE_CASES],
     )
     def test_task_acceptance_phrases(self, expected: bool, content: str) -> None:
+        evidence = detect_refusal(response(content))
+        assert evidence.is_refusal is expected
+        assert evidence.layer == ("text_pattern" if expected else "none")
+
+    @pytest.mark.parametrize(
+        ("content", "expected", "classification"),
+        TRANSITION_EXCLUSION_CASES,
+        ids=[case[0] for case in TRANSITION_EXCLUSION_CASES],
+    )
+    def test_transition_exclusion_contract(
+        self, content: str, expected: bool, classification: str
+    ) -> None:
+        """锁定同句排除，并显式接受两个跨句答案误判。
+
+        前两条是有意接受的误判，由 ``on_all_refused="return_best"`` 兜住；
+        放宽前瞻跨句以消除它们，会让第 4~6 条真拒绝漏判，形成更严重的
+        静默错误（P1）。
+        """
+        assert classification
         evidence = detect_refusal(response(content))
         assert evidence.is_refusal is expected
         assert evidence.layer == ("text_pattern" if expected else "none")
