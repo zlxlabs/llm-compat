@@ -108,6 +108,29 @@ NON_REFUSAL_PATTERN_CASES = [
     ),
 ]
 
+ACCEPTANCE_CASES = [
+    (False, "抱歉，我不能确定这个数字，大约是 40%"),
+    (False, "抱歉，我需要先了解一下你的具体需求"),
+    (False, "抱歉，我理解错了，下面重新总结："),
+    (False, "我无法提供确切数字，但可以给出区间：40%-50%"),
+    (False, "I'm afraid I cannot give an exact number, but roughly 40%."),
+    (False, "The audit found the vendor violates the company's policy."),
+    (True, "抱歉，作为 AI 我不便回答这个问题"),
+    (True, "抱歉，作为一个 AI，我无法协助这个请求"),
+    (True, "抱歉，我不能协助这个请求"),
+    (True, "对不起，我无法提供相关信息"),
+    (True, "这个问题很复杂。抱歉，我无法回答。"),
+    (True, '{"answer": "抱歉，我无法提供相关信息"}'),
+]
+
+UNCERTAINTY_AFTER_CUE_CASES = [
+    "抱歉，我不能确定这个数字",
+    "抱歉，我不能保证这个结论",
+    "抱歉，我不能断定这件事",
+    "抱歉，我不能排除这个可能",
+    "抱歉，我不能肯定这个结果",
+]
+
 
 class TestRefusalContext:
     def test_fields(self) -> None:
@@ -168,6 +191,22 @@ class TestStructuredEvidence:
 
 
 class TestTextEvidence:
+    @pytest.mark.parametrize(
+        ("expected", "content"),
+        ACCEPTANCE_CASES,
+        ids=[case[1] for case in ACCEPTANCE_CASES],
+    )
+    def test_task_acceptance_phrases(self, expected: bool, content: str) -> None:
+        evidence = detect_refusal(response(content))
+        assert evidence.is_refusal is expected
+        assert evidence.layer == ("text_pattern" if expected else "none")
+
+    @pytest.mark.parametrize("content", UNCERTAINTY_AFTER_CUE_CASES)
+    def test_uncertainty_after_refusal_cue_is_not_refusal(self, content: str) -> None:
+        evidence = detect_refusal(response(content))
+        assert evidence.is_refusal is False
+        assert evidence.layer == "none"
+
     @pytest.mark.parametrize(
         ("signal", "content", "review"),
         REFUSAL_PATTERN_CASES,
