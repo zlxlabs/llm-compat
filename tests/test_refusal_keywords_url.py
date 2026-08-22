@@ -31,6 +31,23 @@ class TestSingleUrl:
         assert evidence.is_refusal is True
         assert evidence.signal == "keyword:url"
 
+    @pytest.mark.parametrize(
+        ("mode", "expected"),
+        [("replace", False), ("extend", True)],
+    )
+    def test_builtin_pattern_depends_on_keyword_mode(self, mode, expected):
+        data = {
+            "choices": [{
+                "message": {"content": "I cannot assist with that request"},
+                "finish_reason": "stop",
+            }]
+        }
+        evidence = detect_refusal(
+            data,
+            policy=RefusalPolicy(keywords_mode=mode, extra_keywords=()),
+        )
+        assert evidence.is_refusal is expected
+
     def test_loads_keywords_from_url(self):
         _keyword_cache["http://test:8000/words"] = ["url词1", "url词2"]
         client = LLMClient(

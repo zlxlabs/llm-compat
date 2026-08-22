@@ -270,16 +270,20 @@ class TestDetectorStates:
 
 class TestKeywordModes:
     @pytest.mark.parametrize(
-        ("mode", "keywords", "expected"),
+        ("content", "mode", "keywords", "expected"),
         [
-            ("extend", ("manual",), True),
-            ("replace", ("manual",), True),
-            ("replace", (), False),
+            ("manual refusal", "extend", ("manual",), True),
+            ("manual refusal", "replace", ("manual",), True),
+            ("manual refusal", "replace", (), False),
+            ("I cannot assist with that request", "replace", (), False),
+            ("I cannot assist with that request", "extend", (), True),
         ],
     )
-    def test_keywords_mode(self, mode: str, keywords: tuple[str, ...], expected: bool) -> None:
+    def test_keywords_mode(
+        self, content: str, mode: str, keywords: tuple[str, ...], expected: bool
+    ) -> None:
         evidence = detect_refusal(
-            response("manual refusal"),
+            response(content),
             policy=RefusalPolicy(keywords_mode=mode, extra_keywords=keywords),  # type: ignore[arg-type]
         )
         assert evidence.is_refusal is expected
