@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 import re
 from collections.abc import Callable
@@ -270,11 +271,8 @@ def check_response_keywords(
     if policy is None:
         effective_policy = RefusalPolicy(extra_keywords=tuple(extra_keywords or ()))
     elif extra_keywords:
-        effective_policy = RefusalPolicy(
-            max_content_length=policy.max_content_length,
-            head_window=policy.head_window,
-            keywords_mode=policy.keywords_mode,
-            extra_keywords=policy.extra_keywords + tuple(extra_keywords),
+        effective_policy = dataclasses.replace(
+            policy, extra_keywords=policy.extra_keywords + tuple(extra_keywords)
         )
     else:
         effective_policy = policy

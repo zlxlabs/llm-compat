@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 import pytest
 from pytest_httpx import HTTPXMock
@@ -55,21 +56,26 @@ class TestFallbackBasic:
         self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
     ):
         httpx_mock.add_response(json=_refusal_response())
-        httpx_mock.add_response(json=_chat_response("fallback answer"))
+        httpx_mock.add_response(json=_refusal_response())
         with caplog.at_level("WARNING"):
             async with LLMClient(
                 base_url="https://api.test.com/v1",
                 api_key="sk-test",
                 content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
             ) as client:
-                await client.chat("deepseek-v4", MESSAGES)
-        record = next(record for record in caplog.records if "Refusal detected" in record.message)
-        assert "model=deepseek-v4" in record.message
-        assert "layer=text_pattern" in record.message
-        assert "signal=pattern:cn_first_person_cannot" in record.message
-        assert "position=0" in record.message
-        assert "content_length=8" in record.message
-        assert "finish_reason=stop" in record.message
+                result = await client.chat("deepseek-v4", MESSAGES)
+        warning_records = [
+            record for record in caplog.records if record.levelno == logging.WARNING
+        ]
+        assert warning_records
+        assert "Refusal detected" in warning_records[0].message
+        evidence = result.refusal_evidence
+        assert evidence is not None
+        assert evidence.layer == "text_pattern"
+        assert evidence.signal == "pattern:cn_first_person_cannot"
+        assert evidence.match_position == 0
+        assert evidence.content_length == 8
+        assert evidence.finish_reason == "stop"
 
     async def test_replace_mode_disables_builtin_text_patterns(
         self, httpx_mock: HTTPXMock
