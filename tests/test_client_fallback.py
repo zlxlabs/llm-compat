@@ -51,6 +51,26 @@ MESSAGES = [{"role": "user", "content": "hello"}]
 
 
 class TestFallbackBasic:
+    async def test_refusal_warning_contains_evidence_fields(
+        self, httpx_mock: HTTPXMock, caplog: pytest.LogCaptureFixture
+    ):
+        httpx_mock.add_response(json=_refusal_response())
+        httpx_mock.add_response(json=_chat_response("fallback answer"))
+        with caplog.at_level("WARNING"):
+            async with LLMClient(
+                base_url="https://api.test.com/v1",
+                api_key="sk-test",
+                content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+            ) as client:
+                await client.chat("deepseek-v4", MESSAGES)
+        record = next(record for record in caplog.records if "Refusal detected" in record.message)
+        assert "model=deepseek-v4" in record.message
+        assert "layer=text_pattern" in record.message
+        assert "signal=pattern:cn_first_person_cannot" in record.message
+        assert "position=0" in record.message
+        assert "content_length=8" in record.message
+        assert "finish_reason=stop" in record.message
+
     async def test_replace_mode_disables_builtin_text_patterns(
         self, httpx_mock: HTTPXMock
     ):
@@ -162,9 +182,11 @@ class TestFallbackBasic:
             result = await client.chat("deepseek-v4", MESSAGES)
             assert result.content == "I cannot assist"
             assert result.refusal_suspected is True
-            assert result.refusal_evidence is not None
-            assert result.refusal_evidence.layer == "text_pattern"
-            assert result.fallback_from == "deepseek-v4"
+        assert result.refusal_evidence is not None
+        assert result.refusal_evidence.layer == "text_pattern"
+        assert result.fallback_from == "deepseek-v4"
+        assert result.trace is not None
+        assert result.trace.final_outcome == "content_policy_recovered"
 
     async def test_all_models_refused_raise_mode_includes_layers(
         self, httpx_mock: HTTPXMock
@@ -219,6 +241,23 @@ class TestFallbackBasic:
         assert result.content == "I cannot assist with this"
         assert result.refusal_evidence is not None
         assert result.refusal_evidence.layer == "text_pattern"
+
+    async def test_malformed_candidates_without_content_are_not_rescued(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json={"choices": []})
+        httpx_mock.add_response(json={"choices": []})
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            with pytest.raises(ContentPolicyError, match="malformed") as exc_info:
+                await client.chat("deepseek-v4", MESSAGES)
+        assert exc_info.value.attempt_layers == {
+            "deepseek-v4": "malformed",
+            "gpt-4.1-mini": "malformed",
+        }
 
     async def test_http_400_content_policy_triggers_fallback(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(
