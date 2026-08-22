@@ -101,7 +101,7 @@ DEFAULT_REFUSAL_PATTERNS_EN: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"artificial intelligence|language model)[,:\s]*)?"
             r"\bI\s+(?:cannot|can['’]?t|am unable to)\s+"
             r"(?:assist|help|provide|comply|answer|continue|complete|generate)\b"
-            r"(?:[^,.!?\n]*[.!?]|[^,.!?\n]*[\"'”’)}\]]*\s*$)",
+            r"(?![^.!?\n]{0,30}(?:but|however))",
             re.IGNORECASE,
         ),
     ),
