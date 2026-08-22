@@ -31,7 +31,7 @@ def _refusal_response(content: str = "我无法回答该问题") -> dict:
     return _chat_response(content)
 
 
-def _content_filter_response() -> dict:
+def _content_filter_response(content: str = "provider partial output") -> dict:
     return {
         "id": "chatcmpl-123",
         "object": "chat.completion",
@@ -39,7 +39,7 @@ def _content_filter_response() -> dict:
         "choices": [
             {
                 "index": 0,
-                "message": {"role": "assistant", "content": ""},
+                "message": {"role": "assistant", "content": content},
                 "finish_reason": "content_filter",
             }
         ],
@@ -213,8 +213,26 @@ class TestFallbackBasic:
     async def test_structured_refusals_are_never_rescued(
         self, httpx_mock: HTTPXMock
     ):
-        httpx_mock.add_response(json=_content_filter_response())
-        httpx_mock.add_response(json=_content_filter_response())
+        partial = "provider partial output " + "x" * 500
+        httpx_mock.add_response(json=_content_filter_response(partial))
+        httpx_mock.add_response(json=_content_filter_response(partial))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            with pytest.raises(ContentPolicyError) as exc_info:
+                await client.chat("deepseek-v4", MESSAGES)
+        assert exc_info.value.attempt_layers == {
+            "deepseek-v4": "structured_signal",
+            "gpt-4.1-mini": "structured_signal",
+        }
+
+    async def test_empty_structured_refusal_content_is_not_rescued(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_content_filter_response(""))
+        httpx_mock.add_response(json=_content_filter_response(""))
         async with LLMClient(
             base_url="https://api.test.com/v1",
             api_key="sk-test",
@@ -230,7 +248,8 @@ class TestFallbackBasic:
     async def test_mixed_refusals_rescue_only_inferred_candidate(
         self, httpx_mock: HTTPXMock
     ):
-        httpx_mock.add_response(json=_content_filter_response())
+        structured_content = "provider partial output " + "x" * 500
+        httpx_mock.add_response(json=_content_filter_response(structured_content))
         httpx_mock.add_response(json=_refusal_response("I cannot assist with this"))
         async with LLMClient(
             base_url="https://api.test.com/v1",

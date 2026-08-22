@@ -117,11 +117,44 @@ class TestTextEvidence:
     def test_position_and_length_are_conjunctive_gates(
         self, content: str, expected: bool
     ) -> None:
+        # The long custom-keyword case has a late match, independently locking
+        # the position gate rather than the length gate.
         evidence = detect_refusal(
             response(content),
             policy=RefusalPolicy(extra_keywords=("自定义拒绝",)),
         )
         assert evidence.is_refusal is expected
+
+    def test_length_gate_rejects_long_builtin_match_at_head(self) -> None:
+        content = "抱歉，我无法提供完整的逐字稿，但可以为你总结如下：" + "正文。" * 200
+        assert len(content) > 300
+        evidence = detect_refusal(response(content))
+        assert evidence.is_refusal is False
+        assert evidence.layer == "none"
+
+    def test_length_gate_rejects_long_extra_keyword_at_head(self) -> None:
+        content = "自定义拒绝" + "正文。" * 200
+        assert len(content) > 300
+        evidence = detect_refusal(
+            response(content),
+            policy=RefusalPolicy(extra_keywords=("自定义拒绝",)),
+        )
+        assert evidence.is_refusal is False
+        assert evidence.layer == "none"
+
+    @pytest.mark.parametrize(
+        ("content_length", "expected"),
+        [(300, True), (301, False)],
+    )
+    def test_length_gate_boundary_is_inclusive(
+        self, content_length: int, expected: bool
+    ) -> None:
+        prefix = "我无法回答该问题"
+        content = prefix + "x" * (content_length - len(prefix))
+        evidence = detect_refusal(response(content))
+        assert len(content) == content_length
+        assert evidence.is_refusal is expected
+        assert evidence.layer == ("text_pattern" if expected else "none")
 
     def test_issue_22_long_normal_response_is_not_refused(self) -> None:
         content = "合规分析正文。" * 2000
