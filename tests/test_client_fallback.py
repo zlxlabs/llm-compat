@@ -442,6 +442,59 @@ class TestFallbackStats:
             assert client.stats.error_count == 1
             assert client.stats.total_calls == 1
 
+    async def test_json_rescue_failure_records_error_once_gate_contract(
+        self, httpx_mock: HTTPXMock
+    ):
+        """Gate finding correctness-json-rescue-double-error-accounting contract."""
+        httpx_mock.add_response(json=_refusal_response("我无法回答这个问题。"))
+        httpx_mock.add_response(json=_refusal_response("I cannot assist with that."))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            with pytest.raises(ContentPolicyError):
+                await client.chat_json("deepseek-v4", MESSAGES)
+            assert client.stats.success_count == 0
+            assert client.stats.error_count == 1
+            assert client.stats.total_calls == 1
+
+    async def test_refusal_rescue_success_records_success_once_gate_contract(
+        self, httpx_mock: HTTPXMock
+    ):
+        """Gate finding correctness-json-rescue-double-error-accounting contract."""
+        httpx_mock.add_response(json=_refusal_response("我无法回答这个问题。"))
+        httpx_mock.add_response(json=_refusal_response("I cannot assist with that."))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            result = await client.chat("deepseek-v4", MESSAGES)
+            assert result.content == "I cannot assist with that."
+            assert result.refusal_suspected is True
+            assert client.stats.success_count == 1
+            assert client.stats.error_count == 0
+            assert client.stats.total_calls == 1
+
+    async def test_empty_chain_skips_refusal_error_accounting_gate_contract(
+        self, httpx_mock: HTTPXMock
+    ):
+        """Gate finding correctness-json-rescue-double-error-accounting: with an empty
+        chain, refusal detection does not run, so _base.py:853 and _base.py:619
+        cannot both call record_error.
+        """
+        refusal = "我无法回答这个问题。"
+        httpx_mock.add_response(json=_refusal_response(refusal))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+        ) as client:
+            result = await client.chat("deepseek-v4", MESSAGES)
+            assert result.content == refusal
+            assert result.refusal_suspected is False
+            assert client.stats.error_count == 0
+
     async def test_no_fallback_no_stats(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json=_chat_response("ok"))
         async with LLMClient(
