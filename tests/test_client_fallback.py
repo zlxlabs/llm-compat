@@ -358,6 +358,22 @@ class TestFallbackStats:
             assert client.stats.success_count == 1
             assert client.stats.total_calls == 1
 
+    async def test_json_rescue_validation_failure_records_error_not_success(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_refusal_response())
+        httpx_mock.add_response(json=_refusal_response("I cannot assist"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            with pytest.raises(ContentPolicyError, match="best candidate rescue failed"):
+                await client.chat_json("deepseek-v4", MESSAGES)
+            assert client.stats.success_count == 0
+            assert client.stats.error_count == 1
+            assert client.stats.total_calls == 1
+
     async def test_no_fallback_no_stats(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json=_chat_response("ok"))
         async with LLMClient(

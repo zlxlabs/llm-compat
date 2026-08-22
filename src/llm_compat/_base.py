@@ -598,6 +598,7 @@ class BaseClient:
                 return None
             best = max(inferred, key=lambda candidate: len(candidate["content"]))
             try:
+                parsed = parse_candidate(best["content"]) if parse_candidate is not None else None
                 result = self._extract_result(
                     best["data"],
                     model=best["model"],
@@ -606,9 +607,12 @@ class BaseClient:
                     request_id=request_id,
                 )
                 if parse_candidate is not None:
-                    result.parsed = parse_candidate(result.content)
+                    result.parsed = parsed
             except Exception as error:
                 rescue_failure = f"best candidate rescue failed: {error}"
+                self.stats.record_error(
+                    model=best["model"], error_type="ContentPolicyError"
+                )
                 return None
 
             result.fallback_from = model
