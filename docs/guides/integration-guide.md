@@ -198,7 +198,7 @@ fallback 切换模型时，`chat_json()` 自动为新模型重新选择 json_mod
 
 ### 拒绝检测（证据分级，自动）
 
-1. **声明层**（最可靠）：provider 的 `finish_reason=content_filter`/`safety` 或非空
+1. **声明层**（最可靠）：provider 的 `finish_reason=content_filter`/`content_policy`/`safety` 或非空
    `message.refusal`。这类拒绝不可被文本 detector 否决，也不会在链耗尽时被救援。
 2. **推断层**：默认中英文拒绝言语行为正则，且必须同时满足全文不超过 300 字、命中在前 120
    字；普通题材词（例如“违反”“无法提供”“violates”）不会单独触发。
