@@ -78,7 +78,8 @@ class TestCollectorIntegration:
         mock_collector.report_refusal.assert_called()
         call_kwargs = mock_collector.report_refusal.call_args.kwargs
         assert call_kwargs["model"] == "deepseek-v4"
-        assert call_kwargs["detection_layer"] == "keyword_match"
+        assert call_kwargs["detection_layer"] == "text_pattern"
+        assert call_kwargs["evidence"]["layer"] == "text_pattern"
         assert call_kwargs["fallback_model"] == "gpt-4.1-mini"
         assert call_kwargs["message_count"] == 1
         assert "测试内容" in call_kwargs["input_text"]
