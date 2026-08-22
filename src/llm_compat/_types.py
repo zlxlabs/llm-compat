@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ._trace import CallTrace
+from .refusal import RefusalEvidence
 
 
 @dataclass
@@ -25,6 +26,8 @@ class ChatResult:
     fallback_from: str | None = None
     fallback_chain: list[str] = field(default_factory=list)
     trace: CallTrace | None = None
+    refusal_suspected: bool = False
+    refusal_evidence: RefusalEvidence | None = None
 
     def __str__(self) -> str:
         return self.content

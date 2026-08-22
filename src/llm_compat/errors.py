@@ -3,6 +3,7 @@ from __future__ import annotations
 import httpx
 
 from ._trace import CallTrace
+from .refusal import RefusalEvidence
 
 _RETRYABLE_STATUS_CODES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
 _FATAL_STATUS_CODES: frozenset[int] = frozenset({400, 401, 403, 404})
@@ -72,6 +73,8 @@ class ContentPolicyError(LLMCallError):
         error_kind: str | None = None,
         http_status: int | None = None,
         trace: CallTrace | None = None,
+        evidence: RefusalEvidence | None = None,
+        attempt_layers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(
             message,
@@ -82,6 +85,8 @@ class ContentPolicyError(LLMCallError):
         self.attempted_models: list[str] = attempted_models or []
         self.raw_content = raw_content
         self.original_model = original_model
+        self.evidence = evidence
+        self.attempt_layers = attempt_layers
 
 
 class SkipRequestError(LLMError):

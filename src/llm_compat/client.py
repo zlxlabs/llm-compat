@@ -147,6 +147,7 @@ class LLMClient(BaseClient):
                     finish_reason=report.get("finish_reason"),
                     fallback_model=getattr(result, "model", None),
                     fallback_chain=getattr(result, "fallback_chain", None),
+                    evidence=report.get("evidence"),
                 )
             except Exception:
                 pass

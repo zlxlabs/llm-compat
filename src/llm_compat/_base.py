@@ -8,7 +8,7 @@ import time
 import uuid
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 import httpx
 from pydantic import BaseModel
@@ -37,7 +37,7 @@ from .providers import (
     detect_provider,
     get_provider_caps,
 )
-from .refusal import RefusalDetector, detect_refusal
+from .refusal import RefusalDetector, RefusalEvidence, RefusalPolicy, detect_refusal
 from .sensitive import SensitiveDetector
 
 logger = logging.getLogger(__name__)
@@ -152,6 +152,10 @@ class BaseClient:
         refusal_detector: RefusalDetector | None = None,
         refusal_keywords: list[str] | None = None,
         refusal_keywords_url: str | list[str] | None = None,
+        refusal_keywords_mode: Literal["extend", "replace"] = "extend",
+        refusal_max_content_length: int = 300,
+        refusal_head_window: int = 120,
+        on_all_refused: Literal["raise", "return_best"] = "return_best",
         sensitive_detector: SensitiveDetector | None = None,
         sensitive_words_url: str | list[str] | None = None,
         collector_url: str | None = None,
@@ -173,6 +177,10 @@ class BaseClient:
         self._content_fallbacks = content_fallbacks
         self._refusal_detector = refusal_detector
         self._refusal_keywords_manual = refusal_keywords
+        self._refusal_keywords_mode = refusal_keywords_mode
+        self._refusal_max_content_length = refusal_max_content_length
+        self._refusal_head_window = refusal_head_window
+        self._on_all_refused = on_all_refused
         self._refusal_keywords_urls: list[str] = []
         if refusal_keywords_url:
             if isinstance(refusal_keywords_url, str):
@@ -306,6 +314,7 @@ class BaseClient:
         request_id: str,
         fallback_from: str | None = None,
         fallback_chain: list[str] | None = None,
+        record_success: bool = True,
     ) -> ChatResult:
         content = data["choices"][0]["message"].get("content") or ""
         usage_data = data.get("usage", {})
@@ -321,7 +330,10 @@ class BaseClient:
             usage.prompt_tokens, usage.completion_tokens, usage.total_tokens,
         )
 
-        self.stats.record_success(model=model, latency_ms=latency_ms, tokens=usage.total_tokens)
+        if record_success:
+            self.stats.record_success(
+                model=model, latency_ms=latency_ms, tokens=usage.total_tokens
+            )
 
         return ChatResult(
             content=content,
@@ -333,17 +345,6 @@ class BaseClient:
             fallback_from=fallback_from,
             fallback_chain=fallback_chain or [],
         )
-
-    @staticmethod
-    def _classify_refusal_layer(data: dict[str, Any]) -> str:
-        from .refusal import check_response_keywords, check_structured_signals
-        if check_structured_signals(data):
-            return "structured_signal"
-        choices = data.get("choices", [{}])
-        content = choices[0].get("message", {}).get("content", "") if choices else ""
-        if check_response_keywords(content):
-            return "keyword_match"
-        return "custom_detector"
 
     @staticmethod
     def _has_vision_content(messages: list[dict[str, Any]]) -> bool:
@@ -506,6 +507,7 @@ class BaseClient:
         messages: list[dict[str, Any]],
         *,
         attempt_fn: Callable[..., Generator[_ChatRequest, _ChatResponse, ChatResult]],
+        parse_candidate: Callable[[str], Any] | None = None,
         reasoning_effort: str | None = None,
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
@@ -580,6 +582,59 @@ class BaseClient:
         attempted: list[str] = []
         last_content = ""
         last_error: ContentPolicyError | None = None
+        last_evidence: RefusalEvidence | None = None
+        refusal_candidates: list[dict[str, Any]] = []
+        attempt_layers: dict[str, str] = {}
+        rescue_failure = ""
+
+        def rescue_best_candidate() -> ChatResult | None:
+            nonlocal rescue_failure
+            if self._on_all_refused != "return_best":
+                return None
+            inferred = [
+                candidate
+                for candidate in refusal_candidates
+                if candidate["evidence"].is_inferred and candidate["content"]
+            ]
+            if not inferred:
+                return None
+            best = max(inferred, key=lambda candidate: len(candidate["content"]))
+            try:
+                result = self._extract_result(
+                    best["data"],
+                    model=best["model"],
+                    provider=best["provider"],
+                    latency_ms=best["latency_ms"],
+                    request_id=request_id,
+                    record_success=False,
+                )
+                if parse_candidate is not None:
+                    result.parsed = parse_candidate(result.content)
+            except Exception as error:
+                rescue_failure = f"best candidate rescue failed: {error}"
+                return None
+
+            if result.usage is not None:
+                self.stats.record_success(
+                    model=result.model,
+                    latency_ms=result.latency_ms,
+                    tokens=result.usage.total_tokens,
+                )
+            result.fallback_from = model
+            result.fallback_chain = attempted
+            result.refusal_suspected = True
+            result.refusal_evidence = best["evidence"]
+            result.trace = trace.freeze(
+                final_outcome="content_policy_recovered",
+                final_model=result.model,
+            )
+            return result
+
+        def refusal_summary() -> str:
+            return ", ".join(
+                f"{candidate}={attempt_layers.get(candidate, 'unknown')}"
+                for candidate in attempted
+            )
 
         for current_model in models_to_try:
             elapsed = time.monotonic() - deadline_start
@@ -658,6 +713,7 @@ class BaseClient:
                         and isinstance(response.error, ContentPolicyError)
                         and has_fallback
                     ):
+                        attempt_layers[current_model] = "http_error"
                         inner.close()
                         self._pending_refusal_report = {
                             "model": current_model,
@@ -667,6 +723,11 @@ class BaseClient:
                             "message_count": len(messages),
                             "has_images": self._has_vision_content(messages),
                             "detection_layer": "http_error",
+                            "evidence": (
+                                response.error.evidence.to_dict()
+                                if response.error.evidence is not None
+                                else None
+                            ),
                             "http_status": http_status,
                             "finish_reason": None,
                             "response_preview": str(response.error)[:200],
@@ -674,17 +735,25 @@ class BaseClient:
                         raise ContentPolicyError(
                             str(response.error),
                             http_status=http_status,
+                            evidence=response.error.evidence,
+                            attempt_layers={current_model: "http_error"},
                         ) from response.error
 
                     response_is_refusal = False
                     if has_fallback and response.data and not response.error:
-                        response_is_refusal = detect_refusal(
+                        evidence = detect_refusal(
                             response.data,
                             self._refusal_detector,
-                            extra_keywords=self._get_refusal_keywords(),
+                            policy=RefusalPolicy(
+                                max_content_length=self._refusal_max_content_length,
+                                head_window=self._refusal_head_window,
+                                keywords_mode=self._refusal_keywords_mode,
+                                extra_keywords=tuple(self._get_refusal_keywords() or ()),
+                            ),
                             model=current_model,
                             provider=current_provider,
                         )
+                        response_is_refusal = evidence.is_refusal
                         trace.add_model_attempt(
                             model=current_model,
                             provider=current_provider,
@@ -698,9 +767,26 @@ class BaseClient:
                         )
                         if response_is_refusal:
                             inner.close()
-                            choices = response.data.get("choices", [{}])
-                            choice = choices[0] if choices else {}
-                            last_content = choice.get("message", {}).get("content", "") or ""
+                            choices = response.data.get("choices")
+                            choice = choices[0] if isinstance(choices, list) and choices else {}
+                            message = choice.get("message", {}) if isinstance(choice, dict) else {}
+                            last_content = (
+                                message.get("content", "")
+                                if isinstance(message, dict)
+                                else ""
+                            ) or ""
+                            if not isinstance(last_content, str):
+                                last_content = ""
+                            last_evidence = evidence
+                            attempt_layers[current_model] = evidence.layer
+                            refusal_candidates.append({
+                                "data": response.data,
+                                "content": last_content,
+                                "model": current_model,
+                                "provider": current_provider,
+                                "latency_ms": attempt_latency_ms,
+                                "evidence": evidence,
+                            })
                             self._pending_refusal_report = {
                                 "model": current_model,
                                 "provider": current_provider,
@@ -708,13 +794,16 @@ class BaseClient:
                                 "messages": messages,
                                 "message_count": len(messages),
                                 "has_images": self._has_vision_content(messages),
-                                "detection_layer": self._classify_refusal_layer(response.data),
+                                "detection_layer": evidence.layer,
+                                "evidence": evidence.to_dict(),
                                 "http_status": None,
                                 "finish_reason": choice.get("finish_reason"),
                                 "response_preview": last_content[:200],
                             }
                             raise ContentPolicyError(
-                                f"Model {current_model} refused the request",
+                                f"Model {current_model} refused the request ({evidence.layer})",
+                                evidence=evidence,
+                                attempt_layers={current_model: evidence.layer},
                             )
                     elif response.data and not response.error:
                         trace.add_model_attempt(
@@ -766,12 +855,18 @@ class BaseClient:
                                 model=current_model,
                                 error_type="ContentPolicyError",
                             )
+                        rescued = rescue_best_candidate()
+                        if rescued is not None:
+                            return rescued
                         terminal_error = ContentPolicyError(
-                            f"All models refused: {attempted}",
+                            f"All models refused: {attempted} ({refusal_summary()})"
+                            + (f"; {rescue_failure}" if rescue_failure else ""),
                             attempted_models=attempted,
                             raw_content=last_content,
                             original_model=model,
                             http_status=describe_error(error)[1],
+                            evidence=error.evidence or last_evidence,
+                            attempt_layers=dict(attempt_layers),
                             trace=trace.freeze(
                                 final_outcome="content_policy",
                                 final_model=current_model,
@@ -792,12 +887,18 @@ class BaseClient:
                     )
                 raise
 
+        rescued = rescue_best_candidate()
+        if rescued is not None:
+            return rescued
         terminal_error = ContentPolicyError(
-            f"All models refused: {attempted}",
+            f"All models refused: {attempted} ({refusal_summary()})"
+            + (f"; {rescue_failure}" if rescue_failure else ""),
             attempted_models=attempted,
             raw_content=last_content,
             original_model=model,
             http_status=(describe_error(last_error)[1] if last_error is not None else None),
+            evidence=(last_error.evidence if last_error is not None else None) or last_evidence,
+            attempt_layers=dict(attempt_layers),
             trace=trace.freeze(
                 final_outcome="content_policy",
                 final_model=attempted[-1] if attempted else None,
@@ -960,9 +1061,16 @@ class BaseClient:
             schema=schema, json_schema=json_schema,
             self_correction=self_correction, max_retries=max_retries,
         )
+
+        def parse_candidate(content: str) -> Any:
+            if schema is not None:
+                return parse_json_model(content, schema)
+            return parse_json(content)
+
         return (yield from self._content_fallback_orchestrator(
             model, messages,
             attempt_fn=attempt_fn,
+            parse_candidate=parse_candidate,
             reasoning_effort=reasoning_effort, **extra,
         ))
 

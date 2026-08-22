@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from llm_compat.errors import (
+    ContentPolicyError,
     FatalError,
     JSONParseError,
     LLMError,
@@ -13,6 +14,7 @@ from llm_compat.errors import (
     TruncationError,
     classify_error,
 )
+from llm_compat.refusal import RefusalEvidence
 
 
 class TestErrorHierarchy:
@@ -42,6 +44,16 @@ class TestErrorHierarchy:
         assert err.model == "gpt-4o"
         assert err.request_id == "abc123"
         assert "parse failed" in str(err)
+
+    def test_content_policy_carries_evidence_and_attempt_layers(self):
+        evidence = RefusalEvidence(True, "text_pattern", signal="pattern:test")
+        err = ContentPolicyError(
+            "refused",
+            evidence=evidence,
+            attempt_layers={"deepseek-v4": "text_pattern"},
+        )
+        assert err.evidence == evidence
+        assert err.attempt_layers == {"deepseek-v4": "text_pattern"}
 
 
 class TestClassifyError:

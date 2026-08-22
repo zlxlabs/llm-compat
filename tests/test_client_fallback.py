@@ -135,7 +135,9 @@ class TestFallbackBasic:
             assert result.content == "actual answer"
             assert result.fallback_from == "deepseek-v4"
 
-    async def test_all_models_refused_raises_content_policy_error(self, httpx_mock: HTTPXMock):
+    async def test_all_models_refused_returns_longest_inferred_candidate(
+        self, httpx_mock: HTTPXMock
+    ):
         httpx_mock.add_response(json=_refusal_response())
         httpx_mock.add_response(json=_refusal_response("I cannot assist"))
         async with LLMClient(
@@ -143,11 +145,66 @@ class TestFallbackBasic:
             api_key="sk-test",
             content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
         ) as client:
+            result = await client.chat("deepseek-v4", MESSAGES)
+            assert result.content == "I cannot assist"
+            assert result.refusal_suspected is True
+            assert result.refusal_evidence is not None
+            assert result.refusal_evidence.layer == "text_pattern"
+            assert result.fallback_from == "deepseek-v4"
+
+    async def test_all_models_refused_raise_mode_includes_layers(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_refusal_response())
+        httpx_mock.add_response(json=_refusal_response("I cannot assist"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+            on_all_refused="raise",
+        ) as client:
             with pytest.raises(ContentPolicyError) as exc_info:
                 await client.chat("deepseek-v4", MESSAGES)
-            assert "deepseek-v4" in exc_info.value.attempted_models
-            assert "gpt-4.1-mini" in exc_info.value.attempted_models
-            assert exc_info.value.original_model == "deepseek-v4"
+        error = exc_info.value
+        assert error.attempted_models == ["deepseek-v4", "gpt-4.1-mini"]
+        assert error.attempt_layers == {
+            "deepseek-v4": "text_pattern",
+            "gpt-4.1-mini": "text_pattern",
+        }
+        assert "deepseek-v4=text_pattern" in str(error)
+        assert "gpt-4.1-mini=text_pattern" in str(error)
+
+    async def test_structured_refusals_are_never_rescued(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_content_filter_response())
+        httpx_mock.add_response(json=_content_filter_response())
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            with pytest.raises(ContentPolicyError) as exc_info:
+                await client.chat("deepseek-v4", MESSAGES)
+        assert exc_info.value.attempt_layers == {
+            "deepseek-v4": "structured_signal",
+            "gpt-4.1-mini": "structured_signal",
+        }
+
+    async def test_mixed_refusals_rescue_only_inferred_candidate(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_content_filter_response())
+        httpx_mock.add_response(json=_refusal_response("I cannot assist with this"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            result = await client.chat("deepseek-v4", MESSAGES)
+        assert result.content == "I cannot assist with this"
+        assert result.refusal_evidence is not None
+        assert result.refusal_evidence.layer == "text_pattern"
 
     async def test_http_400_content_policy_triggers_fallback(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(
