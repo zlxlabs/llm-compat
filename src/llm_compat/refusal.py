@@ -71,7 +71,7 @@ DEFAULT_REFUSAL_PATTERNS_CN: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "pattern:cn_apology_meta",
         re.compile(
-            r"(?:^|(?<=[。！？!?\n]))\s*(?:抱歉|对不起)[，,、:\s]*"
+            r"(?:^|(?<=[。！？!?{}\[\]\"\n]))\s*(?:抱歉|对不起)[，,、:\s]*"
             r"(?:(?:我|作为(?:一个)?(?:AI|人工智能|语言模型))"
             r"[^。！？!?\n]{0,60})?"
             r"(?:无法|不能|没办法|不便|不提供|不予|拒绝)"
@@ -81,7 +81,7 @@ DEFAULT_REFUSAL_PATTERNS_CN: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "pattern:cn_as_ai_cannot",
         re.compile(
-            r"(?:^|(?<=[。！？!?\n]))\s*作为(?:一个)?"
+            r"(?:^|(?<=[。！？!?{}\[\]\"\n]))\s*作为(?:一个)?"
             r"(?:AI|人工智能|语言模型)[^。！？!?\n]{0,60}?"
             r"我(?:无法|不能)"
             r"(?![^。！？!?\n]{0,50}(?:但|不过|然而|可以|能够|仍然|以下|如下))"
@@ -90,7 +90,7 @@ DEFAULT_REFUSAL_PATTERNS_CN: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "pattern:cn_first_person_cannot",
         re.compile(
-            r"(?:^|(?<=[。！？!?\n]))\s*我"
+            r"(?:^|(?<=[。！？!?{}\[\]\"\n]))\s*我"
             r"(?:很抱歉[，,、:\s]*)?(?:无法|不能)(?:提供|回答|协助|讨论|继续)"
             r"(?![^。！？!?\n]{0,50}(?:但|不过|然而|可以|能够|仍然|以下|如下))"
         ),
@@ -98,7 +98,7 @@ DEFAULT_REFUSAL_PATTERNS_CN: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "pattern:cn_unsuitable_topic",
         re.compile(
-            r"(?:^|(?<=[。！？!?\n]))\s*(?:这个|该|此)"
+            r"(?:^|(?<=[。！？!?{}\[\]\"\n]))\s*(?:这个|该|此)"
             r"(?:问题|请求|话题)(?:不适合|不便)(?:讨论|回答)"
         ),
     ),
@@ -108,7 +108,7 @@ DEFAULT_REFUSAL_PATTERNS_EN: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "pattern:en_apology_cannot",
         re.compile(
-            r"(?:^|(?<=[.!?\n]))\s*\bI(?:\s+am\s+sorry|['’]m\s+(?:sorry|afraid))"
+            r"(?:^|(?<=[.!?{}\[\]\"\n]))\s*\bI(?:\s+am\s+sorry|['’]m\s+(?:sorry|afraid))"
             r"[^.!?\n]{0,80}\b(?:cannot|can['’]?t|unable\s+to)\b"
             r"(?![^.!?\n]{0,60}\b(?:but|however|roughly|approximately|"
             r"instead|can|could|will|here)\b)",
@@ -118,7 +118,7 @@ DEFAULT_REFUSAL_PATTERNS_EN: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "pattern:en_first_person_assistance",
         re.compile(
-            r"(?:^|(?<=[.!?\n]))\s*\bI\s+can(?:not|['’]t)\s+"
+            r"(?:^|(?<=[.!?{}\[\]\"\n]))\s*\bI\s+can(?:not|['’]t)\s+"
             r"(?:assist|help|provide|comply)\b"
             r"(?![^.!?\n]{0,60}\b(?:but|however|instead|also|can|could|will|here)\b)",
             re.IGNORECASE,
@@ -127,7 +127,7 @@ DEFAULT_REFUSAL_PATTERNS_EN: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "pattern:en_as_ai_cannot",
         re.compile(
-            r"(?:^|(?<=[.!?\n]))\s*\bAs\s+an?\s+"
+            r"(?:^|(?<=[.!?{}\[\]\"\n]))\s*\bAs\s+an?\s+"
             r"(?:AI|artificial intelligence|language model)\b"
             r"[^.!?\n]{0,80}\bI\s+(?:cannot|can['’]?t|unable\s+to)\b"
             r"(?![^.!?\n]{0,60}\b(?:but|however|instead|also|can|could|will|here)\b)",
