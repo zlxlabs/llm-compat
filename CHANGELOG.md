@@ -8,6 +8,25 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-22
+
+### Changed
+
+- **Breaking**：拒绝检测默认词表从普通题材词改为严格的拒绝言语行为正则；文本判定同时要求
+  句式命中位于正文前 120 字且全文不超过 300 字，降低正常长文被误判的风险。
+- 拒绝判定现在返回可序列化的 `RefusalEvidence`，区分 provider 声明层、畸形响应、文本推断层
+  和调用方 detector；结构化声明优先，`refusal_detector` 返回 `False` 可否决文本层判定。
+- **Breaking**：链耗尽时 `on_all_refused` 默认改为 `"return_best"`。若所有丢弃决策都来自推断层，
+  返回最长候选并设置 `ChatResult.refusal_suspected=True`；声明层拒绝仍抛出 `ContentPolicyError`。
+
+### Migration
+
+- 需要保留旧的“所有候选拒绝即抛错”行为时显式设置 `on_all_refused="raise"`。
+- 需要接管文本词表时设置 `refusal_keywords_mode="replace"`；`refusal_keywords` 和
+  `refusal_keywords_url` 仍按子串匹配，但继续受长度/位置门槛约束。
+- 处理可能被文本推断层救援的结果时检查 `result.refusal_suspected` 和
+  `result.refusal_evidence`，并对 `chat_json()` 继续使用 `parsed` 做结构校验。
+
 ## [0.9.1] - 2026-08-17
 
 ### Added

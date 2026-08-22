@@ -51,6 +51,20 @@ MESSAGES = [{"role": "user", "content": "hello"}]
 
 
 class TestFallbackBasic:
+    async def test_replace_mode_disables_builtin_text_patterns(
+        self, httpx_mock: HTTPXMock
+    ):
+        httpx_mock.add_response(json=_refusal_response("I cannot assist"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+            refusal_keywords_mode="replace",
+        ) as client:
+            result = await client.chat("deepseek-v4", MESSAGES)
+        assert result.content == "I cannot assist"
+        assert len(httpx_mock.get_requests()) == 1
+
     async def test_no_fallback_config_normal_behavior(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json=_chat_response("hello world"))
         async with LLMClient(base_url="https://api.test.com/v1", api_key="sk-test") as client:

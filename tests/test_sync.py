@@ -26,6 +26,20 @@ def _chat_response(content: str) -> dict:
 
 
 class TestSyncChat:
+    def test_refusal_configuration_is_available_on_sync_client(self) -> None:
+        client = SyncLLMClient(
+            base_url="http://test/v1",
+            api_key="sk-test",
+            refusal_keywords_mode="replace",
+            refusal_max_content_length=42,
+            refusal_head_window=7,
+            on_all_refused="raise",
+        )
+        assert client._refusal_keywords_mode == "replace"
+        assert client._refusal_max_content_length == 42
+        assert client._refusal_head_window == 7
+        assert client._on_all_refused == "raise"
+
     def test_basic_chat(self, httpx_mock: HTTPXMock) -> None:
         httpx_mock.add_response(json=_chat_response("hello"))
         with SyncLLMClient(base_url="http://test/v1", api_key="sk-test") as client:

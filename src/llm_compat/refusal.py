@@ -207,12 +207,13 @@ def _text_evidence(
     content: str, finish_reason: str | None, policy: RefusalPolicy
 ) -> RefusalEvidence:
     content_length = len(content)
-    base = {
-        "content_length": content_length,
-        "finish_reason": finish_reason,
-    }
     if not content or content_length > policy.max_content_length:
-        return RefusalEvidence(is_refusal=False, layer="none", **base)
+        return RefusalEvidence(
+            is_refusal=False,
+            layer="none",
+            content_length=content_length,
+            finish_reason=finish_reason,
+        )
 
     patterns: tuple[tuple[str, re.Pattern[str]], ...]
     if policy.keywords_mode == "extend":
@@ -229,7 +230,8 @@ def _text_evidence(
                 signal=signal,
                 matched_text=match.group(0)[:80],
                 match_position=match.start(),
-                **base,
+                content_length=content_length,
+                finish_reason=finish_reason,
             )
 
     for keyword in policy.extra_keywords:
@@ -243,10 +245,16 @@ def _text_evidence(
                 signal=f"keyword:{keyword}",
                 matched_text=keyword[:80],
                 match_position=position,
-                **base,
+                content_length=content_length,
+                finish_reason=finish_reason,
             )
 
-    return RefusalEvidence(is_refusal=False, layer="none", **base)
+    return RefusalEvidence(
+        is_refusal=False,
+        layer="none",
+        content_length=content_length,
+        finish_reason=finish_reason,
+    )
 
 
 def check_response_keywords(
