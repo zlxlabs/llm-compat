@@ -335,6 +335,23 @@ class TestFallbackStats:
             assert client.stats.fallback_count == 1
             assert client.stats._refusal_counts.get("deepseek-v4") == 1
 
+    async def test_rescue_without_usage_records_success(self, httpx_mock: HTTPXMock):
+        first = _refusal_response()
+        first.pop("usage")
+        second = _refusal_response("I cannot assist")
+        second.pop("usage")
+        httpx_mock.add_response(json=first)
+        httpx_mock.add_response(json=second)
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            result = await client.chat("deepseek-v4", MESSAGES)
+            assert result.refusal_suspected is True
+            assert client.stats.success_count == 1
+            assert client.stats.total_calls == 1
+
     async def test_no_fallback_no_stats(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json=_chat_response("ok"))
         async with LLMClient(

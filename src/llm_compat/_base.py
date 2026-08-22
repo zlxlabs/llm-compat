@@ -314,7 +314,6 @@ class BaseClient:
         request_id: str,
         fallback_from: str | None = None,
         fallback_chain: list[str] | None = None,
-        record_success: bool = True,
     ) -> ChatResult:
         content = data["choices"][0]["message"].get("content") or ""
         usage_data = data.get("usage", {})
@@ -330,10 +329,9 @@ class BaseClient:
             usage.prompt_tokens, usage.completion_tokens, usage.total_tokens,
         )
 
-        if record_success:
-            self.stats.record_success(
-                model=model, latency_ms=latency_ms, tokens=usage.total_tokens
-            )
+        self.stats.record_success(
+            model=model, latency_ms=latency_ms, tokens=usage.total_tokens
+        )
 
         return ChatResult(
             content=content,
@@ -606,7 +604,6 @@ class BaseClient:
                     provider=best["provider"],
                     latency_ms=best["latency_ms"],
                     request_id=request_id,
-                    record_success=False,
                 )
                 if parse_candidate is not None:
                     result.parsed = parse_candidate(result.content)
@@ -614,12 +611,6 @@ class BaseClient:
                 rescue_failure = f"best candidate rescue failed: {error}"
                 return None
 
-            if result.usage is not None:
-                self.stats.record_success(
-                    model=result.model,
-                    latency_ms=result.latency_ms,
-                    tokens=result.usage.total_tokens,
-                )
             result.fallback_from = model
             result.fallback_chain = attempted
             result.refusal_suspected = True
