@@ -26,8 +26,9 @@
   误判代价由 `on_all_refused="return_best"` 兜住。普通澄清、补充回答和转述他人观点不会仅因出现否定词而触发。
 - 拒绝判定现在返回可序列化的 `RefusalEvidence`，区分 provider 声明层、畸形响应、文本推断层
   和调用方 detector；结构化声明优先，`refusal_detector` 返回 `False` 可否决文本层判定。
-- **Breaking**：链耗尽时 `on_all_refused` 默认改为 `"return_best"`。若所有丢弃决策都来自推断层，
-  返回最长候选并设置 `ChatResult.refusal_suspected=True`；声明层拒绝仍抛出 `ContentPolicyError`。
+- **Breaking**：链耗尽时 `on_all_refused` 默认改为 `"return_best"`。救援只从推断层候选中挑选正文最长者；
+  声明层候选自身一律不救。链上同时存在声明层与推断层候选时，仍会救援推断层候选；若没有非空的推断层候选，
+  抛出 `ContentPolicyError`。被救援的候选设置 `ChatResult.refusal_suspected=True`。
 
 ### Migration
 

@@ -376,10 +376,10 @@ client = LLMClient(
 
 ### 所有模型都拒绝时
 
-默认 `on_all_refused="return_best"`。若候选都来自推断层，库返回正文最长且非空的候选，并设置
-`refusal_suspected=True` 与 `refusal_evidence`；`chat_json()` 会重新执行 JSON 清洗和 schema
-校验，校验失败仍抛 `ContentPolicyError`。声明层拒绝、畸形响应无非空正文、或 HTTP 错误没有可
-救援正文时仍抛错。
+默认 `on_all_refused="return_best"`。救援只从推断层候选中挑选正文最长者；声明层候选自身一律不救。
+链上同时存在声明层与推断层候选时，仍会救援推断层候选；若没有非空的推断层候选，抛
+`ContentPolicyError`。被救援的候选设置 `refusal_suspected=True` 与 `refusal_evidence`；
+`chat_json()` 会重新执行 JSON 清洗和 schema 校验，校验失败仍抛 `ContentPolicyError`。
 
 ```python
 from llm_compat import ContentPolicyError
