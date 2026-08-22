@@ -26,7 +26,32 @@ def response(
 
 REFUSAL_PATTERN_CASES = [
     ("pattern:cn_first_person_cannot", "我无法提供确切数字", "直接拒绝本次提供请求"),
+    (
+        "pattern:cn_first_person_cannot",
+        "我无法提供相关信息。",
+        "句末中文拒绝",
+    ),
+    (
+        "pattern:cn_first_person_cannot",
+        "我无法提供相关信息，请谅解。",
+        "带礼貌收尾的中文拒绝",
+    ),
     ("pattern:cn_first_person_cannot", "抱歉，我不能协助这个请求", "道歉后由我明确拒绝"),
+    (
+        "pattern:cn_first_person_cannot",
+        "抱歉，我不能协助这个请求，建议你换个问法。",
+        "带建议收尾的中文拒绝",
+    ),
+    (
+        "pattern:cn_first_person_cannot",
+        "很抱歉，我无法回答这个问题，因为它涉及敏感内容。",
+        "带因果补充的中文拒绝",
+    ),
+    (
+        "pattern:cn_first_person_cannot",
+        "对不起，我不能继续这个话题，请理解。",
+        "带礼貌收尾的中文拒绝",
+    ),
     (
         "pattern:cn_first_person_cannot",
         "作为一个AI语言模型，我无法回答这个问题",
@@ -37,6 +62,21 @@ REFUSAL_PATTERN_CASES = [
         "pattern:en_first_person_assistance",
         "I'm sorry, but I cannot help with that request.",
         "道歉后由我明确拒绝",
+    ),
+    (
+        "pattern:en_first_person_assistance",
+        "I cannot help with that request.",
+        "句末英文拒绝",
+    ),
+    (
+        "pattern:en_first_person_assistance",
+        "I cannot help with that request, please try rephrasing.",
+        "带建议收尾的英文拒绝",
+    ),
+    (
+        "pattern:en_first_person_assistance",
+        "I'm sorry, but I cannot provide that information, as it violates my guidelines.",
+        "带因果补充的英文拒绝",
     ),
     (
         "pattern:en_first_person_assistance",
