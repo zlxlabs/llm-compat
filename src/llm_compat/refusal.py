@@ -152,6 +152,7 @@ def _structured_evidence(data: dict[str, Any]) -> RefusalEvidence | None:
             is_refusal=True,
             layer="malformed",
             signal="choices_missing_or_empty",
+            content_length=len(content),
             finish_reason=finish_reason,
         )
     if choice is None:
@@ -159,6 +160,7 @@ def _structured_evidence(data: dict[str, Any]) -> RefusalEvidence | None:
             is_refusal=True,
             layer="malformed",
             signal="choice_malformed",
+            content_length=len(content),
             finish_reason=finish_reason,
         )
 
@@ -265,7 +267,17 @@ def check_response_keywords(
 ) -> bool:
     """检查文本拒绝句式，保留旧函数名以兼容直接调用方。"""
 
-    effective_policy = policy or RefusalPolicy(extra_keywords=tuple(extra_keywords or ()))
+    if policy is None:
+        effective_policy = RefusalPolicy(extra_keywords=tuple(extra_keywords or ()))
+    elif extra_keywords:
+        effective_policy = RefusalPolicy(
+            max_content_length=policy.max_content_length,
+            head_window=policy.head_window,
+            keywords_mode=policy.keywords_mode,
+            extra_keywords=policy.extra_keywords + tuple(extra_keywords),
+        )
+    else:
+        effective_policy = policy
     return _text_evidence(content, None, effective_policy).is_refusal
 
 

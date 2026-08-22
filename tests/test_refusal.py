@@ -66,6 +66,21 @@ class TestStructuredEvidence:
         assert evidence.is_refusal is False
         assert evidence.layer == "none"
 
+    @pytest.mark.parametrize(
+        ("data", "signal"),
+        [
+            ({"choices": []}, "choices_missing_or_empty"),
+            ({"choices": [None]}, "choice_malformed"),
+        ],
+    )
+    def test_malformed_evidence_reports_content_length(
+        self, data: dict, signal: str
+    ) -> None:
+        evidence = detect_refusal(data)
+        assert evidence.layer == "malformed"
+        assert evidence.signal == signal
+        assert evidence.content_length == 0
+
 
 class TestTextEvidence:
     @pytest.mark.parametrize(
@@ -256,3 +271,12 @@ class TestKeywordModes:
         assert detect_refusal(response("这里是拒绝标记"), policy=policy).is_refusal is True
         long_content = "x" * 5000 + "拒绝标记"
         assert detect_refusal(response(long_content), policy=policy).is_refusal is False
+
+    def test_compat_keyword_arguments_merge_with_policy(self) -> None:
+        policy = RefusalPolicy(
+            keywords_mode="replace",
+            extra_keywords=("policy-keyword",),
+        )
+        assert check_response_keywords(
+            "legacy-keyword", policy=policy, extra_keywords=["legacy-keyword"]
+        ) is True
