@@ -26,9 +26,9 @@ def response(
 
 REFUSAL_PATTERN_CASES = [
     ("pattern:cn_first_person_cannot", "我无法提供确切数字", "直接拒绝本次提供请求"),
-    ("pattern:cn_apology_meta", "抱歉，我不能协助这个请求", "道歉后由我明确拒绝"),
+    ("pattern:cn_first_person_cannot", "抱歉，我不能协助这个请求", "道歉后由我明确拒绝"),
     (
-        "pattern:cn_as_ai_cannot",
+        "pattern:cn_first_person_cannot",
         "作为一个AI语言模型，我无法回答这个问题",
         "当前回答以 AI 身份明确拒绝",
     ),
@@ -67,12 +67,12 @@ NON_REFUSAL_PATTERN_CASES = [
         "先拒绝精确数字、随后继续回答，不是拒绝本次任务",
     ),
     (
-        "pattern:cn_apology_meta",
+        "pattern:cn_first_person_cannot",
         "抱歉，我需要先了解一下你的具体需求",
         "道歉后的澄清请求没有拒绝 cue",
     ),
     (
-        "pattern:cn_as_ai_cannot",
+        "pattern:cn_first_person_cannot",
         "原文写道：作为一个AI语言模型，我无法回答这个问题，但给出了替代方案",
         "转述他人且继续提供方案，不是本次回答的拒绝",
     ),
