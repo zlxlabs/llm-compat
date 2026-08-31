@@ -7,7 +7,7 @@ import re
 import time
 import uuid
 from collections.abc import Callable, Generator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal, TypeVar
 
 import httpx
@@ -143,6 +143,18 @@ class _ChatResponse:
     error: Exception | None = None
 
 
+@dataclass
+class _CallSideEffects:
+    """Call-scoped refusal evidence destined for collector reporting.
+
+    Created at the start of each public chat/chat_json invocation and passed
+    down the orchestrator. Never stored on the client instance — concurrent
+    calls must not share this container.
+    """
+
+    refusal_reports: list[dict[str, Any]] = field(default_factory=list)
+
+
 class BaseClient:
     def __init__(
         self,
@@ -215,7 +227,6 @@ class BaseClient:
             self._collector = CollectorClient(
                 url=collector_url, project=collector_project, api_key=collector_api_key,
             )
-        self._pending_refusal_report: dict[str, Any] | None = None
         self._max_concurrency = max_concurrency
         self._semaphore: Any = None
         self._on_success = on_success
@@ -223,6 +234,46 @@ class BaseClient:
         self._pre_request = pre_request
         self._strict_unknown_models = strict_unknown_models
         self.stats = LLMStats()
+
+    def _record_terminal_success(self, result: ChatResult) -> ChatResult:
+        tokens = result.usage.total_tokens if result.usage is not None else 0
+        self.stats.record_success(
+            model=result.model, latency_ms=result.latency_ms, tokens=tokens
+        )
+        return result
+
+    def _record_terminal_error(self, model: str, error: Exception) -> None:
+        self.stats.record_error(model=model, error_type=type(error).__name__)
+
+    def _note_refusal_report(
+        self,
+        effects: _CallSideEffects,
+        *,
+        model: str,
+        provider: str,
+        request_id: str,
+        messages: list[dict[str, Any]],
+        detection_layer: str,
+        evidence: RefusalEvidence,
+        http_status: int | None,
+        finish_reason: str | None,
+        response_preview: str,
+    ) -> None:
+        effects.refusal_reports.append(
+            {
+                "model": model,
+                "provider": provider,
+                "request_id": request_id,
+                "messages": messages,
+                "message_count": len(messages),
+                "has_images": self._has_vision_content(messages),
+                "detection_layer": detection_layer,
+                "evidence": evidence.to_dict(),
+                "http_status": http_status,
+                "finish_reason": finish_reason,
+                "response_preview": response_preview[:200],
+            }
+        )
 
     def _get_refusal_keywords(self) -> list[str] | None:
         all_words: set[str] = set()
@@ -344,10 +395,6 @@ class BaseClient:
             usage.prompt_tokens, usage.completion_tokens, usage.total_tokens,
         )
 
-        self.stats.record_success(
-            model=model, latency_ms=latency_ms, tokens=usage.total_tokens
-        )
-
         return ChatResult(
             content=content,
             usage=usage,
@@ -421,6 +468,7 @@ class BaseClient:
             raise resp.error
 
         assert resp.data is not None
+        # Logical-call success is recorded by the orchestrator after this returns.
         return self._extract_result(
             resp.data, model=model, provider=provider,
             latency_ms=resp.latency_ms, request_id=request_id,
@@ -478,6 +526,7 @@ class BaseClient:
                 raise resp.error
 
             assert resp.data is not None
+            # Not a logical-call terminal: JSON parse/schema checks still follow.
             result = self._extract_result(
                 resp.data, model=model, provider=provider,
                 latency_ms=resp.latency_ms, request_id=request_id,
@@ -523,8 +572,10 @@ class BaseClient:
         attempt_fn: Callable[..., Generator[_ChatRequest, _ChatResponse, ChatResult]],
         parse_candidate: Callable[[str], Any] | None = None,
         reasoning_effort: str | None = None,
+        _call_effects: _CallSideEffects | None = None,
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
+        effects = _call_effects if _call_effects is not None else _CallSideEffects()
         request_id = uuid.uuid4().hex[:8]
         # Filter before calling _build_payload because ``stream`` is now a named
         # parameter and Python would otherwise bind a caller's **extra value to it.
@@ -615,6 +666,7 @@ class BaseClient:
             best = max(inferred, key=lambda candidate: len(candidate["content"]))
             try:
                 parsed = parse_candidate(best["content"]) if parse_candidate is not None else None
+                # Rescue success is recorded below after parse/schema succeed.
                 result = self._extract_result(
                     best["data"],
                     model=best["model"],
@@ -626,9 +678,6 @@ class BaseClient:
                     result.parsed = parsed
             except Exception as error:
                 rescue_failure = f"best candidate rescue failed: {error}"
-                self.stats.record_error(
-                    model=best["model"], error_type="ContentPolicyError"
-                )
                 return None
 
             result.fallback_from = model
@@ -639,7 +688,7 @@ class BaseClient:
                 final_outcome="content_policy_recovered",
                 final_model=result.model,
             )
-            return result
+            return self._record_terminal_success(result)
 
         def refusal_summary() -> str:
             return ", ".join(
@@ -733,19 +782,18 @@ class BaseClient:
                         _log_refusal(http_evidence, model=current_model)
                         attempt_layers[current_model] = http_evidence.layer
                         inner.close()
-                        self._pending_refusal_report = {
-                            "model": current_model,
-                            "provider": current_provider,
-                            "request_id": request_id,
-                            "messages": messages,
-                            "message_count": len(messages),
-                            "has_images": self._has_vision_content(messages),
-                            "detection_layer": "http_error",
-                            "evidence": http_evidence.to_dict(),
-                            "http_status": http_status,
-                            "finish_reason": None,
-                            "response_preview": str(response.error)[:200],
-                        }
+                        self._note_refusal_report(
+                            effects,
+                            model=current_model,
+                            provider=current_provider,
+                            request_id=request_id,
+                            messages=messages,
+                            detection_layer="http_error",
+                            evidence=http_evidence,
+                            http_status=http_status,
+                            finish_reason=None,
+                            response_preview=str(response.error),
+                        )
                         raise ContentPolicyError(
                             f"Model {current_model} refused the request ({http_evidence.layer})",
                             http_status=http_status,
@@ -813,19 +861,18 @@ class BaseClient:
                                 "latency_ms": attempt_latency_ms,
                                 "evidence": evidence,
                             })
-                            self._pending_refusal_report = {
-                                "model": current_model,
-                                "provider": current_provider,
-                                "request_id": request_id,
-                                "messages": messages,
-                                "message_count": len(messages),
-                                "has_images": self._has_vision_content(messages),
-                                "detection_layer": evidence.layer,
-                                "evidence": evidence.to_dict(),
-                                "http_status": None,
-                                "finish_reason": choice.get("finish_reason"),
-                                "response_preview": last_content[:200],
-                            }
+                            self._note_refusal_report(
+                                effects,
+                                model=current_model,
+                                provider=current_provider,
+                                request_id=request_id,
+                                messages=messages,
+                                detection_layer=evidence.layer,
+                                evidence=evidence,
+                                http_status=None,
+                                finish_reason=choice.get("finish_reason"),
+                                response_preview=last_content,
+                            )
                             raise ContentPolicyError(
                                 f"Model {current_model} refused the request ({evidence.layer})",
                                 evidence=evidence,
@@ -852,7 +899,7 @@ class BaseClient:
                             final_outcome="success",
                             final_model=result.model,
                         )
-                        return result
+                        return self._record_terminal_success(result)
                     previous_json_mode = current_json_mode
                     request_number += 1
 
@@ -876,11 +923,6 @@ class BaseClient:
                     models_to_try.extend(remaining_models)
 
                     if current_model == models_to_try[-1]:
-                        if not chain:
-                            self.stats.record_error(
-                                model=current_model,
-                                error_type="ContentPolicyError",
-                            )
                         rescued = rescue_best_candidate()
                         if rescued is not None:
                             return rescued
@@ -898,11 +940,12 @@ class BaseClient:
                                 final_model=current_model,
                             ),
                         )
+                        self._record_terminal_error(current_model, terminal_error)
                         raise terminal_error from error
                 continue
 
             except Exception as error:
-                self.stats.record_error(model=current_model, error_type=type(error).__name__)
+                self._record_terminal_error(current_model, error)
                 if isinstance(error, LLMCallError):
                     error_kind, http_status = describe_error(error)
                     error.error_kind = error_kind
@@ -930,6 +973,9 @@ class BaseClient:
                 final_model=attempted[-1] if attempted else None,
             ),
         )
+        self._record_terminal_error(
+            attempted[-1] if attempted else model, terminal_error
+        )
         if last_error is not None:
             raise terminal_error from last_error
         raise terminal_error
@@ -940,12 +986,15 @@ class BaseClient:
         messages: list[dict[str, Any]],
         *,
         reasoning_effort: str | None = None,
+        _call_effects: _CallSideEffects | None = None,
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
         return (yield from self._content_fallback_orchestrator(
             model, messages,
             attempt_fn=self._simple_attempt,
-            reasoning_effort=reasoning_effort, **extra,
+            reasoning_effort=reasoning_effort,
+            _call_effects=_call_effects,
+            **extra,
         ))
 
     def _invoke_pre_request(self, model: str) -> None:
@@ -1059,6 +1108,7 @@ class BaseClient:
         self_correction: bool = False,
         max_retries: int = 2,
         reasoning_effort: str | None = None,
+        _call_effects: _CallSideEffects | None = None,
         **extra: Any,
     ) -> Generator[_ChatRequest, _ChatResponse, ChatResult]:
         from functools import partial
@@ -1097,7 +1147,9 @@ class BaseClient:
             model, messages,
             attempt_fn=attempt_fn,
             parse_candidate=parse_candidate,
-            reasoning_effort=reasoning_effort, **extra,
+            reasoning_effort=reasoning_effort,
+            _call_effects=_call_effects,
+            **extra,
         ))
 
     def _log_single_chat(

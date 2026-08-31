@@ -7,7 +7,7 @@ from typing import Any, TypeVar, cast
 import httpx
 from pydantic import BaseModel
 
-from ._base import BaseClient, _ChatRequest, _ChatResponse
+from ._base import BaseClient, _CallSideEffects, _ChatRequest, _ChatResponse
 from .retry import sync_retry_call
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,13 @@ class SyncLLMClient(BaseClient):
         **extra: Any,
     ) -> Any:
         self._invoke_pre_request(model)
-        gen = self._chat_orchestrator(model, messages, reasoning_effort=reasoning_effort, **extra)
+        effects = _CallSideEffects()
+        gen = self._chat_orchestrator(
+            model, messages,
+            reasoning_effort=reasoning_effort,
+            _call_effects=effects,
+            **extra,
+        )
         try:
             result = self._drive_chat(gen)
         except Exception as e:
@@ -125,11 +131,14 @@ class SyncLLMClient(BaseClient):
         **extra: Any,
     ) -> Any:
         self._invoke_pre_request(model)
+        effects = _CallSideEffects()
         gen = self._json_chat_orchestrator(
             model, messages,
             schema=schema, json_schema=json_schema,
             self_correction=self_correction, max_retries=max_retries,
-            reasoning_effort=reasoning_effort, **extra,
+            reasoning_effort=reasoning_effort,
+            _call_effects=effects,
+            **extra,
         )
         try:
             result = self._drive_chat(gen)
