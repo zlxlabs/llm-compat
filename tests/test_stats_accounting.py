@@ -104,6 +104,23 @@ class TestChatAccounting:
             assert client.stats.error_count == 1
             _assert_balanced(client)
 
+    async def test_all_refused_fallback_chain_records_error_once(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        httpx_mock.add_response(json=_content_filter_response())
+        httpx_mock.add_response(json=_content_filter_response("also filtered"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4.1-mini"]},
+        ) as client:
+            with pytest.raises(ContentPolicyError):
+                await client.chat("deepseek-v4", MESSAGES)
+            assert client.stats.total_calls == 1
+            assert client.stats.success_count == 0
+            assert client.stats.error_count == 1
+            _assert_balanced(client)
+
 
 # --- chat_json() without fallback ------------------------------------------
 
@@ -163,6 +180,18 @@ class TestChatJsonNoFallbackAccounting:
         ) as client:
             with pytest.raises(FatalError):
                 await client.chat_json("gpt-4o", MESSAGES, schema=TagResult)
+            assert client.stats.success_count == 0
+            assert client.stats.error_count == 1
+            _assert_balanced(client)
+
+    async def test_network_error_records_error_once(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_exception(httpx.ConnectError("boom"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1", api_key="sk-test", max_retries=0
+        ) as client:
+            with pytest.raises(RetryableError):
+                await client.chat_json("gpt-4o", MESSAGES, schema=TagResult)
+            assert client.stats.total_calls == 1
             assert client.stats.success_count == 0
             assert client.stats.error_count == 1
             _assert_balanced(client)
@@ -263,6 +292,24 @@ class TestChatJsonFallbackAccounting:
             assert client.stats.error_count == 1
             _assert_balanced(client)
 
+    async def test_network_error_on_fallback_chain_records_error_once(
+        self, httpx_mock: HTTPXMock
+    ) -> None:
+        httpx_mock.add_response(json=_content_filter_response())
+        httpx_mock.add_exception(httpx.ConnectError("boom"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1",
+            api_key="sk-test",
+            content_fallbacks={"deepseek-*": ["gpt-4o"]},
+            max_retries=0,
+        ) as client:
+            with pytest.raises(RetryableError):
+                await client.chat_json("deepseek-v4", MESSAGES, schema=TagResult)
+            assert client.stats.total_calls == 1
+            assert client.stats.success_count == 0
+            assert client.stats.error_count == 1
+            _assert_balanced(client)
+
 
 # --- chat_image / chat_images ----------------------------------------------
 
@@ -309,6 +356,20 @@ class TestChatImageAccounting:
                 await client.chat_image(
                     "gpt-4o", "describe", image_data=b"abc", media_type="image/png",
                 )
+            assert client.stats.error_count == 1
+            _assert_balanced(client)
+
+    async def test_image_network_error_records_error_once(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_exception(httpx.ConnectError("boom"))
+        async with LLMClient(
+            base_url="https://api.test.com/v1", api_key="sk-test", max_retries=0
+        ) as client:
+            with pytest.raises(RetryableError):
+                await client.chat_image(
+                    "gpt-4o", "describe", image_data=b"abc", media_type="image/png",
+                )
+            assert client.stats.total_calls == 1
+            assert client.stats.success_count == 0
             assert client.stats.error_count == 1
             _assert_balanced(client)
 
@@ -404,4 +465,30 @@ class TestSyncAccounting:
         with SyncLLMClient(base_url="https://api.test.com/v1", api_key="sk-test") as client:
             client.chat_image("gpt-4o", "look", image_data=b"x", media_type="image/png")
             assert client.stats.success_count == 1
+            _assert_balanced(client)
+
+    def test_chat_json_network_error_records_error_once(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_exception(httpx.ConnectError("boom"))
+        with SyncLLMClient(
+            base_url="https://api.test.com/v1", api_key="sk-test", max_retries=0
+        ) as client:
+            with pytest.raises(RetryableError):
+                client.chat_json("gpt-4o", MESSAGES, schema=TagResult)
+            assert client.stats.total_calls == 1
+            assert client.stats.success_count == 0
+            assert client.stats.error_count == 1
+            _assert_balanced(client)
+
+    def test_chat_image_network_error_records_error_once(self, httpx_mock: HTTPXMock) -> None:
+        httpx_mock.add_exception(httpx.ConnectError("boom"))
+        with SyncLLMClient(
+            base_url="https://api.test.com/v1", api_key="sk-test", max_retries=0
+        ) as client:
+            with pytest.raises(RetryableError):
+                client.chat_image(
+                    "gpt-4o", "look", image_data=b"x", media_type="image/png",
+                )
+            assert client.stats.total_calls == 1
+            assert client.stats.success_count == 0
+            assert client.stats.error_count == 1
             _assert_balanced(client)
