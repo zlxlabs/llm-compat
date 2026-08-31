@@ -130,8 +130,10 @@ class TestRefusalReportingPaths:
                 order.append("should_not_reach")
             order.append("exception")
 
-        assert "collector" in order
-        assert order.index("collector") < order.index("exception")
+        collector_at = [i for i, mark in enumerate(order) if mark == "collector"]
+        exception_at = order.index("exception")
+        assert collector_at, "expected collector reports before exception"
+        assert collector_at[-1] < exception_at
         assert len(recorder.posts) == 2
         bodies = [item["json"] for item in recorder.posts]
         models = {body["model"] for body in bodies}
