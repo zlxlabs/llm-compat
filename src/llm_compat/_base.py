@@ -321,12 +321,21 @@ class BaseClient:
         fallback_from: str | None = None,
         fallback_chain: list[str] | None = None,
     ) -> ChatResult:
-        content = data["choices"][0]["message"].get("content") or ""
+        choice = data["choices"][0]
+        content = choice["message"].get("content") or ""
+        finish_reason = choice.get("finish_reason")
         usage_data = data.get("usage", {})
+        details = usage_data.get("completion_tokens_details")
+        reasoning_tokens = 0
+        if isinstance(details, dict):
+            raw_reasoning = details.get("reasoning_tokens", 0)
+            if isinstance(raw_reasoning, int) and not isinstance(raw_reasoning, bool):
+                reasoning_tokens = raw_reasoning
         usage = TokenUsage(
             prompt_tokens=usage_data.get("prompt_tokens", 0),
             completion_tokens=usage_data.get("completion_tokens", 0),
             total_tokens=usage_data.get("total_tokens", 0),
+            reasoning_tokens=reasoning_tokens,
         )
 
         logger.info(
@@ -348,6 +357,7 @@ class BaseClient:
             provider=provider,
             fallback_from=fallback_from,
             fallback_chain=fallback_chain or [],
+            finish_reason=finish_reason,
         )
 
     @staticmethod
@@ -707,6 +717,11 @@ class BaseClient:
                             error_kind=error_kind,
                             http_status=http_status,
                             latency_ms=attempt_latency_ms,
+                            detection_layer=(
+                                "http_error"
+                                if isinstance(response.error, ContentPolicyError)
+                                else None
+                            ),
                         )
 
                     if response.error and isinstance(response.error, ContentPolicyError):
@@ -757,6 +772,10 @@ class BaseClient:
                         )
                         if response_is_refusal:
                             _log_refusal(evidence, model=current_model)
+                        choices = response.data.get("choices")
+                        choice = choices[0] if isinstance(choices, list) and choices else {}
+                        if not isinstance(choice, dict):
+                            choice = {}
                         trace.add_model_attempt(
                             model=current_model,
                             provider=current_provider,
@@ -767,11 +786,15 @@ class BaseClient:
                             response_classification=(
                                 "content_policy" if response_is_refusal else None
                             ),
+                            detection_layer=(
+                                evidence.layer if response_is_refusal else None
+                            ),
+                            finish_reason=(
+                                choice.get("finish_reason") if response_is_refusal else None
+                            ),
                         )
                         if response_is_refusal:
                             inner.close()
-                            choices = response.data.get("choices")
-                            choice = choices[0] if isinstance(choices, list) and choices else {}
                             message = choice.get("message", {}) if isinstance(choice, dict) else {}
                             last_content = (
                                 message.get("content", "")

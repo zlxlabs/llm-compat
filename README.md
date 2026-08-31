@@ -61,6 +61,8 @@ async with LLMClient(
     print(result.fallback_from) # 降级时显示原始模型，否则 None
     print(result.refusal_suspected) # 推断层救援的结果为 True
     print(result.refusal_evidence)  # 可序列化的拒绝证据
+    print(result.finish_reason)  # 上游 choices[0].finish_reason；缺失时为 None
+    print(result.usage.reasoning_tokens)  # 思考消耗；缺失时为 0
     print(result.trace.to_dict()) # 安全、可序列化的模型级调用事实
 ```
 
@@ -100,7 +102,8 @@ uv run python scripts/probe_caps.py \
 `requested_model` 是调用方请求的模型；被预检跳过的模型只出现在
 `route_decisions`；真正发出请求的模型才出现在 `model_attempts`；`final_model`
 是成功模型或最后失败模型；`final_outcome` 是整个逻辑调用的结果。一次 attempt 的
-`response_received` 只表示上游返回成功，不代表后续 JSON 解析成功。
+`response_received` 只表示上游返回成功，不代表后续 JSON 解析成功。被判拒的 attempt
+会带 `detection_layer` 与该次 `finish_reason`；正常成功的 attempt 这两个字段为 `None`。
 
 ## 文档
 

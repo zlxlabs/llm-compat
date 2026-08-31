@@ -8,6 +8,11 @@
 
 ## [Unreleased]
 
+- `ChatResult.finish_reason` 原样透传上游 `choices[0].finish_reason`，字段缺失时为 `None`，
+  不猜测为 `"stop"`。`TokenUsage.reasoning_tokens` 取
+  `usage.completion_tokens_details.reasoning_tokens`，缺失时为 `0`。
+- 被判拒的 `ModelAttempt` 带上该次 `detection_layer` 与上游 `finish_reason`；未被判拒的
+  正常 attempt 这两个字段为 `None`。`to_dict()` 同步输出这两个 key。
 - 收紧拒绝句式表对中英混排空白和“不确定后继续作答”的处理，减少文本层假阳性并覆盖常见
   `作为 AI` 表达。
 - 在集成指南中明确文本层是偏向漏判的启发式，记录 `refusal_max_content_length=0`、

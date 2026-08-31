@@ -18,6 +18,22 @@ class TestTokenUsage:
         assert u.prompt_tokens == 0
         assert u.total_tokens == 0
 
+    def test_reasoning_tokens_default_is_zero(self):
+        u = TokenUsage()
+        assert u.reasoning_tokens == 0
+
+    def test_reasoning_tokens_does_not_change_existing_fields(self):
+        u = TokenUsage(
+            prompt_tokens=2095,
+            completion_tokens=5046,
+            total_tokens=7141,
+            reasoning_tokens=4431,
+        )
+        assert u.prompt_tokens == 2095
+        assert u.completion_tokens == 5046
+        assert u.total_tokens == 7141
+        assert u.reasoning_tokens == 4431
+
 
 class TestChatResult:
     def test_str_returns_content(self):
@@ -54,6 +70,14 @@ class TestChatResult:
         )
         assert r.refusal_suspected is True
         assert r.refusal_evidence == evidence
+
+    def test_finish_reason_defaults_to_none(self):
+        r = ChatResult(content="answer")
+        assert r.finish_reason is None
+
+    def test_finish_reason_round_trips(self):
+        r = ChatResult(content="truncated", finish_reason="length")
+        assert r.finish_reason == "length"
 
 
 class TestLLMStats:
