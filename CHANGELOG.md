@@ -4,23 +4,50 @@
 
 0.6.1–0.7.3 是本分支上的中间版本号，从未打 tag 发布，因此合并到 0.8.0 说明中。
 早于 0.7.0 的变更未记录于此，请查阅 git log。当前已发布的 tag 为 `v0.2.0`、`v0.6.0`、
-`v0.8.0`、`v0.9.0`，以及本次的 `v0.9.1`。
+`v0.8.0`、`v0.9.0`、`v0.9.1`、`v0.10.0`，以及本次的 `v0.11.0`。
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-31
+
+### Added
+
 - `ChatResult.finish_reason` 原样透传上游 `choices[0].finish_reason`，字段缺失时为 `None`，
-  不猜测为 `"stop"`。`TokenUsage.reasoning_tokens` 取
-  `usage.completion_tokens_details.reasoning_tokens`，缺失时为 `0`。
+  不猜测为 `"stop"`。消费方不必再用 `usage.completion_tokens == max_tokens` 代理判断截断
+  ——token 计数巧合相等会误判、provider 不上报 usage 会漏判。
+- `TokenUsage.reasoning_tokens` 取 `usage.completion_tokens_details.reasoning_tokens`，
+  缺失时为 `0`。两个缺失值不对称是有意的：`finish_reason` 缺失是「不知道」，
+  `reasoning_tokens` 缺失是「确实没有思考消耗」。
 - 被判拒的 `ModelAttempt` 带上该次 `detection_layer` 与上游 `finish_reason`；未被判拒的
-  正常 attempt 这两个字段为 `None`。`to_dict()` 同步输出这两个 key。
-- 收紧拒绝句式表对中英混排空白和“不确定后继续作答”的处理，减少文本层假阳性并覆盖常见
+  正常 attempt 这两个字段为 `None`。`to_dict()` 同步输出这两个 key，既有 key 的名字与
+  语义不变。
+
+### Fixed
+
+- 一次逻辑调用在 `client.stats` 上恰好一条记录：`chat_json()` 解析/校验失败只记 error，
+  不再先记 success 再记 error。此前无 `content_fallbacks` 配置时同一次调用会留下
+  `success=1, error=1, total=2` 两条互相矛盾的记录，`success_rate` 与 `total_calls` 双双失真。(#24)
+- collector 上报覆盖 `chat()` 与 `chat_json()` 的拒绝路径（含整链失败路径），且发生在
+  `ContentPolicyError` 抛出之前。此前上报只挂在 `chat()` 的成功路径上，`chat_json()`
+  成功失败都不上报。链上中间被判拒的模型现在全部上报，不再只留最后一个。(#26)
+- 拒绝证据改为随调用传递的调用级容器，不再挂在 client 实例字段上。此前并发调用会
+  last-write-wins，把一次调用的拒绝证据上报成另一次调用的（模型名、prompt、判定层全部
+  归错），且不报错。(#27)
+
+### Changed
+
+- 收紧拒绝句式表对中英混排空白和"不确定后继续作答"的处理，减少文本层假阳性并覆盖常见
   `作为 AI` 表达。
 - 在集成指南中明确文本层是偏向漏判的启发式，记录 `refusal_max_content_length=0`、
   `refusal_keywords_mode="replace"` 和 `refusal_detector` 返回 `False` 三条现有逃生门，以及后续
   个案走配置或 backlog 的处置约定。
-- 一次逻辑调用在 `client.stats` 上恰好一条记录：`chat_json()` 解析/校验失败只记 error，
-  不再先记 success。collector 上报覆盖 `chat()` / `chat_json()` 的拒绝路径（含失败路径），
-  且发生在异常抛出之前；拒绝证据改为随调用传递，并发调用不再串扰。
+
+### Known issues
+
+- 整链拒绝的 collector 上报 `await` 期间若任务被取消，调用方拿到的是 `CancelledError`
+  而非 `ContentPolicyError`（`CancelledError` 继承自 `BaseException`，穿过内部的
+  `except Exception`）。`stats` 账本仍正确，但 `on_error` 回调会被跳过。已判 P2 接受不修，
+  跟踪见 #34。
 
 ## [0.10.0] - 2026-08-22
 
