@@ -33,6 +33,8 @@ class ModelAttempt:
     http_status: int | None = None
     latency_ms: int = 0
     response_classification: str | None = None
+    detection_layer: str | None = None
+    finish_reason: str | None = None
 
     def to_dict(self) -> dict[str, str | int | None]:
         return asdict(self)
@@ -95,6 +97,8 @@ class _CallTraceBuilder:
         http_status: int | None = None,
         latency_ms: int = 0,
         response_classification: str | None = None,
+        detection_layer: str | None = None,
+        finish_reason: str | None = None,
     ) -> None:
         if len(self._model_attempts) >= _MAX_MODEL_ATTEMPTS:
             self._dropped_events += 1
@@ -110,6 +114,8 @@ class _CallTraceBuilder:
                 http_status=http_status,
                 latency_ms=latency_ms,
                 response_classification=response_classification,
+                detection_layer=detection_layer,
+                finish_reason=finish_reason,
             )
         )
 

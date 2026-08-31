@@ -12,6 +12,7 @@ class TokenUsage:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    reasoning_tokens: int = 0
 
 
 @dataclass
@@ -28,6 +29,7 @@ class ChatResult:
     trace: CallTrace | None = None
     refusal_suspected: bool = False
     refusal_evidence: RefusalEvidence | None = None
+    finish_reason: str | None = None
 
     def __str__(self) -> str:
         return self.content

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import FrozenInstanceError
 
 import pytest
@@ -90,3 +91,52 @@ def test_error_hierarchy_and_stable_metadata_are_backward_compatible() -> None:
 def test_chat_result_trace_remains_optional() -> None:
     result = ChatResult(content="legacy")
     assert result.trace is None
+
+
+_EXISTING_ATTEMPT_KEYS = {
+    "model",
+    "provider",
+    "json_mode",
+    "trigger",
+    "outcome",
+    "error_kind",
+    "http_status",
+    "latency_ms",
+    "response_classification",
+}
+
+
+def test_model_attempt_new_fields_default_to_none_and_serialize() -> None:
+    attempt = ModelAttempt(
+        model="primary",
+        provider="openai",
+        json_mode="text",
+        trigger="primary",
+        outcome="response_received",
+    )
+    assert attempt.detection_layer is None
+    assert attempt.finish_reason is None
+
+    serialized = attempt.to_dict()
+    assert serialized.keys() >= _EXISTING_ATTEMPT_KEYS
+    assert serialized["detection_layer"] is None
+    assert serialized["finish_reason"] is None
+    json.dumps(serialized)
+
+
+def test_refused_model_attempt_serializes_detection_layer_and_finish_reason() -> None:
+    attempt = ModelAttempt(
+        model="primary",
+        provider="openai",
+        json_mode="text",
+        trigger="primary",
+        outcome="response_received",
+        response_classification="content_policy",
+        detection_layer="structured_signal",
+        finish_reason="content_filter",
+    )
+    serialized = attempt.to_dict()
+    assert serialized["detection_layer"] == "structured_signal"
+    assert serialized["finish_reason"] == "content_filter"
+    assert serialized["response_classification"] == "content_policy"
+    json.dumps(serialized)
