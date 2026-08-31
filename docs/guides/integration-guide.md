@@ -20,7 +20,8 @@ async with LLMClient(
         reasoning_effort="high",
     )
     print(result)              # 直接当 str 用
-    print(result.usage)        # TokenUsage(prompt=8, completion=75, total=83)
+    print(result.usage)        # TokenUsage(prompt=8, completion=75, total=83, reasoning=0)
+    print(result.finish_reason)  # 上游 finish_reason；缺失时为 None
     print(result.latency_ms)   # 1519
 ```
 
@@ -803,7 +804,7 @@ class LLMClient:
 |------|------|------|
 | `content` | `str` | 模型返回的文本（`str(result)` 直接使用） |
 | `parsed` | `Any \| None` | `chat_json()` 时为解析后的对象（Pydantic 实例或 dict） |
-| `usage` | `TokenUsage` | prompt_tokens / completion_tokens / total_tokens |
+| `usage` | `TokenUsage` | prompt_tokens / completion_tokens / total_tokens；`reasoning_tokens` 取上游 `completion_tokens_details.reasoning_tokens`，缺失时为 `0` |
 | `latency_ms` | `int` | 请求延迟（毫秒） |
 | `request_id` | `str` | 请求追踪 ID |
 | `model` | `str` | 实际使用的模型名 |
@@ -813,6 +814,7 @@ class LLMClient:
 | `trace` | `CallTrace \| None` | v0.6.0 模型级调用轨迹；旧代码不传时保持 `None` |
 | `refusal_suspected` | `bool` | 链耗尽救援推断层候选时为 `True` |
 | `refusal_evidence` | `RefusalEvidence \| None` | 触发拒绝或救援的结构化证据 |
+| `finish_reason` | `str \| None` | 原样透传上游 `choices[0].finish_reason`；字段缺失时为 `None`，不猜测为 `"stop"` |
 
 ### CallTrace：成功与失败的统一事实
 
@@ -844,7 +846,9 @@ if trace is not None:
 | final outcome | `CallTrace.final_outcome` | 整个逻辑调用结果，如 `success`、`json_parse`、`content_policy` |
 
 `ModelAttempt.outcome="response_received"` 只说明收到上游响应。对于 `chat_json()`，响应
-仍可能解析失败；解析终态只看 `CallTrace.final_outcome`。trace 不包含 prompt、messages、
+仍可能解析失败；解析终态只看 `CallTrace.final_outcome`。被判拒的 attempt 带
+`detection_layer`（该次实际判定层）和该次上游 `finish_reason`；未被判拒的正常 attempt
+这两个字段为 `None`。trace 不包含 prompt、messages、
 payload、响应正文、headers、API key 或原始异常。公共对象是 frozen dataclass，且内部 tuple
 不可变；超过 100 条模型事件时 `truncated=True` 并记录 `dropped_events`。
 
