@@ -504,6 +504,19 @@ stats.prescan_skips        # 前置跳过次数
 stats._refusal_counts      # 各模型拒绝次数 dict
 ```
 
+一次逻辑调用（`chat` / `chat_json` / `chat_image` / `chat_images`，含 sync 版）在 `stats` 上恰好留下一条记录：成功记 `success_count`，失败记 `error_count`，且恒有 `total_calls == success_count + error_count`。JSON 解析或 schema 校验失败只记 error，不再先记一条 success。`fallback_count` / `json_parse_failures` 是过程计数，不占用这条「一次调用一条」口径。
+
+`chat_stream()` 不走编排器，当前既不记账也不上报 collector（既有边界，不是漏记）。
+
+### Collector 上报覆盖面
+
+配了 `collector_url` 时，`chat()` / `chat_json()` / `chat_image()` / `chat_images()` 在判定到拒绝后会上报 sidecar：
+
+- 覆盖成功路径里被判拒的中间模型（随后 fallback 或救援成功也上报），以及整链 `ContentPolicyError`、被分类为 `http_error` 的 HTTP 拒绝。
+- 上报发生在异常抛出给调用方**之前**；JSON 解析失败、普通 4xx/5xx/网络错误不上报。
+- 没配 collector 时失败路径不额外报错，`ContentPolicyError.evidence` / `attempt_layers` 仍保留。
+- `SyncLLMClient` 不报送（`CollectorClient.report_refusal` 是异步接口，这是既有边界）。
+
 ### 启动校验
 
 ```python

@@ -18,6 +18,9 @@
 - 在集成指南中明确文本层是偏向漏判的启发式，记录 `refusal_max_content_length=0`、
   `refusal_keywords_mode="replace"` 和 `refusal_detector` 返回 `False` 三条现有逃生门，以及后续
   个案走配置或 backlog 的处置约定。
+- 一次逻辑调用在 `client.stats` 上恰好一条记录：`chat_json()` 解析/校验失败只记 error，
+  不再先记 success。collector 上报覆盖 `chat()` / `chat_json()` 的拒绝路径（含失败路径），
+  且发生在异常抛出之前；拒绝证据改为随调用传递，并发调用不再串扰。
 
 ## [0.10.0] - 2026-08-22
 

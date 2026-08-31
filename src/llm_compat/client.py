@@ -10,7 +10,7 @@ from typing import Any, TypeVar, cast
 import httpx
 from pydantic import BaseModel
 
-from ._base import BaseClient, _ChatRequest, _ChatResponse
+from ._base import BaseClient, _CallSideEffects, _ChatRequest, _ChatResponse
 from .retry import async_retry_call
 
 logger = logging.getLogger(__name__)
@@ -109,6 +109,22 @@ class LLMClient(BaseClient):
             except StopIteration as si:
                 return si.value
 
+    async def _finish_driven_chat(
+        self,
+        model: str,
+        gen: Any,
+        effects: _CallSideEffects,
+    ) -> Any:
+        try:
+            result = await self._drive_chat(gen)
+        except Exception as e:
+            await self._report_call_refusals(effects, result=None)
+            self._invoke_on_error(model, e)
+            raise
+        await self._report_call_refusals(effects, result=result)
+        self._invoke_on_success(model, result.latency_ms)
+        return result
+
     async def chat(
         self,
         model: str,
@@ -118,20 +134,26 @@ class LLMClient(BaseClient):
         **extra: Any,
     ) -> Any:
         self._invoke_pre_request(model)
-        gen = self._chat_orchestrator(model, messages, reasoning_effort=reasoning_effort, **extra)
-        try:
-            result = await self._drive_chat(gen)
-        except Exception as e:
-            self._invoke_on_error(model, e)
-            raise
-        self._invoke_on_success(model, result.latency_ms)
-        await self._maybe_report_refusal(result)
-        return result
+        effects = _CallSideEffects()
+        gen = self._chat_orchestrator(
+            model, messages,
+            reasoning_effort=reasoning_effort,
+            _call_effects=effects,
+            **extra,
+        )
+        return await self._finish_driven_chat(model, gen, effects)
 
-    async def _maybe_report_refusal(self, result: Any) -> None:
-        report = self._pending_refusal_report
-        self._pending_refusal_report = None
-        if report and self._collector:
+    async def _report_call_refusals(
+        self,
+        effects: _CallSideEffects,
+        *,
+        result: Any | None,
+    ) -> None:
+        if not effects.refusal_reports or not self._collector:
+            return
+        fallback_model = getattr(result, "model", None) if result is not None else None
+        fallback_chain = getattr(result, "fallback_chain", None) if result is not None else None
+        for report in effects.refusal_reports:
             try:
                 preview = self._collector.extract_preview(report["messages"])
                 await self._collector.report_refusal(
@@ -145,8 +167,8 @@ class LLMClient(BaseClient):
                     detection_layer=report.get("detection_layer", ""),
                     http_status=report.get("http_status"),
                     finish_reason=report.get("finish_reason"),
-                    fallback_model=getattr(result, "model", None),
-                    fallback_chain=getattr(result, "fallback_chain", None),
+                    fallback_model=fallback_model,
+                    fallback_chain=fallback_chain,
                     evidence=report.get("evidence"),
                 )
             except Exception:
@@ -165,19 +187,16 @@ class LLMClient(BaseClient):
         **extra: Any,
     ) -> Any:
         self._invoke_pre_request(model)
+        effects = _CallSideEffects()
         gen = self._json_chat_orchestrator(
             model, messages,
             schema=schema, json_schema=json_schema,
             self_correction=self_correction, max_retries=max_retries,
-            reasoning_effort=reasoning_effort, **extra,
+            reasoning_effort=reasoning_effort,
+            _call_effects=effects,
+            **extra,
         )
-        try:
-            result = await self._drive_chat(gen)
-        except Exception as e:
-            self._invoke_on_error(model, e)
-            raise
-        self._invoke_on_success(model, result.latency_ms)
-        return result
+        return await self._finish_driven_chat(model, gen, effects)
 
     async def chat_stream(
         self,
