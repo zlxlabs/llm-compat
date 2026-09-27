@@ -47,9 +47,9 @@ Always respond in 中文
 
 ## 参考实现
 
-- 已有 provider 翻译层实现：`/home/zlx/projects/personal/VideoTranscriptAPI/src/video_transcript_api/llm/providers.py`
-- 已有工程指南：`/home/zlx/projects/personal/VideoTranscriptAPI/docs/development/llm/engineering_guide.md`
-- 第一个消费者：`/home/zlx/projects/personal/Memos_auto_with_AI/backend/core/clients/llm_client.py`
+- 已有 provider 翻译层实现：`~/projects/personal/VideoTranscriptAPI/src/video_transcript_api/llm/providers.py`
+- 已有工程指南：`~/projects/personal/VideoTranscriptAPI/docs/development/llm/engineering_guide.md`
+- 第一个消费者：`~/projects/personal/Memos_auto_with_AI/backend/core/clients/llm_client.py`
 
 ## 代码规范
 
