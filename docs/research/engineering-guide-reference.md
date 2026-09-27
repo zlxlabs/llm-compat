@@ -3,7 +3,7 @@
 本文档是对 `VideoTranscriptAPI/docs/development/llm/engineering_guide.md` 中已验证模式的提炼。
 该指南是 llm-compat 包设计的主要参考来源。
 
-完整原文见：`/home/zlx/projects/personal/VideoTranscriptAPI/docs/development/llm/engineering_guide.md`
+完整原文见：`~/projects/personal/VideoTranscriptAPI/docs/development/llm/engineering_guide.md`
 
 ## 已验证的核心模式
 

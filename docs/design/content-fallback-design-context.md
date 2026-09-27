@@ -116,7 +116,7 @@ _FATAL_STATUS_CODES = frozenset({400, 401, 403, 404})
 
 #### VideoTranscriptAPI — `providers.py`
 
-路径：`/home/zlx/projects/personal/VideoTranscriptAPI/src/video_transcript_api/llm/providers.py`
+路径：`~/projects/personal/VideoTranscriptAPI/src/video_transcript_api/llm/providers.py`
 
 这是 llm-compat 的前身实现，包含：
 - `detect_provider()` + `_translate()` 的完整逻辑
@@ -130,12 +130,12 @@ _FATAL_STATUS_CODES = frozenset({400, 401, 403, 404})
 
 ```
 grep -r 'refusal\|filter\|sensitive\|moderation' \
-  /home/zlx/projects/personal/VideoTranscriptAPI/src/ --include='*.py'
+  ~/projects/personal/VideoTranscriptAPI/src/ --include='*.py'
 ```
 
 #### Memos Auto — `llm_client.py`
 
-路径：`/home/zlx/projects/personal/Memos_auto_with_AI/backend/core/clients/llm_client.py`
+路径：`~/projects/personal/Memos_auto_with_AI/backend/core/clients/llm_client.py`
 
 这是 llm-compat 的第一个消费者，展示了典型的集成模式：
 - 薄包装层，委托 `llm_compat.LLMClient` 处理 HTTP/重试/翻译
@@ -146,7 +146,7 @@ grep -r 'refusal\|filter\|sensitive\|moderation' \
 
 ```
 grep -r 'refusal\|filter\|sensitive\|moderation' \
-  /home/zlx/projects/personal/Memos_auto_with_AI/backend/ --include='*.py'
+  ~/projects/personal/Memos_auto_with_AI/backend/ --include='*.py'
 ```
 
 ## 5. 设计考量
